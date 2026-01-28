@@ -5,28 +5,38 @@
 
 #include "sl_component_catalog.h"
 #include "sl_system_init.h"
-#include "app.h"
+#include "sl_event_handler.h"
+
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
 #include "sl_power_manager.h"
 #endif
-#include "sl_event_handler.h"
+
+#if defined(SL_CATALOG_KERNEL_PRESENT)
+#include "sl_system_kernel.h"
+#else
+void sl_system_process_action(void);
+#endif
 
 int main(void)
 {
   // Initialize Silicon Labs system
   sl_system_init();
 
-  // Initialize application
-  app_init();
-
-  // Main event loop
-  while (1) {
-#if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
-    // Power manager service
-    sl_power_manager_sleep();
+#if defined(SL_CATALOG_KERNEL_PRESENT)
+  // Start kernel
+  sl_system_kernel_start();
 #else
-    // No power manager - call event handler
-    sl_zigbee_common_rtos_idle_handler();
+  // Bare metal main loop
+  while (1) {
+    // Run event handlers
+    sl_system_process_action();
+
+#if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
+    // Sleep until next event
+    sl_power_manager_sleep();
 #endif
   }
+#endif
+
+  return 0;
 }
