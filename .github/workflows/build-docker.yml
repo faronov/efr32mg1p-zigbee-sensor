@@ -93,6 +93,9 @@ jobs:
           # Fix git ownership issue in container
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+          # Set HOME to /root where Silicon Labs tools are installed
+          export HOME=/root
+
           # Set environment variables
           export GSDK_DIR=/gecko_sdk_4.5.0
           export BOARD=brd4151a
