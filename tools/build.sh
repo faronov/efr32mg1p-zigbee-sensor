@@ -95,7 +95,14 @@ echo "  Firmware Output: $FIRMWARE_DIR"
 echo ""
 echo -e "${GREEN}Configuring SLC CLI...${NC}"
 GCC_TOOLCHAIN_DIR="$(dirname $(which arm-none-eabi-gcc))/.."
-slc configuration --sdk="$GSDK_DIR" --gcc-toolchain="$GCC_TOOLCHAIN_DIR"
+
+# Try to configure SLC, but don't fail if it errors (might work anyway)
+if slc configuration --sdk="$GSDK_DIR" --gcc-toolchain="$GCC_TOOLCHAIN_DIR" 2>&1; then
+  echo -e "${GREEN}✓${NC} SLC configuration successful"
+else
+  echo -e "${YELLOW}Warning: SLC configuration failed, but continuing anyway${NC}"
+  echo "Will attempt project generation without explicit configuration"
+fi
 
 # Clean old firmware directory if it exists
 if [ -d "$FIRMWARE_DIR" ]; then
