@@ -56,12 +56,17 @@ RUN aria2c --checksum=sha-256=b5b2b2410eac0c9e2a72320f46605ecac0d376910cafded5da
     && mkdir /gecko_sdk_4.5.0 && bsdtar -xf sdk.zip -C /gecko_sdk_4.5.0 \
     && rm sdk.zip
 
-# Add tools to PATH
-ENV PATH="$PATH:/root/.silabs/slt/bin"
+# Create wrapper script to add GCC to PATH at runtime
+RUN echo '#!/bin/bash\n\
+GCC_BIN=$(find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" -path "*/p/bin" | head -1)\n\
+export PATH="$GCC_BIN:/root/.silabs/slt/bin:$PATH"\n\
+exec "$@"' > /usr/local/bin/entrypoint.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh
 
-# Find and add GCC ARM toolchain to PATH
-RUN GCC_PATH=$(find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" -path "*/p/bin" | head -1) \
-    && echo "export PATH=\"$GCC_PATH:\$PATH\"" >> /root/.bashrc
+# Add tools to PATH
+ENV PATH="/root/.silabs/slt/bin:$PATH"
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 WORKDIR /workspace
 
