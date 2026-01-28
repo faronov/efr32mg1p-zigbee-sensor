@@ -169,6 +169,13 @@ cp "$PROJECT_ROOT/include/"*.h "$FIRMWARE_DIR/include/" 2>/dev/null || true
 
 echo -e "${GREEN}✓${NC} Custom source files copied"
 
+# Optimize Makefile for size (change -Og to -Os to reduce flash usage)
+echo ""
+echo -e "${GREEN}Optimizing for size...${NC}"
+sed -i 's/-Og/-Os/g' "$FIRMWARE_DIR/$MAKEFILE_NAME"
+sed -i 's/-Og/-Os/g' "$FIRMWARE_DIR/ZigbeeMinimal.project.mak" 2>/dev/null || true
+echo -e "${GREEN}✓${NC} Optimization flags updated"
+
 # Build the project
 echo ""
 echo -e "${GREEN}Building project...${NC}"
