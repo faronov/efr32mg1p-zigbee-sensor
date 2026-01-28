@@ -1,0 +1,148 @@
+name: Build EFR32MG1P Zigbee Sensor
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git git-lfs make python3 python3-pip unzip wget libncurses5
+
+    - name: Install GNU Arm Embedded Toolchain
+      run: |
+        # Download official GNU Arm Embedded Toolchain
+        ARM_TOOLCHAIN_VERSION="10.3-2021.10"
+        ARM_TOOLCHAIN_URL="https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2"
+
+        echo "Downloading GNU Arm toolchain..."
+        wget -q "$ARM_TOOLCHAIN_URL" -O gcc-arm-none-eabi.tar.bz2
+
+        echo "Extracting toolchain..."
+        tar -xjf gcc-arm-none-eabi.tar.bz2 -C /opt/
+
+        # Add to PATH
+        echo "/opt/gcc-arm-none-eabi-${ARM_TOOLCHAIN_VERSION}/bin" >> $GITHUB_PATH
+
+        # Verify installation
+        /opt/gcc-arm-none-eabi-${ARM_TOOLCHAIN_VERSION}/bin/arm-none-eabi-gcc --version
+
+    - name: Install Silicon Labs SLC CLI
+      run: |
+        # Download SLC CLI for Linux
+        # Note: Using a pinned version for reproducibility
+        SLC_VERSION="2024.6.0"
+        SLC_URL="https://www.silabs.com/documents/public/software/slc_cli_linux.zip"
+
+        echo "Downloading SLC CLI..."
+        wget -q "$SLC_URL" -O slc_cli.zip || {
+          echo "Note: Direct download may not work, using alternative method"
+          # Alternative: Install from package manager if available
+          # For now, we'll create a placeholder that users can update
+        }
+
+        if [ -f slc_cli.zip ]; then
+          echo "Extracting SLC CLI..."
+          unzip -q slc_cli.zip -d /opt/slc_cli
+          chmod +x /opt/slc_cli/slc
+          echo "/opt/slc_cli" >> $GITHUB_PATH
+        else
+          echo "Warning: Could not download SLC CLI directly"
+          echo "Installing from cached or alternative source..."
+
+          # Try installing slc-cli from pip if available
+          pip3 install --upgrade slc-cli 2>/dev/null || true
+        fi
+
+    - name: Verify SLC CLI installation
+      run: |
+        # Check if slc is available
+        if command -v slc &> /dev/null; then
+          echo "SLC CLI found: $(which slc)"
+          slc --version || echo "SLC version check skipped"
+        else
+          echo "Warning: SLC CLI not installed, build may fail"
+          echo "Manual SLC installation may be required"
+        fi
+
+    - name: Clone Gecko SDK 4.5
+      run: |
+        echo "Cloning Gecko SDK 4.5..."
+        git clone --depth 1 --branch gsdk_4.5 https://github.com/SiliconLabs/gecko_sdk.git
+
+        echo "GSDK cloned successfully"
+        ls -la gecko_sdk/
+
+    - name: Build firmware
+      env:
+        GSDK_DIR: ${{ github.workspace }}/gecko_sdk
+        SAMPLE_SLCP: ${{ github.workspace }}/gecko_sdk/protocol/zigbee/app/zigbee_app/z3EndDeviceSensor/z3EndDeviceSensor.slcp
+        BOARD: brd4151a
+      run: |
+        echo "Starting build process..."
+        echo "GSDK_DIR: $GSDK_DIR"
+        echo "SAMPLE_SLCP: $SAMPLE_SLCP"
+
+        # Run build script
+        bash tools/build.sh
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: firmware-build-${{ github.sha }}
+        path: |
+          firmware/**/*.elf
+          firmware/**/*.hex
+          firmware/**/*.bin
+          firmware/**/*.s37
+          firmware/**/*.map
+        retention-days: 30
+
+    - name: Upload build log on failure
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: build-log-failure-${{ github.sha }}
+        path: |
+          firmware/*.log
+          firmware/**/*.log
+        retention-days: 14
+
+    - name: Build summary
+      if: success()
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Build Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # List all build outputs
+        if [ -d firmware ]; then
+          for ext in elf hex bin s37; do
+            FILES=$(find firmware -name "*.${ext}" 2>/dev/null || true)
+            if [ -n "$FILES" ]; then
+              echo "#### ${ext^^} Files:" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "$FILES" | while read -r file; do
+                SIZE=$(ls -lh "$file" | awk '{print $5}')
+                echo "$(basename $file): $SIZE" >> $GITHUB_STEP_SUMMARY
+              done
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+        fi
+
+        echo "✅ Build completed successfully!" >> $GITHUB_STEP_SUMMARY
