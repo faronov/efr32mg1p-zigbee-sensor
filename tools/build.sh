@@ -104,6 +104,15 @@ else
   echo "Will attempt project generation without explicit configuration"
 fi
 
+# Trust the SDK (required for SLC CLI signature verification)
+echo ""
+echo -e "${GREEN}Trusting GSDK...${NC}"
+if slc signature trust --sdk="$GSDK_DIR" 2>&1; then
+  echo -e "${GREEN}✓${NC} SDK trusted successfully"
+else
+  echo -e "${YELLOW}Warning: SDK trust command failed, but continuing anyway${NC}"
+fi
+
 # Clean old firmware directory if it exists
 if [ -d "$FIRMWARE_DIR" ]; then
   echo -e "${YELLOW}Cleaning old firmware directory...${NC}"
