@@ -31,6 +31,11 @@ if [ ! -d "$GSDK_DIR" ]; then
   exit 1
 fi
 
+# Get script directory and project root (needed for SLCP path)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+FIRMWARE_DIR="$PROJECT_ROOT/firmware"
+
 # Use custom project SLCP if not provided
 if [ -z "$SAMPLE_SLCP" ]; then
   SAMPLE_SLCP="$PROJECT_ROOT/zigbee_bme280_sensor.slcp"
@@ -67,11 +72,6 @@ echo -e "${GREEN}✓${NC} arm-none-eabi-gcc found: $(which arm-none-eabi-gcc)"
 
 GCC_VERSION=$(arm-none-eabi-gcc --version | head -n1)
 echo "  Version: $GCC_VERSION"
-
-# Get script directory and project root
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
-FIRMWARE_DIR="$PROJECT_ROOT/firmware"
 
 echo ""
 echo -e "${GREEN}Configuration:${NC}"
