@@ -113,30 +113,41 @@ jobs:
         echo "GSDK_DIR: $GSDK_DIR"
         echo "PATH: $PATH"
 
-        # Ensure slc is in PATH
-        if ! command -v slc &> /dev/null; then
-          echo "slc not found, checking for slc-cli..."
-          if command -v slc-cli &> /dev/null; then
-            echo "Using slc-cli, creating alias..."
-            alias slc='slc-cli'
-          else
-            echo "Manually adding SLC to PATH..."
-            export PATH="/opt/slc_cli/slc_cli/bin:$PATH"
-          fi
+        # Ensure slc is in PATH - force add SLC directory
+        export PATH="/opt/slc_cli/slc_cli/bin:$PATH"
+
+        # Check what SLC binaries are available
+        if [ -f "/opt/slc_cli/slc_cli/bin/slc" ]; then
+          echo "SLC command: /opt/slc_cli/slc_cli/bin/slc"
+        elif [ -f "/opt/slc_cli/slc_cli/bin/slc-cli" ]; then
+          echo "SLC command: /opt/slc_cli/slc_cli/bin/slc-cli (will use slc symlink)"
+        else
+          echo "Warning: SLC binary not found in expected location"
+          ls -la /opt/slc_cli/slc_cli/bin/ || echo "Directory not found"
         fi
 
-        echo "SLC command: $(which slc 2>/dev/null || which slc-cli 2>/dev/null || echo 'not found')"
+        # Verify slc is now accessible
+        which slc || echo "Note: slc not in PATH, build script will need to handle this"
 
-        # Find a suitable Zigbee end device sample (exclude GPD, host, NCP, RCP)
+        # Find a suitable Zigbee end device sample
+        # Prefer ZigbeeMinimal as it's a clean battery-powered end device
         SAMPLE_SLCP=$(find gecko_sdk/protocol/zigbee -name "*.slcp" 2>/dev/null | \
-          grep -E "z3.*end.*device|sleepy.*end|minimal" | \
-          grep -v "host\|ncp\|rcp\|gpd" | \
+          grep -i "ZigbeeMinimal\.slcp" | \
+          grep -v "Host" | \
           head -n 1)
+
+        # Fallback to any Z3 end device
+        if [ -z "$SAMPLE_SLCP" ]; then
+          SAMPLE_SLCP=$(find gecko_sdk/protocol/zigbee -name "*.slcp" 2>/dev/null | \
+            grep -iE "z3.*end|sleepy.*end|minimal" | \
+            grep -v "host\|ncp\|rcp\|gpd" | \
+            head -n 1)
+        fi
 
         if [ -z "$SAMPLE_SLCP" ]; then
           echo "Error: Could not find suitable Zigbee sample"
           echo "Available samples:"
-          find gecko_sdk/protocol/zigbee -name "*.slcp" 2>/dev/null | head -20
+          find gecko_sdk/protocol/zigbee -name "*.slcp" 2>/dev/null | head -30
           exit 1
         fi
 
