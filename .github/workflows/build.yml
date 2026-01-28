@@ -127,10 +127,10 @@ jobs:
 
         echo "SLC command: $(which slc 2>/dev/null || which slc-cli 2>/dev/null || echo 'not found')"
 
-        # Find a suitable Zigbee end device sample
+        # Find a suitable Zigbee end device sample (exclude GPD, host, NCP, RCP)
         SAMPLE_SLCP=$(find gecko_sdk/protocol/zigbee -name "*.slcp" 2>/dev/null | \
-          grep -i "sensor\|end.*device" | \
-          grep -v "host\|ncp\|rcp" | \
+          grep -E "z3.*end.*device|sleepy.*end|minimal" | \
+          grep -v "host\|ncp\|rcp\|gpd" | \
           head -n 1)
 
         if [ -z "$SAMPLE_SLCP" ]; then
