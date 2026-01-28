@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpng16-16 \
     libpcre2-16-0 \
     libglib2.0-0 \
-    openjdk-17-jre-headless \
+    openjdk-21-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
 # Install slt (Silicon Labs Tooling) CLI
