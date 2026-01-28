@@ -94,15 +94,23 @@ echo "  Firmware Output: $FIRMWARE_DIR"
 # Configure SLC CLI
 echo ""
 echo -e "${GREEN}Configuring SLC CLI...${NC}"
+
+# Clear any existing SLC configuration to avoid stale paths
+rm -rf ~/.slc 2>/dev/null || true
+
 GCC_TOOLCHAIN_DIR="$(dirname $(which arm-none-eabi-gcc))/.."
 
-# Try to configure SLC, but don't fail if it errors (might work anyway)
+# Configure SLC with current GCC location
 if slc configuration --sdk="$GSDK_DIR" --gcc-toolchain="$GCC_TOOLCHAIN_DIR" 2>&1; then
   echo -e "${GREEN}✓${NC} SLC configuration successful"
 else
   echo -e "${YELLOW}Warning: SLC configuration failed, but continuing anyway${NC}"
   echo "Will attempt project generation without explicit configuration"
 fi
+
+# Verify SLC configuration
+echo "SLC configuration:"
+slc configuration | grep -E "(sdk|gcc)" || true
 
 # Trust the SDK (required for SLC CLI signature verification)
 echo ""
