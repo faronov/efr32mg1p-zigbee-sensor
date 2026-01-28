@@ -130,12 +130,16 @@ slc generate "$SAMPLE_SLCP" \
   -o makefile \
   --with "$BOARD"
 
-if [ ! -f "$FIRMWARE_DIR/${PROJECT_NAME}.Makefile" ]; then
-  echo -e "${RED}Error: Project generation failed${NC}"
+# Find the generated Makefile (SLC may use sample name instead of our project name)
+MAKEFILE=$(find "$FIRMWARE_DIR" -maxdepth 1 -name "*.Makefile" 2>/dev/null | head -1)
+
+if [ -z "$MAKEFILE" ] || [ ! -f "$MAKEFILE" ]; then
+  echo -e "${RED}Error: Project generation failed - no Makefile found${NC}"
   exit 1
 fi
 
-echo -e "${GREEN}✓${NC} Project generated successfully"
+MAKEFILE_NAME=$(basename "$MAKEFILE")
+echo -e "${GREEN}✓${NC} Project generated successfully: $MAKEFILE_NAME"
 
 # Copy our custom source files
 echo ""
@@ -172,7 +176,7 @@ else
 fi
 
 echo "Building with $JOBS parallel jobs..."
-make -f "${PROJECT_NAME}.Makefile" -j"$JOBS"
+make -f "$MAKEFILE_NAME" -j"$JOBS"
 
 # Find and report build outputs
 echo ""
