@@ -10,8 +10,8 @@ description: >
 author: Silicon Laboratories, Inc.
 
 component:
-  # Core Zigbee stack (minimal for end device)
-  - id: zigbee_pro_stack
+  # Core Zigbee stack (leaf stack for end device)
+  - id: zigbee_pro_leaf_stack
   - id: zigbee_zcl_framework_core
 
   # Network joining
