@@ -3,18 +3,30 @@
  * @brief Main entry point for Zigbee BME280 Sensor application
  */
 
-#include "app/framework/include/af.h"
+#include "sl_component_catalog.h"
 #include "sl_system_init.h"
-#include "app/framework/util/af-main.h"
+#include "app.h"
+#if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
+#include "sl_power_manager.h"
+#endif
+#include "sl_event_handler.h"
 
 int main(void)
 {
   // Initialize Silicon Labs system
   sl_system_init();
 
-  // Initialize and run Zigbee application framework
-  // This function contains the main event loop and never returns
-  emberAfMain();
+  // Initialize application
+  app_init();
 
-  return 0;
+  // Main event loop
+  while (1) {
+#if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
+    // Power manager service
+    sl_power_manager_sleep();
+#else
+    // No power manager - call event handler
+    sl_zigbee_common_rtos_idle_handler();
+#endif
+  }
 }

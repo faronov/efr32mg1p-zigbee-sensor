@@ -19,6 +19,11 @@ component:
   - id: zigbee_scan_dispatch
   - id: zigbee_update_tc_link_key
 
+  # Hardware drivers
+  - id: emlib_i2c
+  - id: emlib_gpio
+  - id: emlib_cmu
+
   # Minimal I/O (no CLI, no LED, no debug print to save flash)
   - id: iostream_recommended_stream
 
