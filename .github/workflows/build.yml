@@ -87,17 +87,32 @@ jobs:
         git clone --depth 1 --branch gsdk_4.5 https://github.com/SiliconLabs/gecko_sdk.git
 
         echo "GSDK cloned successfully"
-        ls -la gecko_sdk/
+        echo "Available Zigbee sample projects:"
+        find gecko_sdk/protocol/zigbee -name "*.slcp" 2>/dev/null | grep -i "sensor\|enddevice\|end_device" | head -10 || echo "No samples found"
 
     - name: Build firmware
       env:
         GSDK_DIR: ${{ github.workspace }}/gecko_sdk
-        SAMPLE_SLCP: ${{ github.workspace }}/gecko_sdk/protocol/zigbee/app/zigbee_app/z3EndDeviceSensor/z3EndDeviceSensor.slcp
         BOARD: brd4151a
       run: |
         echo "Starting build process..."
         echo "GSDK_DIR: $GSDK_DIR"
-        echo "SAMPLE_SLCP: $SAMPLE_SLCP"
+
+        # Find a suitable Zigbee end device sample
+        SAMPLE_SLCP=$(find gecko_sdk/protocol/zigbee -name "*.slcp" 2>/dev/null | \
+          grep -i "sensor\|end.*device" | \
+          grep -v "host\|ncp\|rcp" | \
+          head -n 1)
+
+        if [ -z "$SAMPLE_SLCP" ]; then
+          echo "Error: Could not find suitable Zigbee sample"
+          echo "Available samples:"
+          find gecko_sdk/protocol/zigbee -name "*.slcp" 2>/dev/null | head -20
+          exit 1
+        fi
+
+        echo "Using sample: $SAMPLE_SLCP"
+        export SAMPLE_SLCP
 
         # Run build script
         bash tools/build.sh
