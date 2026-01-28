@@ -122,17 +122,19 @@ jobs:
           echo "Found GCC at: $GCC_BIN"
           export PATH="$GCC_BIN:$PATH"
 
-          # Verify GCC is now accessible
-          if ! command -v arm-none-eabi-gcc &> /dev/null; then
-            echo "ERROR: arm-none-eabi-gcc still not found after adding to PATH!"
-            echo "PATH: $PATH"
-            ls -la "$GCC_BIN" | head -10
+          # Verify GCC is accessible by trying to run it
+          echo "Verifying GCC..."
+          if "$GCC_BIN/arm-none-eabi-gcc" --version > /dev/null 2>&1; then
+            echo "✓ GCC is executable"
+            "$GCC_BIN/arm-none-eabi-gcc" --version | head -1
+          else
+            echo "ERROR: Cannot execute arm-none-eabi-gcc!"
+            file "$GCC_BIN/arm-none-eabi-gcc"
+            ldd "$GCC_BIN/arm-none-eabi-gcc" 2>&1 | head -20
             exit 1
           fi
 
-          echo "✓ GCC: $(which arm-none-eabi-gcc)"
-          arm-none-eabi-gcc --version | head -1
-          echo "✓ SLC: $(which slc)"
+          echo "✓ SLC: $(which slc || echo '/root/.silabs/slt/bin/slc')"
 
           # Find ZigbeeMinimal sample
           SAMPLE_SLCP=$(find /gecko_sdk_4.5.0/protocol/zigbee -name '*.slcp' 2>/dev/null | \
