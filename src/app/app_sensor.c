@@ -47,11 +47,18 @@ bool app_sensor_init(void)
 
 static void sensor_update_event_handler(sl_zigbee_event_t *event)
 {
-  // Perform sensor update
-  app_sensor_update();
+  // Only read sensor if network is up (power optimization)
+  if (emberAfNetworkState() == EMBER_JOINED_NETWORK) {
+    // Perform sensor update
+    app_sensor_update();
 
-  // Reschedule for next update
-  sl_zigbee_event_set_delay_ms(&sensor_update_event, SENSOR_UPDATE_INTERVAL_MS);
+    // Reschedule for next update
+    sl_zigbee_event_set_delay_ms(&sensor_update_event, SENSOR_UPDATE_INTERVAL_MS);
+  } else {
+    // Network down - stop periodic reads to save power
+    emberAfCorePrintln("Network down: sensor reads suspended");
+    // Event will be restarted when network comes back up
+  }
 }
 
 void app_sensor_update(void)

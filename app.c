@@ -24,9 +24,23 @@ static bool led_blink_active = false;
 // LED off timer - turn off LED after network join confirmation
 static sl_zigbee_event_t led_off_event;
 
+// Network join retry with exponential backoff
+static sl_zigbee_event_t network_join_retry_event;
+static uint8_t join_attempt_count = 0;
+static const uint32_t join_retry_delays_ms[] = {
+  0,        // First attempt: immediate
+  30000,    // 30 seconds
+  60000,    // 1 minute
+  120000,   // 2 minutes
+  300000,   // 5 minutes
+  600000    // 10 minutes (max backoff)
+};
+#define MAX_JOIN_RETRY_DELAY_INDEX (sizeof(join_retry_delays_ms) / sizeof(join_retry_delays_ms[0]) - 1)
+
 // Forward declarations
 static void led_blink_event_handler(sl_zigbee_event_t *event);
 static void led_off_event_handler(sl_zigbee_event_t *event);
+static void network_join_retry_event_handler(sl_zigbee_event_t *event);
 
 /**
  * @brief Zigbee application init callback
@@ -43,6 +57,9 @@ void emberAfInitCallback(void)
   // Initialize LED events
   sl_zigbee_event_init(&led_blink_event, led_blink_event_handler);
   sl_zigbee_event_init(&led_off_event, led_off_event_handler);
+
+  // Initialize network join retry event
+  sl_zigbee_event_init(&network_join_retry_event, network_join_retry_event_handler);
 
   // Initialize BME280 sensor
   if (!app_sensor_init()) {
@@ -67,6 +84,10 @@ void emberAfStackStatusCallback(EmberStatus status)
   if (status == EMBER_NETWORK_UP) {
     emberAfCorePrintln("Network joined successfully");
 
+    // Reset join attempt counter on success
+    join_attempt_count = 0;
+    sl_zigbee_event_set_inactive(&network_join_retry_event);
+
     // Stop LED blinking
     led_blink_active = false;
     sl_zigbee_event_set_inactive(&led_blink_event);
@@ -83,7 +104,7 @@ void emberAfStackStatusCallback(EmberStatus status)
     app_sensor_update();
 
   } else if (status == EMBER_NETWORK_DOWN) {
-    emberAfCorePrintln("Network down");
+    emberAfCorePrintln("Network down - entering low power mode");
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Turn LED off when network is down
@@ -91,6 +112,9 @@ void emberAfStackStatusCallback(EmberStatus status)
     // Cancel any pending LED off event
     sl_zigbee_event_set_inactive(&led_off_event);
 #endif
+
+    // Sensor timer will automatically stop reading (see app_sensor.c)
+    // Device will use minimal power while waiting for network
   }
 }
 
@@ -123,8 +147,9 @@ void sl_button_on_change(const sl_button_t *handle)
 #endif
 
     } else {
-      // Not on network - start network steering
-      emberAfCorePrintln("Button pressed: Joining network...");
+      // Not on network - start network steering with retry logic
+      emberAfCorePrintln("Button pressed: Joining network (attempt %d)...",
+                         join_attempt_count + 1);
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
       // Start LED blinking to indicate joining
@@ -133,7 +158,28 @@ void sl_button_on_change(const sl_button_t *handle)
 #endif
 
       // Start network steering
-      emberAfPluginNetworkSteeringStart();
+      EmberStatus join_status = emberAfPluginNetworkSteeringStart();
+
+      if (join_status != EMBER_SUCCESS) {
+        emberAfCorePrintln("Join failed to start: 0x%x", join_status);
+
+        // Schedule retry with exponential backoff
+        uint8_t delay_index = (join_attempt_count < MAX_JOIN_RETRY_DELAY_INDEX)
+                              ? join_attempt_count
+                              : MAX_JOIN_RETRY_DELAY_INDEX;
+        uint32_t retry_delay = join_retry_delays_ms[delay_index];
+
+        emberAfCorePrintln("Will retry in %d seconds", retry_delay / 1000);
+        sl_zigbee_event_set_delay_ms(&network_join_retry_event, retry_delay);
+        join_attempt_count++;
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+        // Stop LED blinking on failure
+        led_blink_active = false;
+        sl_zigbee_event_set_inactive(&led_blink_event);
+        sl_led_turn_off(&sl_led_led0);
+#endif
+      }
     }
   }
 }
@@ -166,4 +212,46 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
   sl_led_turn_off(&sl_led_led0);
   emberAfCorePrintln("LED turned off to save power");
 #endif
+}
+
+/**
+ * @brief Network join retry event handler
+ *
+ * Automatically retries network joining with exponential backoff
+ * when network is not available.
+ */
+static void network_join_retry_event_handler(sl_zigbee_event_t *event)
+{
+  emberAfCorePrintln("Auto-retry: Attempting to join network (attempt %d)...",
+                     join_attempt_count + 1);
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+  // Start LED blinking to indicate joining
+  led_blink_active = true;
+  sl_zigbee_event_set_active(&led_blink_event);
+#endif
+
+  // Attempt to join
+  EmberStatus join_status = emberAfPluginNetworkSteeringStart();
+
+  if (join_status != EMBER_SUCCESS) {
+    emberAfCorePrintln("Join attempt failed: 0x%x", join_status);
+
+    // Schedule next retry with exponential backoff
+    uint8_t delay_index = (join_attempt_count < MAX_JOIN_RETRY_DELAY_INDEX)
+                          ? join_attempt_count
+                          : MAX_JOIN_RETRY_DELAY_INDEX;
+    uint32_t retry_delay = join_retry_delays_ms[delay_index];
+
+    emberAfCorePrintln("Will retry in %d seconds", retry_delay / 1000);
+    sl_zigbee_event_set_delay_ms(&network_join_retry_event, retry_delay);
+    join_attempt_count++;
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+    // Stop LED blinking on failure
+    led_blink_active = false;
+    sl_zigbee_event_set_inactive(&led_blink_event);
+    sl_led_turn_off(&sl_led_led0);
+#endif
+  }
 }

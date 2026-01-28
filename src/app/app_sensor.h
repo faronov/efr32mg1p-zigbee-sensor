@@ -11,8 +11,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// Sensor update interval in milliseconds (30 seconds)
-#define SENSOR_UPDATE_INTERVAL_MS   30000
+// Sensor update interval in milliseconds
+// Default: 5 minutes (300000 ms) for battery-powered operation
+// For testing/development: use 30000 (30 seconds)
+// For production: use 300000-900000 (5-15 minutes)
+#define SENSOR_UPDATE_INTERVAL_MS   300000
 
 /**
  * @brief Initialize sensor integration

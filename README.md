@@ -8,7 +8,12 @@ A Zigbee 3.0 end device sensor application for Silicon Labs EFR32MG1P (Wireless 
 - **SDK**: Gecko SDK (GSDK) 4.5 LTS
 - **Sensor**: Bosch BME280 (Temperature, Humidity, Pressure) via I2C
 - **Zigbee Profile**: Zigbee 3.0 Sleepy End Device
-- **Update Interval**: 30 seconds (configurable)
+- **Update Interval**: 5 minutes (configurable, optimized for battery life)
+- **Power Optimization**:
+  - Sensor readings suspended when network down
+  - Exponential backoff for network join retries (30s → 10min)
+  - LED auto-off after 3 seconds
+  - Event-driven operation in low power mode
 - **User Interface**:
   - Button (BTN0): Join network / Trigger sensor reading
   - LED (LED0): Network status indication
@@ -193,13 +198,33 @@ efr32mg1p-bme280-zigbee-sensor/
 
 ## Configuration
 
+### Power Optimization
+
+See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for detailed power saving strategies.
+
+**Key power features**:
+- **No sensor reads when network down**: Saves power when not connected
+- **Exponential backoff**: Network join retries increase from 30s to 10min intervals
+- **5-minute sensor interval**: Default reading interval optimized for battery life
+- **LED auto-off**: Turns off after 3s to conserve power
+
+**Estimated battery life on CR2032**:
+- Current configuration: ~3-6 months
+- With event-driven only: ~6-12 months
+
 ### Sensor Update Interval
 
 To change the sensor reading interval, edit `src/app/app_sensor.h`:
 
 ```c
-// Change from 30000ms (30s) to desired interval
+// For testing (30 seconds):
 #define SENSOR_UPDATE_INTERVAL_MS   30000
+
+// For production (5 minutes - default):
+#define SENSOR_UPDATE_INTERVAL_MS   300000
+
+// For maximum battery life (15 minutes):
+#define SENSOR_UPDATE_INTERVAL_MS   900000
 ```
 
 ### I2C Pin Configuration
