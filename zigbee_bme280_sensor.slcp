@@ -23,8 +23,17 @@ component:
   - id: emlib_i2c
   - id: emlib_gpio
   - id: emlib_cmu
+  - id: sleeptimer
 
-  # Minimal I/O (no CLI, no LED, no debug print to save flash)
+  # User interface
+  - id: simple_button
+    instance:
+      - btn0
+  - id: simple_led
+    instance:
+      - led0
+
+  # I/O
   - id: iostream_recommended_stream
 
 configuration:

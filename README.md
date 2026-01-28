@@ -7,8 +7,11 @@ A Zigbee 3.0 end device sensor application for Silicon Labs EFR32MG1P (Wireless 
 - **Target MCU**: Silicon Labs EFR32MG1P232F256GM48 (BRD4151A)
 - **SDK**: Gecko SDK (GSDK) 4.5 LTS
 - **Sensor**: Bosch BME280 (Temperature, Humidity, Pressure) via I2C
-- **Zigbee Profile**: Zigbee 3.0 End Device
+- **Zigbee Profile**: Zigbee 3.0 Sleepy End Device
 - **Update Interval**: 30 seconds (configurable)
+- **User Interface**:
+  - Button (BTN0): Join network / Trigger sensor reading
+  - LED (LED0): Network status indication
 - **Headless Build**: Fully reproducible CI/CD pipeline using GNU Arm GCC and SLC CLI
 
 ## Zigbee Clusters
@@ -30,6 +33,20 @@ The sensor exposes the following server clusters on Endpoint 1:
 - **Pressure**: Signed 16-bit integer in kilopascals (kPa)
 
 The device supports Zigbee attribute reporting (Configure Reporting), allowing a coordinator to receive automatic updates when values change.
+
+## User Interface
+
+### Button (BTN0)
+
+- **Not joined to network**: Press to start network joining (LED will blink)
+- **Joined to network**: Press to trigger immediate sensor reading (LED will flash briefly)
+
+### LED (LED0)
+
+- **Off**: Not joined to network
+- **Blinking (500ms)**: Network joining in progress
+- **Solid on**: Successfully joined to network
+- **Rapid flash (100ms x10)**: Sensor initialization error
 
 ## Hardware Setup
 
