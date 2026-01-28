@@ -1,0 +1,112 @@
+name: Build with Docker
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      run: |
+        echo "Building Docker image with build tools..."
+        docker build -t efr32-builder:latest .
+
+    - name: Clone Gecko SDK 4.5
+      run: |
+        echo "Cloning Gecko SDK 4.5..."
+        git clone --depth 1 --branch gsdk_4.5 https://github.com/SiliconLabs/gecko_sdk.git
+
+    - name: Build firmware in Docker
+      run: |
+        echo "Building firmware in Docker container..."
+        docker run --rm \
+          -v $PWD:/workspace \
+          -w /workspace \
+          -e GSDK_DIR=/workspace/gecko_sdk \
+          -e BOARD=brd4151a \
+          efr32-builder:latest \
+          bash -c "
+            # Find ZigbeeMinimal sample
+            SAMPLE_SLCP=\$(find gecko_sdk/protocol/zigbee -name '*.slcp' 2>/dev/null | \
+              grep -i 'ZigbeeMinimal\.slcp' | \
+              grep -v 'Host' | \
+              head -n 1)
+
+            if [ -z \"\$SAMPLE_SLCP\" ]; then
+              echo 'Error: Could not find ZigbeeMinimal sample'
+              exit 1
+            fi
+
+            export SAMPLE_SLCP
+            echo \"Using sample: \$SAMPLE_SLCP\"
+
+            # Run build script
+            bash tools/build.sh
+          "
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: firmware-build-${{ github.sha }}
+        path: |
+          firmware/**/*.elf
+          firmware/**/*.hex
+          firmware/**/*.bin
+          firmware/**/*.s37
+          firmware/**/*.map
+        retention-days: 30
+
+    - name: Upload build log on failure
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: build-log-failure-${{ github.sha }}
+        path: |
+          firmware/*.log
+          firmware/**/*.log
+        retention-days: 14
+
+    - name: Build summary
+      if: success()
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Build Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # List all build outputs
+        if [ -d firmware ]; then
+          for ext in elf hex bin s37; do
+            FILES=$(find firmware -name "*.${ext}" 2>/dev/null || true)
+            if [ -n "$FILES" ]; then
+              echo "#### ${ext^^} Files:" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "$FILES" | while read -r file; do
+                SIZE=$(ls -lh "$file" | awk '{print $5}')
+                echo "$(basename $file): $SIZE" >> $GITHUB_STEP_SUMMARY
+              done
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+        fi
+
+        echo "✅ Build completed successfully!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🐳 Built using Docker container with:" >> $GITHUB_STEP_SUMMARY
+        echo "- Silicon Labs SLC CLI" >> $GITHUB_STEP_SUMMARY
+        echo "- GNU Arm Embedded Toolchain 10.3-2021.10" >> $GITHUB_STEP_SUMMARY
+        echo "- Gecko SDK 4.5 LTS" >> $GITHUB_STEP_SUMMARY
