@@ -169,16 +169,9 @@ cp "$PROJECT_ROOT/include/"*.h "$FIRMWARE_DIR/include/" 2>/dev/null || true
 
 echo -e "${GREEN}✓${NC} Custom source files copied"
 
-# Optimize Makefile for size (change -Og to -Os to reduce flash usage)
-echo ""
-echo -e "${GREEN}Optimizing for size...${NC}"
-sed -i 's/-Og/-Os/g' "$FIRMWARE_DIR/$MAKEFILE_NAME"
-sed -i 's/-Og/-Os/g' "$FIRMWARE_DIR/ZigbeeMinimal.project.mak" 2>/dev/null || true
-echo -e "${GREEN}✓${NC} Optimization flags updated"
-
 # Build the project
 echo ""
-echo -e "${GREEN}Building project...${NC}"
+echo -e "${GREEN}Building project (release mode for size optimization)...${NC}"
 cd "$FIRMWARE_DIR"
 
 # Determine number of parallel jobs
@@ -191,7 +184,8 @@ else
 fi
 
 echo "Building with $JOBS parallel jobs..."
-make -f "$MAKEFILE_NAME" -j"$JOBS"
+# Build release configuration which has size optimizations
+make -f "$MAKEFILE_NAME" -j"$JOBS" CONF=release
 
 # Find and report build outputs
 echo ""
