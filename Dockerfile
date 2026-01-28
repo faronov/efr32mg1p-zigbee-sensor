@@ -43,8 +43,15 @@ RUN SLC_EXEC=$(find /opt/slc_cli -type f -executable -name "slc-cli" | head -n 1
 # Make SLC available in PATH
 ENV PATH="/opt/slc_cli/slc_cli/bin/slc-cli:${PATH}"
 
+# Set up writable home directory for SLC CLI
+RUN mkdir -p /build && chmod 777 /build
+ENV HOME=/build
+
 # Set up Java options for SLC CLI
-ENV JAVA_TOOL_OPTIONS="-Duser.home=/tmp"
+ENV JAVA_TOOL_OPTIONS="-Duser.home=/build"
+
+# Make SLC configuration directory writable
+RUN find /opt/slc_cli -type d -exec chmod 777 {} \;
 
 # Verify installations
 RUN arm-none-eabi-gcc --version || echo "ARM GCC not found" \
