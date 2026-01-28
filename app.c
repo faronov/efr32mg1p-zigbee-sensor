@@ -3,16 +3,18 @@
  * @brief Application logic for Zigbee BME280 Sensor
  */
 
+#include "sl_component_catalog.h"
+#include "zigbee_app_framework_event.h"
 #include "app/framework/include/af.h"
 #include "app_sensor.h"
 
 /**
- * @brief Zigbee stack initialization callback
+ * @brief Zigbee application init callback
  *
  * Called when the Zigbee stack has completed initialization.
- * This is the ideal place to initialize application components.
+ * This is where we initialize application components.
  */
-void emberAfMainInitCallback(void)
+void emberAfInitCallback(void)
 {
   emberAfCorePrintln("Zigbee BME280 Sensor Application");
   emberAfCorePrintln("Silicon Labs EFR32MG1P + Bosch BME280");
