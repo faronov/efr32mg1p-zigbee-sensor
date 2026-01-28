@@ -18,7 +18,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y git git-lfs make python3 python3-pip unzip wget libncurses6
+        sudo apt-get install -y git git-lfs make python3 python3-pip unzip wget libncurses6 openjdk-11-jre-headless
 
     - name: Install GNU Arm Embedded Toolchain
       run: |
