@@ -57,6 +57,9 @@ RUN find /opt/slc_cli -type d -exec chmod 777 {} \;
 RUN arm-none-eabi-gcc --version || echo "ARM GCC not found" \
     && java -version || echo "Java not found"
 
+# Initialize SLC CLI (this may create necessary configuration files)
+RUN /opt/slc_cli/slc_cli/bin/slc-cli/slc --help || echo "SLC initialization attempted"
+
 # Create working directory
 WORKDIR /workspace
 
