@@ -79,13 +79,20 @@ jobs:
 
     - name: Verify SLC CLI installation
       run: |
+        echo "Current PATH: $PATH"
+        echo "Checking for slc..."
+
         # Check if slc is available
         if command -v slc &> /dev/null; then
-          echo "SLC CLI found: $(which slc)"
+          echo "✓ SLC CLI found: $(which slc)"
           slc --version || echo "SLC version check skipped"
+        elif command -v slc-cli &> /dev/null; then
+          echo "✓ slc-cli found: $(which slc-cli)"
+          slc-cli --version || echo "SLC version check skipped"
         else
-          echo "Warning: SLC CLI not installed, build may fail"
-          echo "Manual SLC installation may be required"
+          echo "Warning: SLC CLI not found in PATH"
+          echo "Checking /opt/slc_cli..."
+          find /opt/slc_cli -name "slc*" -type f 2>/dev/null || echo "No slc files found"
         fi
 
     - name: Clone Gecko SDK 4.5
@@ -104,6 +111,21 @@ jobs:
       run: |
         echo "Starting build process..."
         echo "GSDK_DIR: $GSDK_DIR"
+        echo "PATH: $PATH"
+
+        # Ensure slc is in PATH
+        if ! command -v slc &> /dev/null; then
+          echo "slc not found, checking for slc-cli..."
+          if command -v slc-cli &> /dev/null; then
+            echo "Using slc-cli, creating alias..."
+            alias slc='slc-cli'
+          else
+            echo "Manually adding SLC to PATH..."
+            export PATH="/opt/slc_cli/slc_cli/bin:$PATH"
+          fi
+        fi
+
+        echo "SLC command: $(which slc 2>/dev/null || which slc-cli 2>/dev/null || echo 'not found')"
 
         # Find a suitable Zigbee end device sample
         SAMPLE_SLCP=$(find gecko_sdk/protocol/zigbee -name "*.slcp" 2>/dev/null | \
