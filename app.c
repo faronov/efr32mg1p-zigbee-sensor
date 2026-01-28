@@ -21,8 +21,12 @@
 static sl_zigbee_event_t led_blink_event;
 static bool led_blink_active = false;
 
+// LED off timer - turn off LED after network join confirmation
+static sl_zigbee_event_t led_off_event;
+
 // Forward declarations
 static void led_blink_event_handler(sl_zigbee_event_t *event);
+static void led_off_event_handler(sl_zigbee_event_t *event);
 
 /**
  * @brief Zigbee application init callback
@@ -36,8 +40,9 @@ void emberAfInitCallback(void)
   emberAfCorePrintln("Silicon Labs EFR32MG1P + Bosch BME280");
   emberAfCorePrintln("Press BTN0 to join network or trigger sensor reading");
 
-  // Initialize LED blink event
+  // Initialize LED events
   sl_zigbee_event_init(&led_blink_event, led_blink_event_handler);
+  sl_zigbee_event_init(&led_off_event, led_off_event_handler);
 
   // Initialize BME280 sensor
   if (!app_sensor_init()) {
@@ -69,6 +74,9 @@ void emberAfStackStatusCallback(EmberStatus status)
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Turn LED on solid to indicate network is up
     sl_led_turn_on(&sl_led_led0);
+
+    // Schedule LED to turn off after 3 seconds to save power
+    sl_zigbee_event_set_delay_ms(&led_off_event, 3000);
 #endif
 
     // Perform initial sensor reading after joining
@@ -80,6 +88,8 @@ void emberAfStackStatusCallback(EmberStatus status)
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Turn LED off when network is down
     sl_led_turn_off(&sl_led_led0);
+    // Cancel any pending LED off event
+    sl_zigbee_event_set_inactive(&led_off_event);
 #endif
   }
 }
@@ -106,10 +116,10 @@ void sl_button_on_change(const sl_button_t *handle)
       app_sensor_update();
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-      // Flash LED to indicate sensor read
-      sl_led_turn_off(&sl_led_led0);
-      sl_sleeptimer_delay_millisecond(100);
+      // Flash LED briefly to indicate sensor read
       sl_led_turn_on(&sl_led_led0);
+      sl_sleeptimer_delay_millisecond(200);
+      sl_led_turn_off(&sl_led_led0);
 #endif
 
     } else {
@@ -142,5 +152,18 @@ static void led_blink_event_handler(sl_zigbee_event_t *event)
     // Blink every 500ms
     sl_zigbee_event_set_delay_ms(&led_blink_event, 500);
   }
+#endif
+}
+
+/**
+ * @brief LED off event handler
+ *
+ * Turns off the LED after network join confirmation to save power.
+ */
+static void led_off_event_handler(sl_zigbee_event_t *event)
+{
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+  sl_led_turn_off(&sl_led_led0);
+  emberAfCorePrintln("LED turned off to save power");
 #endif
 }

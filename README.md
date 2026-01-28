@@ -43,10 +43,13 @@ The device supports Zigbee attribute reporting (Configure Reporting), allowing a
 
 ### LED (LED0)
 
-- **Off**: Not joined to network
+- **Off**: Default state (not joined or joined and idle to save power)
 - **Blinking (500ms)**: Network joining in progress
-- **Solid on**: Successfully joined to network
+- **Solid on (3 seconds)**: Successfully joined to network (turns off after 3s to save power)
+- **Brief flash (200ms)**: Sensor reading triggered by button press
 - **Rapid flash (100ms x10)**: Sensor initialization error
+
+The LED automatically turns off after joining to conserve battery power on this sleepy end device.
 
 ## Hardware Setup
 
