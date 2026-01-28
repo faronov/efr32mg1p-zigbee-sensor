@@ -31,28 +31,18 @@ if [ ! -d "$GSDK_DIR" ]; then
   exit 1
 fi
 
-# Locate sample SLCP if not provided
+# Use custom project SLCP if not provided
 if [ -z "$SAMPLE_SLCP" ]; then
-  # Try to find a suitable Zigbee SoC end device sample
-  SAMPLE_SLCP="$GSDK_DIR/protocol/zigbee/app/zigbee_app/z3EndDeviceSensor/z3EndDeviceSensor.slcp"
+  SAMPLE_SLCP="$PROJECT_ROOT/zigbee_bme280_sensor.slcp"
 
   if [ ! -f "$SAMPLE_SLCP" ]; then
-    # Try alternative path
-    SAMPLE_SLCP="$GSDK_DIR/protocol/zigbee/app/zigbee_app/z3EndDevice/z3EndDevice.slcp"
-  fi
-
-  if [ ! -f "$SAMPLE_SLCP" ]; then
-    echo -e "${RED}Error: Could not find suitable Zigbee sample SLCP${NC}"
-    echo "Please set SAMPLE_SLCP environment variable to point to a Zigbee SoC SLCP file"
+    echo -e "${RED}Error: Custom SLCP not found: $SAMPLE_SLCP${NC}"
     exit 1
   fi
 
-  echo -e "${YELLOW}Using sample: $SAMPLE_SLCP${NC}"
-fi
-
-if [ ! -f "$SAMPLE_SLCP" ]; then
-  echo -e "${RED}Error: SAMPLE_SLCP file not found: $SAMPLE_SLCP${NC}"
-  exit 1
+  echo -e "${GREEN}Using custom project: $SAMPLE_SLCP${NC}"
+else
+  echo -e "${YELLOW}Using provided SLCP: $SAMPLE_SLCP${NC}"
 fi
 
 # Check for required tools

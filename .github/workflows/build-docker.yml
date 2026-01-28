@@ -138,23 +138,9 @@ jobs:
           fi
 
           echo "✓ SLC: $(which slc || echo '/root/.silabs/slt/bin/slc')"
+          echo "✓ Using custom BME280 sensor project"
 
-          # Find ZigbeeMinimal sample
-          SAMPLE_SLCP=$(find /gecko_sdk_4.5.0/protocol/zigbee -name '*.slcp' 2>/dev/null | \
-            grep -i 'ZigbeeMinimal\.slcp' | \
-            grep -v 'Host' | \
-            head -n 1)
-
-          if [ -z "$SAMPLE_SLCP" ]; then
-            echo "Error: Could not find ZigbeeMinimal sample"
-            find /gecko_sdk_4.5.0/protocol/zigbee -name "*.slcp" | grep -i minimal | head -5
-            exit 1
-          fi
-
-          export SAMPLE_SLCP
-          echo "✓ Using sample: $SAMPLE_SLCP"
-
-          # Run build script
+          # Run build script (will use zigbee_bme280_sensor.slcp)
           bash tools/build.sh
 
       - name: List build outputs
@@ -169,11 +155,11 @@ jobs:
         with:
           name: firmware-${{ github.sha }}
           path: |
-            firmware/**/*.elf
-            firmware/**/*.hex
-            firmware/**/*.bin
-            firmware/**/*.s37
-            firmware/**/*.map
+            firmware/build/**/*.out
+            firmware/build/**/*.hex
+            firmware/build/**/*.bin
+            firmware/build/**/*.s37
+            firmware/build/**/*.map
           retention-days: 30
           if-no-files-found: error
 
