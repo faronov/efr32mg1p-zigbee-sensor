@@ -1,67 +1,68 @@
-# Dockerfile for building EFR32MG1P Zigbee projects with Silicon Labs tools
-FROM ubuntu:22.04
+# Dockerfile for building EFR32MG1P Zigbee projects using Silicon Labs tooling
+# Based on NabuCasa/silabs-firmware-builder approach
+FROM debian:trixie-slim
 
-# Prevent interactive prompts during package installation
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV HOME=/root
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    git-lfs \
-    make \
-    python3 \
-    python3-pip \
-    wget \
-    curl \
-    unzip \
-    openjdk-11-jre-headless \
+# Install base dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    aria2 \
     ca-certificates \
+    git \
+    libarchive-tools \
+    bzip2 \
+    unzip \
+    jq \
+    make \
+    libstdc++6 \
+    libgl1 \
+    libpng16-16 \
+    libpcre2-16-0 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install GNU Arm Embedded Toolchain
-RUN wget -q https://developer.arm.com/-/media/Files/downloads/gnu-rm/10.3-2021.10/gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2 \
-    && tar -xjf gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2 -C /opt/ \
-    && rm gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2
+# Install slt (Silicon Labs Tooling) CLI
+RUN aria2c --checksum=sha-256=8c2dd5091c15d5dd7b8fc978a512c49d9b9c5da83d4d0b820cfe983b38ef3612 -o slt.zip \
+        https://www.silabs.com/documents/public/software/slt-cli-1.1.0-linux-x64.zip \
+    && bsdtar -xf slt.zip -C /usr/bin && rm slt.zip \
+    && chmod +x /usr/bin/slt \
+    && slt --non-interactive install conan
 
-# Add ARM toolchain to PATH
-ENV PATH="/opt/gcc-arm-none-eabi-10.3-2021.10/bin:${PATH}"
+# Install Silicon Labs toolchain and SDK via slt
+RUN slt --non-interactive install \
+        cmake/3.30.2 \
+        ninja/1.12.1 \
+        commander/1.22.0 \
+        slc-cli/6.0.15 \
+        simplicity-sdk/2025.6.2 \
+    # Create stable symlinks
+    && mkdir -p /root/.silabs/slt/bin \
+    && ln -s "$(slt where commander)/commander" /root/.silabs/slt/bin/commander \
+    && ln -s "$(slt where cmake)/bin/cmake" /root/.silabs/slt/bin/cmake \
+    && ln -s "$(slt where ninja)/ninja" /root/.silabs/slt/bin/ninja \
+    && printf '#!/bin/sh\nexec "%s/slc" "$@"\n' "$(slt where slc-cli)" > /root/.silabs/slt/bin/slc \
+    && chmod +x /root/.silabs/slt/bin/slc \
+    # Clean up caches
+    && rm -rf /root/.silabs/slt/installs/archive/*.zip \
+              /root/.silabs/slt/installs/archive/*.tar.* \
+              /root/.silabs/slt/installs/conan/p/*/d/
 
-# Install Silicon Labs SLC CLI
-RUN wget -q https://www.silabs.com/documents/public/software/slc_cli_linux.zip -O slc_cli.zip \
-    && mkdir -p /opt/slc_cli \
-    && unzip -q slc_cli.zip -d /opt/slc_cli \
-    && rm slc_cli.zip
+# Download Gecko SDK 4.5.0 (for Series 1 support)
+RUN aria2c --checksum=sha-256=b5b2b2410eac0c9e2a72320f46605ecac0d376910cafded5daca9c1f78e966c8 -o sdk.zip \
+        https://github.com/SiliconLabs/gecko_sdk/releases/download/v4.5.0/gecko-sdk.zip \
+    && mkdir /gecko_sdk_4.5.0 && bsdtar -xf sdk.zip -C /gecko_sdk_4.5.0 \
+    && rm sdk.zip
 
-# Find and symlink the SLC executable
-RUN SLC_EXEC=$(find /opt/slc_cli -type f -executable -name "slc-cli" | head -n 1) \
-    && if [ -n "$SLC_EXEC" ]; then \
-         SLC_DIR=$(dirname "$SLC_EXEC"); \
-         ln -sf "$SLC_EXEC" "$SLC_DIR/slc"; \
-         echo "export PATH=\"$SLC_DIR:\$PATH\"" >> /etc/profile.d/slc.sh; \
-       fi
+# Add tools to PATH
+ENV PATH="$PATH:/root/.silabs/slt/bin"
 
-# Make SLC available in PATH
-ENV PATH="/opt/slc_cli/slc_cli/bin/slc-cli:${PATH}"
+# Find and add GCC ARM toolchain to PATH
+RUN GCC_PATH=$(find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" -path "*/p/bin" | head -1) \
+    && echo "export PATH=\"$GCC_PATH:\$PATH\"" >> /root/.bashrc
 
-# Set up writable home directory for SLC CLI
-RUN mkdir -p /build && chmod 777 /build
-ENV HOME=/build
-
-# Set up Java options for SLC CLI
-ENV JAVA_TOOL_OPTIONS="-Duser.home=/build"
-
-# Make SLC configuration directory writable
-RUN find /opt/slc_cli -type d -exec chmod 777 {} \;
-
-# Verify installations
-RUN arm-none-eabi-gcc --version || echo "ARM GCC not found" \
-    && java -version || echo "Java not found"
-
-# Initialize SLC CLI (this may create necessary configuration files)
-RUN /opt/slc_cli/slc_cli/bin/slc-cli/slc --help || echo "SLC initialization attempted"
-
-# Create working directory
 WORKDIR /workspace
 
-# Default command
 CMD ["/bin/bash"]

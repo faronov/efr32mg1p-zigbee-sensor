@@ -1,4 +1,4 @@
-name: Build with Docker
+name: Build Firmware
 
 on:
   push:
@@ -7,106 +7,149 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+
 jobs:
-  build:
+  check-container:
+    name: Check if container build needed
     runs-on: ubuntu-latest
-
+    permissions:
+      packages: write
+    outputs:
+      container_name: ${{ steps.container-info.outputs.container_name }}
+      build_needed: ${{ steps.container-info.outputs.build_needed }}
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build Docker image
-      run: |
-        echo "Building Docker image with build tools..."
-        docker build -t efr32-builder:latest .
+      - name: Determine container info
+        id: container-info
+        run: |
+          IMAGE_NAME=$(echo ${{ github.repository }} | awk '{print tolower($0)}')
+          TAG_NAME=$(echo "${{ hashFiles('Dockerfile') }}" | cut -c-16)
+          CONTAINER_NAME="${{ env.REGISTRY }}/${IMAGE_NAME}:${TAG_NAME}"
 
-    - name: Clone Gecko SDK 4.5
-      run: |
-        echo "Cloning Gecko SDK 4.5..."
-        git clone --depth 1 --branch gsdk_4.5 https://github.com/SiliconLabs/gecko_sdk.git
+          echo "container_name=$CONTAINER_NAME" >> $GITHUB_OUTPUT
 
-    - name: Build firmware in Docker
-      run: |
-        echo "Building firmware in Docker container..."
-        docker run --rm \
-          -v $PWD:/workspace \
-          -w /workspace \
-          -e GSDK_DIR=/workspace/gecko_sdk \
-          -e BOARD=brd4151a \
-          efr32-builder:latest \
-          bash -c "
-            # Find ZigbeeMinimal sample
-            SAMPLE_SLCP=\$(find gecko_sdk/protocol/zigbee -name '*.slcp' 2>/dev/null | \
-              grep -i 'ZigbeeMinimal\.slcp' | \
-              grep -v 'Host' | \
-              head -n 1)
+          # Check if container already exists
+          if docker manifest inspect "$CONTAINER_NAME" > /dev/null 2>&1; then
+            echo "build_needed=false" >> $GITHUB_OUTPUT
+            echo "Container already exists: $CONTAINER_NAME"
+          else
+            echo "build_needed=true" >> $GITHUB_OUTPUT
+            echo "Container needs to be built: $CONTAINER_NAME"
+          fi
 
-            if [ -z \"\$SAMPLE_SLCP\" ]; then
-              echo 'Error: Could not find ZigbeeMinimal sample'
-              exit 1
-            fi
+  build-container:
+    name: Build Docker container
+    needs: check-container
+    if: needs.check-container.outputs.build_needed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
 
-            export SAMPLE_SLCP
-            echo \"Using sample: \$SAMPLE_SLCP\"
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            # Run build script
-            bash tools/build.sh
-          "
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      if: success()
-      with:
-        name: firmware-build-${{ github.sha }}
-        path: |
-          firmware/**/*.elf
-          firmware/**/*.hex
-          firmware/**/*.bin
-          firmware/**/*.s37
-          firmware/**/*.map
-        retention-days: 30
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ needs.check-container.outputs.container_name }}
+          cache-from: type=registry,ref=${{ needs.check-container.outputs.container_name }}-cache
+          cache-to: type=registry,ref=${{ needs.check-container.outputs.container_name }}-cache,mode=max
 
-    - name: Upload build log on failure
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: build-log-failure-${{ github.sha }}
-        path: |
-          firmware/*.log
-          firmware/**/*.log
-        retention-days: 14
+  build-firmware:
+    name: Build firmware
+    needs: [check-container, build-container]
+    if: always() && needs.check-container.result == 'success'
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.check-container.outputs.container_name }}
+      options: --user root
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Build summary
-      if: success()
-      run: |
-        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Build Artifacts" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
+      - name: Build firmware
+        run: |
+          # Fix git ownership issue in container
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-        # List all build outputs
-        if [ -d firmware ]; then
-          for ext in elf hex bin s37; do
-            FILES=$(find firmware -name "*.${ext}" 2>/dev/null || true)
-            if [ -n "$FILES" ]; then
-              echo "#### ${ext^^} Files:" >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              echo "$FILES" | while read -r file; do
-                SIZE=$(ls -lh "$file" | awk '{print $5}')
-                echo "$(basename $file): $SIZE" >> $GITHUB_STEP_SUMMARY
-              done
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-        fi
+          # Set environment variables
+          export GSDK_DIR=/gecko_sdk_4.5.0
+          export BOARD=brd4151a
 
-        echo "✅ Build completed successfully!" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🐳 Built using Docker container with:" >> $GITHUB_STEP_SUMMARY
-        echo "- Silicon Labs SLC CLI" >> $GITHUB_STEP_SUMMARY
-        echo "- GNU Arm Embedded Toolchain 10.3-2021.10" >> $GITHUB_STEP_SUMMARY
-        echo "- Gecko SDK 4.5 LTS" >> $GITHUB_STEP_SUMMARY
+          # Find ZigbeeMinimal sample
+          SAMPLE_SLCP=$(find /gecko_sdk_4.5.0/protocol/zigbee -name '*.slcp' 2>/dev/null | \
+            grep -i 'ZigbeeMinimal\.slcp' | \
+            grep -v 'Host' | \
+            head -n 1)
+
+          if [ -z "$SAMPLE_SLCP" ]; then
+            echo "Error: Could not find ZigbeeMinimal sample"
+            find /gecko_sdk_4.5.0/protocol/zigbee -name "*.slcp" | grep -i minimal | head -5
+            exit 1
+          fi
+
+          export SAMPLE_SLCP
+          echo "Using sample: $SAMPLE_SLCP"
+
+          # Find GCC toolchain and add to PATH
+          GCC_BIN=$(find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" -path "*/p/bin" | head -1)
+          export PATH="$GCC_BIN:$PATH"
+
+          echo "GCC: $(which arm-none-eabi-gcc || echo 'not found')"
+          echo "SLC: $(which slc || echo 'not found')"
+
+          # Run build script
+          bash tools/build.sh
+
+      - name: List build outputs
+        if: always()
+        run: |
+          echo "Build directory contents:"
+          find firmware -type f 2>/dev/null || echo "No firmware directory"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: firmware-${{ github.sha }}
+          path: |
+            firmware/**/*.elf
+            firmware/**/*.hex
+            firmware/**/*.bin
+            firmware/**/*.s37
+            firmware/**/*.map
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Build summary
+        if: success()
+        run: |
+          echo "## ✅ Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          find firmware -type f \( -name "*.elf" -o -name "*.hex" -o -name "*.bin" -o -name "*.s37" \) -exec ls -lh {} \; 2>/dev/null | awk '{print $9, $5}' || echo "No files found"
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🐳 Built with Silicon Labs tooling via slt" >> $GITHUB_STEP_SUMMARY
