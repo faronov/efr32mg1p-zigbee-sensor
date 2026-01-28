@@ -99,12 +99,23 @@ jobs:
 
           # Find and add GCC to PATH (CRITICAL for build)
           echo "Looking for GCC ARM toolchain..."
-          GCC_BIN=$(find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" -path "*/p/bin" 2>/dev/null | head -1)
 
-          if [ -z "$GCC_BIN" ]; then
-            echo "ERROR: GCC toolchain not found!"
-            echo "Searching in conan packages:"
-            find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" 2>/dev/null | head -10
+          # Find GCC package directory
+          GCC_PKG=$(find /root/.silabs/slt/installs/conan/p -maxdepth 1 -type d -name "gcc-*" 2>/dev/null | grep -v "gcc-a51b5" | head -1)
+
+          if [ -z "$GCC_PKG" ]; then
+            echo "ERROR: GCC package not found!"
+            echo "Available packages:"
+            ls -la /root/.silabs/slt/installs/conan/p/ | grep gcc
+            exit 1
+          fi
+
+          GCC_BIN="$GCC_PKG/p/bin"
+
+          if [ ! -d "$GCC_BIN" ]; then
+            echo "ERROR: GCC bin directory not found at: $GCC_BIN"
+            echo "Contents of GCC package:"
+            ls -la "$GCC_PKG/p/" || ls -la "$GCC_PKG/"
             exit 1
           fi
 
