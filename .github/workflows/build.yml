@@ -60,6 +60,13 @@ jobs:
             echo "Found SLC at: $SLC_EXEC"
             chmod +x "$SLC_EXEC"
             SLC_DIR=$(dirname "$SLC_EXEC")
+
+            # Create symlink if binary is named slc-cli
+            if [[ "$SLC_EXEC" == *"slc-cli" ]]; then
+              sudo ln -sf "$SLC_EXEC" "$SLC_DIR/slc"
+              echo "Created symlink: slc -> slc-cli"
+            fi
+
             echo "$SLC_DIR" >> $GITHUB_PATH
             echo "SLC CLI installed successfully"
           else
