@@ -53,25 +53,24 @@ jobs:
           mkdir -p /opt/slc_cli
           unzip -q slc_cli.zip -d /opt/slc_cli
 
-          # Find the slc executable (it might be in a subdirectory)
-          SLC_EXEC=$(find /opt/slc_cli -name "slc" -o -name "slc-cli" | head -n 1)
+          # Find the actual slc executable (look for executable files, not directories)
+          SLC_EXEC=$(find /opt/slc_cli -type f -name "slc" -o -type f -name "slc-cli" | head -n 1)
 
           if [ -n "$SLC_EXEC" ]; then
             echo "Found SLC at: $SLC_EXEC"
             chmod +x "$SLC_EXEC"
             SLC_DIR=$(dirname "$SLC_EXEC")
 
-            # Create symlink if binary is named slc-cli
-            if [[ "$SLC_EXEC" == *"slc-cli" ]]; then
-              sudo ln -sf "$SLC_EXEC" "$SLC_DIR/slc"
-              echo "Created symlink: slc -> slc-cli"
-            fi
+            # Create symlink slc -> actual binary
+            sudo ln -sf "$SLC_EXEC" "$SLC_DIR/slc"
+            echo "Created symlink: $SLC_DIR/slc -> $SLC_EXEC"
 
             echo "$SLC_DIR" >> $GITHUB_PATH
             echo "SLC CLI installed successfully"
           else
             echo "Warning: Could not find slc executable in extracted files"
-            ls -la /opt/slc_cli/
+            echo "Searching for any slc-related files:"
+            find /opt/slc_cli -name "*slc*" -type f | head -20
           fi
         else
           echo "Warning: Could not download SLC CLI"
