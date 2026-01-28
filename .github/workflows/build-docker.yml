@@ -97,6 +97,32 @@ jobs:
           export GSDK_DIR=/gecko_sdk_4.5.0
           export BOARD=brd4151a
 
+          # Find and add GCC to PATH (CRITICAL for build)
+          echo "Looking for GCC ARM toolchain..."
+          GCC_BIN=$(find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" -path "*/p/bin" 2>/dev/null | head -1)
+
+          if [ -z "$GCC_BIN" ]; then
+            echo "ERROR: GCC toolchain not found!"
+            echo "Searching in conan packages:"
+            find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" 2>/dev/null | head -10
+            exit 1
+          fi
+
+          echo "Found GCC at: $GCC_BIN"
+          export PATH="$GCC_BIN:$PATH"
+
+          # Verify GCC is now accessible
+          if ! command -v arm-none-eabi-gcc &> /dev/null; then
+            echo "ERROR: arm-none-eabi-gcc still not found after adding to PATH!"
+            echo "PATH: $PATH"
+            ls -la "$GCC_BIN" | head -10
+            exit 1
+          fi
+
+          echo "✓ GCC: $(which arm-none-eabi-gcc)"
+          arm-none-eabi-gcc --version | head -1
+          echo "✓ SLC: $(which slc)"
+
           # Find ZigbeeMinimal sample
           SAMPLE_SLCP=$(find /gecko_sdk_4.5.0/protocol/zigbee -name '*.slcp' 2>/dev/null | \
             grep -i 'ZigbeeMinimal\.slcp' | \
@@ -110,14 +136,7 @@ jobs:
           fi
 
           export SAMPLE_SLCP
-          echo "Using sample: $SAMPLE_SLCP"
-
-          # Find GCC toolchain and add to PATH
-          GCC_BIN=$(find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" -path "*/p/bin" | head -1)
-          export PATH="$GCC_BIN:$PATH"
-
-          echo "GCC: $(which arm-none-eabi-gcc || echo 'not found')"
-          echo "SLC: $(which slc || echo 'not found')"
+          echo "✓ Using sample: $SAMPLE_SLCP"
 
           # Run build script
           bash tools/build.sh

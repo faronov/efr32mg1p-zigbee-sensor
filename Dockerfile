@@ -56,21 +56,13 @@ RUN aria2c --checksum=sha-256=b5b2b2410eac0c9e2a72320f46605ecac0d376910cafded5da
     && mkdir /gecko_sdk_4.5.0 && bsdtar -xf sdk.zip -C /gecko_sdk_4.5.0 \
     && rm sdk.zip
 
-# Find GCC ARM toolchain and add directly to PATH in ENV
-RUN GCC_BIN=$(find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" -path "*/p/bin" | head -1) \
-    && echo "GCC ARM toolchain found at: $GCC_BIN" \
-    && echo "$GCC_BIN" > /tmp/gcc_path
-
-# Add GCC and tools to PATH permanently
-RUN GCC_BIN=$(cat /tmp/gcc_path) && echo "export PATH=$GCC_BIN:/root/.silabs/slt/bin:\$PATH" >> /etc/profile
+# Add Silicon Labs tools to PATH
+# Note: GCC ARM toolchain path is set at runtime in the workflow
 ENV PATH="/root/.silabs/slt/bin:$PATH"
 
-# Workaround for GitHub Actions: symlink GCC binaries to /root/.silabs/slt/bin
-RUN GCC_BIN=$(cat /tmp/gcc_path) \
-    && for file in "$GCC_BIN"/*; do \
-         ln -sf "$file" "/root/.silabs/slt/bin/$(basename $file)" 2>/dev/null || true; \
-       done \
-    && rm /tmp/gcc_path
+# Verify GCC toolchain was installed
+RUN GCC_BIN=$(find /root/.silabs/slt/installs/conan/p -type d -name "gcc-*" -path "*/p/bin" 2>/dev/null | head -1) \
+    && if [ -z "$GCC_BIN" ]; then echo "WARNING: GCC not found during build"; else echo "GCC found at: $GCC_BIN"; fi
 
 WORKDIR /workspace
 
