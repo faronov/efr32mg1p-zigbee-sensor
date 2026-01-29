@@ -129,13 +129,6 @@ define:
   - name: BTL_STORAGE_SPIFLASH_SECTOR_SIZE
     value: 4096
 
-# Include custom configuration headers
-config_file:
-  - path: config/btl_spiflash_storage_cfg.h
-    file_id: btl_spiflash_storage_config
-  - path: config/btl_spi_peripheral_usart_driver_cfg.h
-    file_id: btl_spi_driver_config
-
 # Toolchain
 toolchain_settings:
   - option: gcc_linker_option
