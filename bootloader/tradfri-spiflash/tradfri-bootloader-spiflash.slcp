@@ -37,6 +37,9 @@ component:
   # GPIO for LED indication (optional)
   - id: bootloader_gpio_activation
 
+  # Debug support (required for btl_debug_cfg.h)
+  - id: bootloader_debug
+
 configuration:
   # Application start address (after bootloader)
   - name: BOOTLOADER_ENFORCE_SIGNED_UPGRADE
