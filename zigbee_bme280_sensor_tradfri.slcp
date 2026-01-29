@@ -114,6 +114,9 @@ configuration:
     value: 4
   - name: SL_SPIDRV_EXP_CLK_LOC
     value: 4
+  # CS control mode (0 = spidrvCsControlAuto - driver controls CS)
+  - name: SL_SPIDRV_EXP_CS_CONTROL
+    value: 0
 
   # GPIO pin configuration for LED and Button
   # Note: These must be in the 'define' section, not 'configuration'
