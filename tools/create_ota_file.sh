@@ -20,17 +20,17 @@ echo "Creating OTA file for ${VARIANT} v${VERSION}"
 echo "Firmware version: ${FW_VERSION}"
 echo "=========================================="
 
-# Paths - try multiple possible firmware locations
+# Paths - try multiple possible firmware locations (check release first, then debug)
 if [ -f "firmware/build/release/zigbee_bme280_sensor_${VARIANT}.s37" ]; then
     FIRMWARE_DIR="firmware/build/release"
-elif [ -f "firmware/build/debug/zigbee_bme280_sensor_${VARIANT}.s37" ]; then
-    FIRMWARE_DIR="firmware/build/debug"
 elif [ -f "build/${VARIANT}/release/zigbee_bme280_sensor_${VARIANT}.s37" ]; then
     FIRMWARE_DIR="build/${VARIANT}/release"
+elif [ -f "firmware/build/debug/zigbee_bme280_sensor_${VARIANT}.s37" ]; then
+    FIRMWARE_DIR="firmware/build/debug"
 elif [ -f "build/${VARIANT}/debug/zigbee_bme280_sensor_${VARIANT}.s37" ]; then
     FIRMWARE_DIR="build/${VARIANT}/debug"
 else
-    FIRMWARE_DIR="firmware/build/debug"  # Default to GitHub Actions path
+    FIRMWARE_DIR="firmware/build/release"  # Default to release build
 fi
 
 OUTPUT_DIR="build/${VARIANT}/ota"
@@ -56,10 +56,10 @@ echo "Output: ${GBL_FILE}"
 
 # Create GBL file using commander
 # GBL is Silicon Labs Gecko Bootloader format
+# Note: Metadata is optional and can cause issues with some commander versions
 commander gbl create "${GBL_FILE}" \
     --app "${S37_FILE}" \
-    --device EFR32MG1P132F256GM32 \
-    --metadata 0x02010000:${FW_VERSION}
+    --device EFR32MG1P132F256GM32
 
 if [ $? -eq 0 ]; then
     echo "✓ GBL file created successfully"

@@ -129,7 +129,7 @@ echo -e "${GREEN}Generating project with SLC...${NC}"
 cd "$PROJECT_ROOT"
 
 # Build the SLC generate command
-SLC_CMD="slc generate \"$SAMPLE_SLCP\" -np -d firmware -name \"$PROJECT_NAME\" -o makefile"
+SLC_CMD="slc generate \"$SAMPLE_SLCP\" -np -d firmware -name \"$PROJECT_NAME\" -o makefile --configuration release"
 
 # Handle board/device specification
 if [ "$BOARD" = "custom" ]; then
