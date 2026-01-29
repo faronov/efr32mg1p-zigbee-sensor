@@ -17,7 +17,7 @@ This guide explains how to create Zigbee OTA firmware files (`.gbl`, `.ota`, `.z
 - **Purpose**: Zigbee-compliant OTA update file
 - **Contains**: GBL wrapped with Zigbee OTA header
 - **Zigbee Header includes**:
-  - Manufacturer ID (0x10F2 for IKEA TRÅDFRI compatibility)
+  - Manufacturer ID (0x1049 for Silicon Labs compatibility)
   - Image Type (0x0000 for application)
   - Firmware Version (e.g., 0x01000000 for v1.0.0)
   - Header String (human-readable description)
@@ -83,7 +83,7 @@ Version 1.2.3 → 0x01020300
 ```bash
 commander gbl parse input.gbl \
     --ota output.ota \
-    --manufacturer 0x10F2 \
+    --manufacturer 0x1049 \
     --imagetype 0x0000 \
     --version 0x01000000 \
     --device EFR32MG1P132F256GM32 \
@@ -92,7 +92,7 @@ commander gbl parse input.gbl \
 
 **Parameters**:
 - `--manufacturer`: Zigbee manufacturer code
-  - `0x10F2`: IKEA TRÅDFRI (for compatibility)
+  - `0x1049`: Silicon Labs (for compatibility)
   - `0x1049`: Silicon Labs
   - Custom: Register your own with Zigbee Alliance
 - `--imagetype`: Image type identifier
@@ -134,7 +134,7 @@ commander gbl create build/tradfri/ota/firmware.gbl \
 # Step 2: Create OTA/Zigbee file
 commander gbl parse build/tradfri/ota/firmware.gbl \
     --ota build/tradfri/ota/firmware.ota \
-    --manufacturer 0x10F2 \
+    --manufacturer 0x1049 \
     --imagetype 0x0000 \
     --version 0x01000000 \
     --device EFR32MG1P132F256GM32 \
@@ -193,7 +193,7 @@ Offset  Description                 Example
 0x0004  Header Version              0x0100
 0x0006  Header Length               0x0038 (56 bytes)
 0x0008  Header Field Control        0x0000
-0x000A  Manufacturer Code           0x10F2 (IKEA)
+0x000A  Manufacturer Code           0x1049 (IKEA)
 0x000C  Image Type                  0x0000
 0x000E  File Version                0x01000000
 0x0012  Zigbee Stack Version        0x0002
