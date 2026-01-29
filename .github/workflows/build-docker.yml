@@ -157,6 +157,28 @@ jobs:
           # Run build script
           bash tools/build.sh
 
+      - name: Create OTA files - ${{ matrix.variant.name }}
+        if: success()
+        run: |
+          # Set HOME for commander
+          export HOME=/root
+
+          # Extract version from git tag or use default
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            VERSION="1.0.0"
+            echo "No valid version tag found, using default: $VERSION"
+          else
+            echo "Using version from tag: $VERSION"
+          fi
+
+          # Determine variant (tradfri or brd4151a)
+          VARIANT="${{ matrix.variant.board }}"
+
+          # Create OTA files
+          echo "Creating OTA files for ${VARIANT} v${VERSION}..."
+          bash tools/create_ota_file.sh "$VARIANT" "$VERSION" || echo "⚠️ OTA file creation failed (non-blocking)"
+
       - name: List build outputs
         if: always()
         run: |
@@ -174,6 +196,9 @@ jobs:
             firmware/build/**/*.bin
             firmware/build/**/*.s37
             firmware/build/**/*.map
+            build/**/*.gbl
+            build/**/*.ota
+            build/**/*.zigbee
           retention-days: 30
           if-no-files-found: error
 
@@ -189,6 +214,15 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           find firmware -type f \( -name "*.elf" -o -name "*.hex" -o -name "*.bin" -o -name "*.s37" \) -exec ls -lh {} \; 2>/dev/null | awk '{print $9, $5}' || echo "No files found"
           echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### OTA Files" >> $GITHUB_STEP_SUMMARY
+          if find build -type f \( -name "*.gbl" -o -name "*.ota" -o -name "*.zigbee" \) 2>/dev/null | grep -q .; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            find build -type f \( -name "*.gbl" -o -name "*.ota" -o -name "*.zigbee" \) -exec ls -lh {} \; 2>/dev/null | awk '{print $9, $5}'
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "_No OTA files generated_" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🐳 Built with Silicon Labs tooling via slt" >> $GITHUB_STEP_SUMMARY
 
