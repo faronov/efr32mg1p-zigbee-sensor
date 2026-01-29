@@ -37,10 +37,17 @@ static const uint32_t join_retry_delays_ms[] = {
 };
 #define MAX_JOIN_RETRY_DELAY_INDEX (sizeof(join_retry_delays_ms) / sizeof(join_retry_delays_ms[0]) - 1)
 
+// Button press duration tracking
+static uint32_t button_press_start_tick = 0;
+static bool button_pressed = false;
+#define LONG_PRESS_THRESHOLD_MS 2000
+
 // Forward declarations
 static void led_blink_event_handler(sl_zigbee_event_t *event);
 static void led_off_event_handler(sl_zigbee_event_t *event);
 static void network_join_retry_event_handler(sl_zigbee_event_t *event);
+static void handle_short_press(void);
+static void handle_long_press(void);
 
 /**
  * @brief Zigbee application init callback
@@ -121,64 +128,36 @@ void emberAfStackStatusCallback(EmberStatus status)
 /**
  * @brief Button press callback
  *
- * Called when a button is pressed on the board.
+ * Called when a button is pressed or released on the board.
+ * Detects short press (<2s) vs long press (>=2s).
  */
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
 void sl_button_on_change(const sl_button_t *handle)
 {
-  // Only handle button press (not release)
-  if (sl_button_get_state(handle) != SL_SIMPLE_BUTTON_PRESSED) {
-    return;
-  }
-
   if (handle == &sl_button_btn0) {
-    EmberNetworkStatus network_state = emberAfNetworkState();
-
-    if (network_state == EMBER_JOINED_NETWORK) {
-      // Already on network - trigger sensor reading
-      emberAfCorePrintln("Button pressed: Reading sensor...");
-      app_sensor_update();
-
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-      // Flash LED briefly to indicate sensor read
-      sl_led_turn_on(&sl_led_led0);
-      sl_sleeptimer_delay_millisecond(200);
-      sl_led_turn_off(&sl_led_led0);
-#endif
-
+    if (sl_button_get_state(handle) == SL_SIMPLE_BUTTON_PRESSED) {
+      // Button pressed - record start time
+      button_press_start_tick = sl_sleeptimer_get_tick_count();
+      button_pressed = true;
+      emberAfCorePrintln("Button pressed...");
     } else {
-      // Not on network - start network steering with retry logic
-      emberAfCorePrintln("Button pressed: Joining network (attempt %d)...",
-                         join_attempt_count + 1);
+      // Button released - check duration
+      if (button_pressed) {
+        uint32_t duration_ticks = sl_sleeptimer_get_tick_count() - button_press_start_tick;
+        uint32_t duration_ms = sl_sleeptimer_tick_to_ms(duration_ticks);
 
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-      // Start LED blinking to indicate joining
-      led_blink_active = true;
-      sl_zigbee_event_set_active(&led_blink_event);
-#endif
+        emberAfCorePrintln("Button released after %d ms", duration_ms);
 
-      // Start network steering
-      EmberStatus join_status = emberAfPluginNetworkSteeringStart();
-
-      if (join_status != EMBER_SUCCESS) {
-        emberAfCorePrintln("Join failed to start: 0x%x", join_status);
-
-        // Schedule retry with exponential backoff
-        uint8_t delay_index = (join_attempt_count < MAX_JOIN_RETRY_DELAY_INDEX)
-                              ? join_attempt_count
-                              : MAX_JOIN_RETRY_DELAY_INDEX;
-        uint32_t retry_delay = join_retry_delays_ms[delay_index];
-
-        emberAfCorePrintln("Will retry in %d seconds", retry_delay / 1000);
-        sl_zigbee_event_set_delay_ms(&network_join_retry_event, retry_delay);
-        join_attempt_count++;
-
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-        // Stop LED blinking on failure
-        led_blink_active = false;
-        sl_zigbee_event_set_inactive(&led_blink_event);
-        sl_led_turn_off(&sl_led_led0);
-#endif
+        if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
+          // Long press: Leave and rejoin network
+          emberAfCorePrintln("Long press detected: Leave/Rejoin network");
+          handle_long_press();
+        } else {
+          // Short press: Immediate sensor read and report
+          emberAfCorePrintln("Short press detected: Immediate sensor read");
+          handle_short_press();
+        }
+        button_pressed = false;
       }
     }
   }
@@ -253,5 +232,120 @@ static void network_join_retry_event_handler(sl_zigbee_event_t *event)
     sl_zigbee_event_set_inactive(&led_blink_event);
     sl_led_turn_off(&sl_led_led0);
 #endif
+  }
+}
+
+/**
+ * @brief Handle short button press (<2 seconds)
+ *
+ * Short press triggers immediate sensor read and report.
+ * If not joined to network, starts network joining.
+ */
+static void handle_short_press(void)
+{
+  EmberNetworkStatus network_state = emberAfNetworkState();
+
+  if (network_state == EMBER_JOINED_NETWORK) {
+    // Already on network - trigger immediate sensor reading
+    emberAfCorePrintln("Triggering immediate sensor read...");
+    app_sensor_update();
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+    // Flash LED briefly to indicate sensor read
+    sl_led_turn_on(&sl_led_led0);
+    sl_sleeptimer_delay_millisecond(200);
+    sl_led_turn_off(&sl_led_led0);
+#endif
+
+  } else {
+    // Not on network - start network steering
+    emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
+                       join_attempt_count + 1);
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+    // Start LED blinking to indicate joining
+    led_blink_active = true;
+    sl_zigbee_event_set_active(&led_blink_event);
+#endif
+
+    // Start network steering
+    EmberStatus join_status = emberAfPluginNetworkSteeringStart();
+
+    if (join_status != EMBER_SUCCESS) {
+      emberAfCorePrintln("Join failed to start: 0x%x", join_status);
+
+      // Schedule retry with exponential backoff
+      uint8_t delay_index = (join_attempt_count < MAX_JOIN_RETRY_DELAY_INDEX)
+                            ? join_attempt_count
+                            : MAX_JOIN_RETRY_DELAY_INDEX;
+      uint32_t retry_delay = join_retry_delays_ms[delay_index];
+
+      emberAfCorePrintln("Will retry in %d seconds", retry_delay / 1000);
+      sl_zigbee_event_set_delay_ms(&network_join_retry_event, retry_delay);
+      join_attempt_count++;
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+      // Stop LED blinking on failure
+      led_blink_active = false;
+      sl_zigbee_event_set_inactive(&led_blink_event);
+      sl_led_turn_off(&sl_led_led0);
+#endif
+    }
+  }
+}
+
+/**
+ * @brief Handle long button press (>=2 seconds)
+ *
+ * Long press causes the device to leave the current network
+ * and immediately attempt to rejoin (useful for moving to a new coordinator).
+ */
+static void handle_long_press(void)
+{
+  EmberNetworkStatus network_state = emberAfNetworkState();
+
+  if (network_state == EMBER_JOINED_NETWORK) {
+    emberAfCorePrintln("Leaving network and rejoining...");
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+    // Flash LED rapidly to indicate leave operation
+    for (int i = 0; i < 5; i++) {
+      sl_led_toggle(&sl_led_led0);
+      sl_sleeptimer_delay_millisecond(100);
+    }
+#endif
+
+    // Leave the network
+    EmberStatus leave_status = emberLeaveNetwork();
+    if (leave_status == EMBER_SUCCESS) {
+      emberAfCorePrintln("Left network successfully");
+
+      // Reset join attempt counter for new join
+      join_attempt_count = 0;
+
+      // Small delay to ensure leave completes
+      sl_sleeptimer_delay_millisecond(500);
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+      // Start LED blinking to indicate joining
+      led_blink_active = true;
+      sl_zigbee_event_set_active(&led_blink_event);
+#endif
+
+      // Start network steering to rejoin
+      EmberStatus join_status = emberAfPluginNetworkSteeringStart();
+      if (join_status != EMBER_SUCCESS) {
+        emberAfCorePrintln("Failed to start rejoin: 0x%x", join_status);
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+        led_blink_active = false;
+        sl_zigbee_event_set_inactive(&led_blink_event);
+        sl_led_turn_off(&sl_led_led0);
+#endif
+      }
+    } else {
+      emberAfCorePrintln("Failed to leave network: 0x%x", leave_status);
+    }
+  } else {
+    emberAfCorePrintln("Not joined to network - long press ignored");
   }
 }

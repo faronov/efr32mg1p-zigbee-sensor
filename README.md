@@ -9,15 +9,19 @@ A Zigbee 3.0 end device sensor application for Silicon Labs EFR32MG1P (Wireless 
   - EFR32MG1P132F256GM32 (IKEA TRÅDFRI board) with OTA support
 - **SDK**: Gecko SDK (GSDK) 4.5 LTS
 - **Sensor**: Bosch BME280 (Temperature, Humidity, Pressure) via I2C
+- **Power**: 2xAAA batteries (3.0V nominal)
 - **Zigbee Profile**: Zigbee 3.0 Sleepy End Device
-- **Update Interval**: 5 minutes (configurable, optimized for battery life)
+- **Update Interval**: 1 minute (configurable, optimized for 2xAAA battery life)
+- **Battery Monitoring**: Real-time voltage and percentage reporting via Power Configuration cluster
 - **Power Optimization**:
   - Sensor readings suspended when network down
   - Exponential backoff for network join retries (30s → 10min)
   - LED auto-off after 3 seconds
   - Event-driven operation in low power mode
 - **User Interface**:
-  - Button (BTN0): Join network / Trigger sensor reading
+  - Button (BTN0):
+    - Short press (<2s): Trigger immediate sensor reading / Join network
+    - Long press (≥2s): Leave and rejoin network
   - LED (LED0): Network status indication
 - **OTA Updates**: TRÅDFRI variant includes OTA bootloader support with external SPI flash
 - **Headless Build**: Fully reproducible CI/CD pipeline using GNU Arm GCC and SLC CLI
@@ -29,16 +33,29 @@ The sensor exposes the following server clusters on Endpoint 1:
 | Cluster ID | Cluster Name                | Attribute | Data Type | Unit | Update Rate |
 |------------|----------------------------|-----------|-----------|------|-------------|
 | 0x0000     | Basic                      | -         | -         | -    | -           |
+| 0x0001     | Power Configuration        | 0x0020    | uint8     | 100mV | 1min       |
+|            |                            | 0x0021    | uint8     | 0.5% | 1min        |
 | 0x0003     | Identify                   | -         | -         | -    | -           |
-| 0x0402     | Temperature Measurement    | 0x0000    | int16     | 0.01°C | 30s       |
-| 0x0405     | Relative Humidity          | 0x0000    | uint16    | 0.01%RH | 30s      |
-| 0x0403     | Pressure Measurement       | 0x0000    | int16     | kPa  | 30s         |
+| 0x0402     | Temperature Measurement    | 0x0000    | int16     | 0.01°C | 1min       |
+| 0x0405     | Relative Humidity          | 0x0000    | uint16    | 0.01%RH | 1min      |
+| 0x0403     | Pressure Measurement       | 0x0000    | int16     | kPa  | 1min         |
 
 ### Attribute Details
 
 - **Temperature**: Signed 16-bit integer in hundredths of degrees Celsius (0.01°C resolution)
 - **Humidity**: Unsigned 16-bit integer in hundredths of percent RH (0.01%RH resolution)
 - **Pressure**: Signed 16-bit integer in kilopascals (kPa)
+- **Battery Voltage (0x0020)**: Unsigned 8-bit integer in 100mV units (e.g., 30 = 3.0V)
+- **Battery Percentage (0x0021)**: Unsigned 8-bit integer, 0-200 range (200 = 100%, 0.5% resolution)
+
+### Battery Configuration
+
+The device is configured for 2xAAA alkaline batteries:
+- **Full**: 3.2V (2x 1.6V fresh alkaline) = 100% (200)
+- **Nominal**: 3.0V (2x 1.5V) = ~86% (172)
+- **Empty**: 1.8V (2x 0.9V depleted) = 0% (0)
+
+Battery voltage is measured using the EFR32MG1P internal ADC and reported every minute or when voltage changes by ≥0.1V.
 
 The device supports Zigbee attribute reporting (Configure Reporting), allowing a coordinator to receive automatic updates when values change.
 
@@ -46,8 +63,13 @@ The device supports Zigbee attribute reporting (Configure Reporting), allowing a
 
 ### Button (BTN0)
 
-- **Not joined to network**: Press to start network joining (LED will blink)
-- **Joined to network**: Press to trigger immediate sensor reading (LED will flash briefly)
+**Short Press (<2 seconds):**
+- **Not joined to network**: Start network joining (LED will blink)
+- **Joined to network**: Trigger immediate sensor reading and report (LED will flash briefly)
+
+**Long Press (≥2 seconds):**
+- **Joined to network**: Leave current network and immediately rejoin (useful for switching coordinators)
+- **Not joined**: No action
 
 ### LED (LED0)
 
@@ -242,12 +264,14 @@ See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for detailed power saving str
 **Key power features**:
 - **No sensor reads when network down**: Saves power when not connected
 - **Exponential backoff**: Network join retries increase from 30s to 10min intervals
-- **5-minute sensor interval**: Default reading interval optimized for battery life
+- **1-minute sensor interval**: Default reading interval optimized for 2xAAA battery life
 - **LED auto-off**: Turns off after 3s to conserve power
+- **Battery monitoring**: Real-time voltage and percentage tracking
 
-**Estimated battery life on CR2032**:
-- Current configuration: ~3-6 months
-- With event-driven only: ~6-12 months
+**Estimated battery life on 2xAAA alkaline (~2400 mAh)**:
+- Current configuration (1min updates): ~6-12 months
+- With 5-minute updates: ~12-18 months
+- Event-driven only: ~18-24 months
 
 ### Sensor Update Interval
 
@@ -257,7 +281,10 @@ To change the sensor reading interval, edit `src/app/app_sensor.h`:
 // For testing (30 seconds):
 #define SENSOR_UPDATE_INTERVAL_MS   30000
 
-// For production (5 minutes - default):
+// For responsive updates (1 minute - default for 2xAAA):
+#define SENSOR_UPDATE_INTERVAL_MS   60000
+
+// For balanced operation (5 minutes):
 #define SENSOR_UPDATE_INTERVAL_MS   300000
 
 // For maximum battery life (15 minutes):

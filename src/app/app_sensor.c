@@ -5,11 +5,13 @@
 
 #include "app_sensor.h"
 #include "bme280_min.h"
+#include "battery.h"
 #include "af.h"
 #include "app/framework/include/af.h"
 #include <stdio.h>
 
 // Zigbee cluster IDs
+#define ZCL_POWER_CONFIG_CLUSTER_ID          0x0001
 #define ZCL_TEMP_MEASUREMENT_CLUSTER_ID      0x0402
 #define ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID  0x0403
 #define ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID  0x0405
@@ -18,6 +20,10 @@
 #define ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID      0x0000
 #define ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID  0x0000
 #define ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID  0x0000
+
+// Power Configuration cluster attribute IDs
+#define ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID              0x0020
+#define ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID 0x0021
 
 // Endpoint where sensor clusters are located
 #define SENSOR_ENDPOINT  1
@@ -37,6 +43,14 @@ bool app_sensor_init(void)
   }
 
   emberAfCorePrintln("BME280 sensor initialized successfully");
+
+  // Initialize battery monitoring
+  if (!battery_init()) {
+    emberAfCorePrintln("Error: Battery monitoring initialization failed");
+    return false;
+  }
+
+  emberAfCorePrintln("Battery monitoring initialized successfully");
 
   // Initialize and schedule the event for periodic updates
   sl_zigbee_event_init(&sensor_update_event, sensor_update_event_handler);
@@ -116,7 +130,40 @@ void app_sensor_update(void)
     emberAfCorePrintln("Error: Failed to update pressure attribute (0x%x)", status);
   }
 
+  // Update Power Configuration cluster (0x0001)
+  // Read battery voltage and percentage
+  uint16_t battery_voltage_mv = battery_read_voltage_mv();
+  uint8_t battery_voltage_100mv = battery_read_voltage_100mv();
+  uint8_t battery_percentage = battery_calculate_percentage(battery_voltage_mv);
+
+  emberAfCorePrintln("Battery: %d mV (%d %%), raw: %d/200",
+                     battery_voltage_mv,
+                     battery_percentage / 2, // Convert to percentage (200 = 100%)
+                     battery_percentage);
+
+  // Update BatteryVoltage attribute (0x0020)
+  // uint8, in 100mV units (e.g., 30 = 3.0V)
+  status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                       ZCL_POWER_CONFIG_CLUSTER_ID,
+                                       ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID,
+                                       (uint8_t *)&battery_voltage_100mv,
+                                       ZCL_INT8U_ATTRIBUTE_TYPE);
+  if (status != EMBER_ZCL_STATUS_SUCCESS) {
+    emberAfCorePrintln("Error: Failed to update battery voltage attribute (0x%x)", status);
+  }
+
+  // Update BatteryPercentageRemaining attribute (0x0021)
+  // uint8, 0-200 range (0.5% resolution, 200 = 100%)
+  status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                       ZCL_POWER_CONFIG_CLUSTER_ID,
+                                       ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID,
+                                       (uint8_t *)&battery_percentage,
+                                       ZCL_INT8U_ATTRIBUTE_TYPE);
+  if (status != EMBER_ZCL_STATUS_SUCCESS) {
+    emberAfCorePrintln("Error: Failed to update battery percentage attribute (0x%x)", status);
+  }
+
   // Trigger attribute reporting (if configured by coordinator)
   // The reporting mechanism will automatically send reports if bound
-  emberAfCorePrintln("Sensor attributes updated successfully");
+  emberAfCorePrintln("Sensor and battery attributes updated successfully");
 }

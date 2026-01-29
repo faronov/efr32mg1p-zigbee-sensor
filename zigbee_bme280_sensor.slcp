@@ -23,6 +23,7 @@ component:
   - id: emlib_i2c
   - id: emlib_gpio
   - id: emlib_cmu
+  - id: emlib_adc
   - id: sleeptimer
 
   # User interface
@@ -76,6 +77,7 @@ source:
   - path: src/app/app_sensor.c
   - path: src/drivers/hal_i2c.c
   - path: src/drivers/bme280/bme280_min.c
+  - path: src/drivers/battery.c
 
 include:
   - path: ./
