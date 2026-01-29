@@ -127,12 +127,18 @@ fi
 echo ""
 echo -e "${GREEN}Generating project with SLC...${NC}"
 cd "$PROJECT_ROOT"
-slc generate "$SAMPLE_SLCP" \
-  -np \
-  -d firmware \
-  -name "$PROJECT_NAME" \
-  -o makefile \
-  --with "$BOARD"
+
+# Build the SLC generate command
+SLC_CMD="slc generate \"$SAMPLE_SLCP\" -np -d firmware -name \"$PROJECT_NAME\" -o makefile"
+
+# Only add --with flag if BOARD is set and not "custom"
+# TRÅDFRI uses device specification in .slcp, so skip --with for it
+if [ -n "$BOARD" ] && [ "$BOARD" != "custom" ]; then
+  SLC_CMD="$SLC_CMD --with \"$BOARD\""
+fi
+
+echo "Running: $SLC_CMD"
+eval $SLC_CMD
 
 # Find the generated Makefile (SLC may use sample name instead of our project name)
 MAKEFILE=$(find "$FIRMWARE_DIR" -maxdepth 1 -name "*.Makefile" 2>/dev/null | head -1)
