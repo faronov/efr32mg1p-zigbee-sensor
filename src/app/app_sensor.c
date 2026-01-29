@@ -49,6 +49,14 @@ bool app_sensor_init(void)
   return true;
 }
 
+void app_sensor_start_periodic_updates(void)
+{
+  // (Re)start the periodic sensor update event
+  emberAfCorePrintln("Starting periodic sensor updates (interval: %d seconds)",
+                     SENSOR_UPDATE_INTERVAL_MS / 1000);
+  sl_zigbee_event_set_delay_ms(&sensor_update_event, SENSOR_UPDATE_INTERVAL_MS);
+}
+
 static void sensor_update_event_handler(sl_zigbee_event_t *event)
 {
   // Only read sensor if network is up (power optimization)
@@ -61,7 +69,7 @@ static void sensor_update_event_handler(sl_zigbee_event_t *event)
   } else {
     // Network down - stop periodic reads to save power
     emberAfCorePrintln("Network down: sensor reads suspended");
-    // Event will be restarted when network comes back up
+    // Event will be restarted by app_sensor_start_periodic_updates() when network comes back up
   }
 }
 

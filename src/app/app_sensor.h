@@ -39,4 +39,13 @@ bool app_sensor_init(void);
  */
 void app_sensor_update(void);
 
+/**
+ * @brief Start (or restart) periodic sensor updates
+ *
+ * Schedules the periodic sensor update event. This should be called
+ * when the network comes back up to resume periodic updates after
+ * they were suspended due to network unavailability.
+ */
+void app_sensor_start_periodic_updates(void);
+
 #endif // APP_SENSOR_H

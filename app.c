@@ -110,6 +110,9 @@ void emberAfStackStatusCallback(EmberStatus status)
     // Perform initial sensor reading after joining
     app_sensor_update();
 
+    // Restart periodic sensor updates
+    app_sensor_start_periodic_updates();
+
   } else if (status == EMBER_NETWORK_DOWN) {
     emberAfCorePrintln("Network down - entering low power mode");
 
@@ -120,7 +123,7 @@ void emberAfStackStatusCallback(EmberStatus status)
     sl_zigbee_event_set_inactive(&led_off_event);
 #endif
 
-    // Sensor timer will automatically stop reading (see app_sensor.c)
+    // Sensor timer will automatically stop reading when event handler checks network state
     // Device will use minimal power while waiting for network
   }
 }
