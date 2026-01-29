@@ -23,7 +23,8 @@ component:
   - id: zigbee_ota_storage_simple
   - id: zigbee_ota_storage_simple_eeprom
   - id: bootloader_interface
-  - id: mx25_flash_shutdown_usart
+  # Note: mx25_flash_shutdown_usart removed - designed for MX25 flash, not IS25LQ020B
+  # Flash power management handled by SPIDRV component
   - id: spidrv
     instance:
       - exp
@@ -85,7 +86,6 @@ configuration:
   # SPI Flash configuration for IS25LQ020B (256KB) on TRÅDFRI
   # SPI pins: PB11 (CS), PD15 (MOSI), PD14 (MISO), PD13 (CLK)
   # CRITICAL: USART0 Location 4 (LOC4) required for PD13/14/15
-  # MX25 shutdown definitions moved to 'define' section
   - name: SL_SPIDRV_EXP_BITRATE
     value: 4000000
   - name: SL_SPIDRV_EXP_CS_PORT
@@ -181,12 +181,3 @@ define:
     value: 4
   - name: SL_SPIDRV_EXP_CLK_LOC
     value: 4
-
-  # MX25 flash shutdown definitions
-  # Must be in 'define' section for preprocessor checks
-  - name: SL_MX25_FLASH_SHUTDOWN_USART
-    value: USART0
-  - name: SL_MX25_FLASH_SHUTDOWN_CS_PORT
-    value: gpioPortB
-  - name: SL_MX25_FLASH_SHUTDOWN_CS_PIN
-    value: 11
