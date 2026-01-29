@@ -14,12 +14,15 @@ description: >
 category: Bootloader|Core
 author: Silicon Labs, Inc. (Modified for TRÅDFRI)
 
-# Bootloader components - minimal configuration for flash space
+# Bootloader components for application bootloader with external SPI flash
 component:
   # Core bootloader
   - id: bootloader_core
 
-  # Storage slots management (provides storage interface)
+  # CRITICAL: Common storage implementation (provides storage_main)
+  - id: bootloader_common_storage_single
+
+  # Storage slots management (provides slot configuration)
   - id: bootloader_storage_slots
 
   # SPI flash storage for OTA images
@@ -31,10 +34,19 @@ component:
   # Image parser for application images
   - id: bootloader_image_parser
 
+  # CRC validation for image verification
+  - id: bootloader_crc
+
+  # Cryptographic support (AES, SHA, ECDSA)
+  - id: bootloader_aes_sha_ecdsa
+
+  # Token management for security keys
+  - id: bootloader_token_management
+
   # Delay driver for flash operations
   - id: bootloader_delay_driver
 
-  # Debug component (required by bootloader_core)
+  # Debug output
   - id: bootloader_debug
 
 configuration:
