@@ -14,22 +14,13 @@ description: >
 category: Bootloader|Core
 author: Silicon Labs, Inc. (Modified for TRÅDFRI)
 
-# Bootloader components for external SPI flash storage
+# Bootloader components - minimal production configuration
 component:
   # Core bootloader
   - id: bootloader_core
 
-  # Storage slots management (provides storage_main interface)
+  # Storage slots management (provides storage interface)
   - id: bootloader_storage_slots
-
-  # Application properties interface
-  - id: bootloader_app_properties
-
-  # Application upgrade version check
-  - id: bootloader_app_upgrade_version
-
-  # Compression support
-  - id: bootloader_compression_lzma
 
   # SPI flash storage for OTA images
   - id: bootloader_spiflash_storage
@@ -48,9 +39,6 @@ component:
 
   # CRC calculation for integrity checking
   - id: bootloader_crc
-
-  # Debug component (generates btl_debug_cfg.h)
-  - id: bootloader_debug
 
 configuration:
   # Application start address (after bootloader)
