@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 // Zigbee cluster IDs
-#define ZCL_POWER_CONFIG_CLUSTER_ID          0x0001
+// Note: ZCL_POWER_CONFIG_CLUSTER_ID is already defined in zap headers
 #define ZCL_TEMP_MEASUREMENT_CLUSTER_ID      0x0402
 #define ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID  0x0403
 #define ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID  0x0405

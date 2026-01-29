@@ -18,8 +18,8 @@
 // ADC reference voltage in mV (internal 1.25V reference)
 #define ADC_REF_VOLTAGE_MV          1250
 
-// VDD divider: EFR32MG1P uses /3 divider for VDD measurement
-#define VDD_DIVIDER                 3
+// AVDD gain: EFR32MG1P Series 1 uses 1/4 gain for AVDD measurement
+#define AVDD_SCALE_FACTOR           4
 
 /**
  * @brief Initialize battery voltage measurement
@@ -38,7 +38,7 @@ bool battery_init(void)
   // Configure for single-ended mode
   ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
   initSingle.reference = adcRef1V25;        // 1.25V internal reference
-  initSingle.input = adcSingleInputVDDDiv3; // VDD/3 input
+  initSingle.posSel = adcPosSelAVDD;        // VDD measurement (AVDD channel)
   initSingle.resolution = adcRes12Bit;      // 12-bit resolution
   initSingle.acqTime = adcAcqTime256;       // Longer acquisition for accuracy
   ADC_InitSingle(ADC0, &initSingle);
@@ -61,8 +61,9 @@ uint16_t battery_read_voltage_mv(void)
   uint32_t adc_value = ADC_DataSingleGet(ADC0);
 
   // Calculate voltage in mV
-  // VDD = (ADC_value / 4096) * ADC_REF_VOLTAGE * VDD_DIVIDER
-  uint32_t voltage_mv = (adc_value * ADC_REF_VOLTAGE_MV * VDD_DIVIDER) / 4096;
+  // AVDD = (ADC_value / 4096) * ADC_REF_VOLTAGE * AVDD_SCALE_FACTOR
+  // Scale factor of 4 accounts for the 1/4 gain on AVDD input
+  uint32_t voltage_mv = (adc_value * ADC_REF_VOLTAGE_MV * AVDD_SCALE_FACTOR) / 4096;
 
   return (uint16_t)voltage_mv;
 }
