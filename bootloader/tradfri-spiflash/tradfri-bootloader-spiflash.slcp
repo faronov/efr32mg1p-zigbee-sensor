@@ -14,7 +14,7 @@ description: >
 category: Bootloader|Core
 author: Silicon Labs, Inc. (Modified for TRÅDFRI)
 
-# Bootloader components - minimal production configuration
+# Bootloader components - minimal configuration for flash space
 component:
   # Core bootloader
   - id: bootloader_core
@@ -28,17 +28,14 @@ component:
   # SPI controller driver for flash communication
   - id: bootloader_spi_controller_usart_driver
 
-  # GPIO activation (button and LED support)
-  - id: bootloader_gpio_activation
-
   # Image parser for application images
   - id: bootloader_image_parser
 
   # Delay driver for flash operations
   - id: bootloader_delay_driver
 
-  # CRC calculation for integrity checking
-  - id: bootloader_crc
+  # Debug component (required by bootloader_core)
+  - id: bootloader_debug
 
 configuration:
   # Application start address (after bootloader)
@@ -61,16 +58,6 @@ configuration:
   - name: SLOT0_SIZE
     value: 262144  # 256KB
 
-  # GPIO activation (optional - use button for bootloader mode)
-  - name: BTL_GPIO_ACTIVATION_POLARITY
-    value: 0  # Active low (button pressed = 0)
-
-  # LED indication during bootloader operation
-  - name: BTL_PLUGIN_GPIO_ACTIVATION_BUTTON_ENABLE
-    value: 1
-  - name: BTL_PLUGIN_GPIO_ACTIVATION_LED_ENABLE
-    value: 1
-
 # Custom defines for TRÅDFRI hardware
 define:
   # Bootloader version
@@ -84,19 +71,6 @@ define:
   # TRÅDFRI board identification
   - name: CUSTOM_BOARD_TRADFRI
     value: 1
-
-  # Button for bootloader activation (PB13)
-  # SDK expects SL_BTL_* prefix
-  - name: SL_BTL_BUTTON_PORT
-    value: gpioPortB
-  - name: SL_BTL_BUTTON_PIN
-    value: 13
-
-  # LED for bootloader indication (PA0)
-  - name: SL_BTL_LED_PORT
-    value: gpioPortA
-  - name: SL_BTL_LED_PIN
-    value: 0
 
   # SPI Flash pins (CRITICAL - TRÅDFRI specific)
   # USART0 Location 4 for PD13/14/15
