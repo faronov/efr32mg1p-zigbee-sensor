@@ -28,6 +28,9 @@ component:
   # Image parser for application images
   - id: bootloader_image_parser
 
+  # Application properties (required for bootloader operation)
+  - id: bootloader_app_properties
+
   # Security features
   - id: bootloader_aes_sha_ecdsa
 
