@@ -403,10 +403,8 @@ static EmberStatus create_binding(uint8_t local_endpoint,
   EmberStatus status = emberSetBinding(binding_index, &binding);
 
   if (status == EMBER_SUCCESS) {
-    emberAfCorePrint("Binding [%d] created: EP %d → Cluster 0x%2X → ",
-                     binding_index, local_endpoint, cluster_id);
-    emberAfPrintBigEndianEui64(dest_eui64);
-    emberAfCorePrintln(" EP %d", dest_endpoint);
+    emberAfCorePrintln("Binding [%d] created: EP %d → Cluster 0x%2X → EP %d",
+                       binding_index, local_endpoint, cluster_id, dest_endpoint);
   } else {
     emberAfCorePrintln("Binding creation failed: 0x%x", status);
   }
@@ -436,9 +434,7 @@ static void auto_bind_to_coordinator(void)
     return;
   }
 
-  emberAfCorePrint("Coordinator EUI64: ");
-  emberAfPrintBigEndianEui64(coordinator_eui64);
-  emberAfCorePrintln("");
+  emberAfCorePrintln("Binding to coordinator (node 0x0000)");
 
   // Bind temperature measurement cluster (0x0402)
   create_binding(1, ZCL_TEMP_MEASUREMENT_CLUSTER_ID, coordinator_eui64, 1);
@@ -472,10 +468,8 @@ static void print_binding_table(void)
     EmberStatus status = emberGetBinding(i, &entry);
 
     if (status == EMBER_SUCCESS && entry.type != EMBER_UNUSED_BINDING) {
-      emberAfCorePrint("  [%d] EP %d → Cluster 0x%2X → ",
-                       i, entry.local, entry.clusterId);
-      emberAfPrintBigEndianEui64(entry.identifier);
-      emberAfCorePrintln(" EP %d", entry.remote);
+      emberAfCorePrintln("  [%d] EP %d → Cluster 0x%2X → EP %d",
+                         i, entry.local, entry.clusterId, entry.remote);
       active_bindings++;
     }
   }
@@ -495,10 +489,8 @@ static void print_binding_table(void)
  */
 void emberAfSetBindingCallback(EmberBindingTableEntry *entry)
 {
-  emberAfCorePrint("Binding notification: EP %d → Cluster 0x%2X → ",
-                   entry->local, entry->clusterId);
-  emberAfPrintBigEndianEui64(entry->identifier);
-  emberAfCorePrintln(" EP %d", entry->remote);
+  emberAfCorePrintln("Binding notification: EP %d → Cluster 0x%2X → EP %d",
+                     entry->local, entry->clusterId, entry->remote);
 }
 
 /**

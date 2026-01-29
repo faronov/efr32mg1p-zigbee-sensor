@@ -21,6 +21,7 @@ component:
   # Binding support for direct device-to-device communication
   - id: zigbee_binding_table
   - id: zigbee_end_device_bind
+  - id: zigbee_binding_table_library
 
   # OTA bootloader support
   - id: zigbee_ota_client_policy
