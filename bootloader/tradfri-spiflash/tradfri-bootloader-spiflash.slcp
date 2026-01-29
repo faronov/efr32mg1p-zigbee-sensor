@@ -28,9 +28,6 @@ component:
   # Image parser for application images
   - id: bootloader_image_parser
 
-  # Compression support (optional, reduces OTA image size)
-  - id: bootloader_compression_lz4
-
   # Security features
   - id: bootloader_aes_sha_ecdsa
 
@@ -39,12 +36,6 @@ component:
 
   # GPIO for LED indication (optional)
   - id: bootloader_gpio_activation
-
-  # UART driver for debug output (optional)
-  - id: bootloader_uart_driver
-
-# Device configuration
-device: EFR32MG1P132F256GM32
 
 configuration:
   # Application start address (after bootloader)
