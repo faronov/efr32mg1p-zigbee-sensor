@@ -76,9 +76,10 @@ echo "Output: ${OTA_FILE}"
 
 # Create proper Zigbee OTA file with ZCL header using Simplicity Commander
 # This wraps the GBL in a Zigbee OTA format with manufacturer ID, version, etc.
+# Using Silicon Labs manufacturer ID (0x1049) since this is DIY firmware for EFR32 chip
 commander ota create \
     --upgrade-image "${GBL_FILE}" \
-    --manufacturer-id 0x10F2 \
+    --manufacturer-id 0x1049 \
     --image-type 0x0000 \
     --firmware-version ${FW_VERSION} \
     --string "BME280 Sensor v${VERSION}" \
