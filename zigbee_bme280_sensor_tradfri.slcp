@@ -91,6 +91,8 @@ configuration:
     value: 11
   - name: SL_SPIDRV_EXP_BITRATE
     value: 4000000
+  - name: SL_SPIDRV_EXP_PERIPHERAL
+    value: USART0
   - name: SL_SPIDRV_EXP_CS_PORT
     value: gpioPortB
   - name: SL_SPIDRV_EXP_CS_PIN
