@@ -19,8 +19,8 @@ component:
   # Core bootloader
   - id: bootloader_core
 
-  # SPI flash storage for OTA images (try alternate component name)
-  - id: bootloader_storage_spiflash
+  # SPI flash storage for OTA images
+  - id: bootloader_spiflash_storage
 
   # SPI controller driver for flash communication
   - id: bootloader_spi_controller_usart_driver
@@ -30,6 +30,9 @@ component:
 
   # Delay driver for flash operations
   - id: bootloader_delay_driver
+
+  # GPIO activation (may provide needed initialization)
+  - id: bootloader_gpio_activation
 
   # Debug support (generates btl_debug_cfg.h)
   - id: bootloader_debug
