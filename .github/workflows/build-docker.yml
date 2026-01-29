@@ -161,6 +161,7 @@ jobs:
 
       - name: Create OTA files - ${{ matrix.variant.name }}
         if: success()
+        shell: bash
         run: |
           # Set HOME for commander
           export HOME=/root
@@ -174,8 +175,15 @@ jobs:
             echo "Using version from tag: $VERSION"
           fi
 
-          # Determine variant (tradfri or brd4151a)
-          VARIANT="${{ matrix.variant.board }}"
+          # Map variant name (custom → tradfri, brd4151a → brd4151a)
+          BOARD="${{ matrix.variant.board }}"
+          if [ "$BOARD" = "custom" ]; then
+            VARIANT="tradfri"
+          else
+            VARIANT="$BOARD"
+          fi
+
+          echo "Board: $BOARD, Variant: $VARIANT"
 
           # Create OTA files
           echo "Creating OTA files for ${VARIANT} v${VERSION}..."

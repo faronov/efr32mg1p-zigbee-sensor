@@ -72,14 +72,6 @@ configuration:
 
 # Custom defines for TRÅDFRI hardware
 define:
-  # Bootloader version
-  - name: BOOTLOADER_VERSION_MAIN
-    value: 1
-  - name: BOOTLOADER_VERSION_MAJOR
-    value: 0
-  - name: BOOTLOADER_VERSION_MINOR
-    value: 0
-
   # TRÅDFRI board identification
   - name: CUSTOM_BOARD_TRADFRI
     value: 1
