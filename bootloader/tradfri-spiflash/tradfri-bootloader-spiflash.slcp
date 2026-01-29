@@ -49,6 +49,9 @@ component:
   # CRC calculation for integrity checking
   - id: bootloader_crc
 
+  # Debug component (generates btl_debug_cfg.h)
+  - id: bootloader_debug
+
 configuration:
   # Application start address (after bootloader)
   - name: BOOTLOADER_ENFORCE_SIGNED_UPGRADE
