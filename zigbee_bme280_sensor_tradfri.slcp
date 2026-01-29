@@ -18,6 +18,10 @@ component:
   - id: zigbee_scan_dispatch
   - id: zigbee_update_tc_link_key
 
+  # Binding support for direct device-to-device communication
+  - id: zigbee_binding_table
+  - id: zigbee_end_device_bind
+
   # OTA bootloader support
   - id: zigbee_ota_client_policy
   - id: zigbee_ota_storage_simple
@@ -65,9 +69,10 @@ configuration:
   - name: SLI_ZIGBEE_PRIMARY_NETWORK_SECURITY_TYPE
     value: SLI_ZIGBEE_NETWORK_SECURITY_TYPE_3_0
 
-  # Minimal binding table
+  # Binding table (5 entries: 3 measurement clusters + 2 spare)
+  # Each binding ~16 bytes, total ~80 bytes RAM
   - name: EMBER_BINDING_TABLE_SIZE
-    value: 2
+    value: 5
 
   # Reduced NVM size for Series 1
   - name: NVM3_DEFAULT_NVM_SIZE

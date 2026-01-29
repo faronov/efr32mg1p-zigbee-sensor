@@ -141,6 +141,12 @@ void emberAfStackStatusCallback(EmberStatus status)
     // Restart periodic sensor updates
     app_sensor_start_periodic_updates();
 
+    // Auto-bind sensor clusters to coordinator for efficient reporting
+    auto_bind_to_coordinator();
+
+    // Print binding table for verification
+    print_binding_table();
+
   } else if (status == EMBER_NETWORK_DOWN) {
     emberAfCorePrintln("Network down - will attempt optimized rejoin");
 
@@ -354,6 +360,151 @@ static void start_optimized_rejoin(void)
     rejoin_state = REJOIN_STATE_ALL_CHANNELS;
     sl_zigbee_event_set_delay_ms(&rejoin_retry_event, 10);
   }
+}
+
+/**
+ * @brief Create a binding entry for a cluster
+ *
+ * Creates a unicast binding from this device's endpoint to a destination
+ * device for the specified cluster. This enables direct reporting without
+ * coordinator relay.
+ *
+ * @param local_endpoint Local endpoint (typically 1 for sensor)
+ * @param cluster_id Cluster ID to bind (e.g., temperature, humidity)
+ * @param dest_eui64 Destination device EUI64 address
+ * @param dest_endpoint Destination endpoint (typically 1)
+ * @return EMBER_SUCCESS if binding created, error code otherwise
+ */
+static EmberStatus create_binding(uint8_t local_endpoint,
+                                   uint16_t cluster_id,
+                                   EmberEUI64 dest_eui64,
+                                   uint8_t dest_endpoint)
+{
+  EmberBindingTableEntry binding;
+
+  // Configure unicast binding
+  binding.type = EMBER_UNICAST_BINDING;
+  binding.local = local_endpoint;
+  binding.clusterId = cluster_id;
+  binding.remote = dest_endpoint;
+  MEMCOPY(binding.identifier, dest_eui64, EUI64_SIZE);
+
+  // Find unused binding slot and set the binding
+  uint8_t binding_index = emberFindUnusedBindingIndex();
+  if (binding_index == 0xFF) {
+    emberAfCorePrintln("ERROR: No free binding table entries");
+    return EMBER_TABLE_FULL;
+  }
+
+  EmberStatus status = emberSetBinding(binding_index, &binding);
+
+  if (status == EMBER_SUCCESS) {
+    emberAfCorePrint("Binding [%d] created: EP %d → Cluster 0x%2X → ",
+                     binding_index, local_endpoint, cluster_id);
+    emberAfPrintBigEndianEui64(dest_eui64);
+    emberAfCorePrintln(" EP %d", dest_endpoint);
+  } else {
+    emberAfCorePrintln("Binding creation failed: 0x%x", status);
+  }
+
+  return status;
+}
+
+/**
+ * @brief Auto-bind sensor clusters to coordinator
+ *
+ * Automatically creates bindings for all sensor measurement clusters
+ * (temperature, humidity, pressure, battery) to the coordinator after
+ * joining the network. This enables efficient direct reporting.
+ */
+static void auto_bind_to_coordinator(void)
+{
+  EmberStatus status;
+  EmberEUI64 coordinator_eui64;
+
+  emberAfCorePrintln("=== Auto-binding sensor clusters to coordinator ===");
+
+  // Get coordinator EUI64
+  // Note: Coordinator is node ID 0x0000
+  status = emberLookupEui64ByNodeId(0x0000, coordinator_eui64);
+  if (status != EMBER_SUCCESS) {
+    emberAfCorePrintln("ERROR: Failed to get coordinator EUI64: 0x%x", status);
+    return;
+  }
+
+  emberAfCorePrint("Coordinator EUI64: ");
+  emberAfPrintBigEndianEui64(coordinator_eui64);
+  emberAfCorePrintln("");
+
+  // Bind temperature measurement cluster (0x0402)
+  create_binding(1, ZCL_TEMP_MEASUREMENT_CLUSTER_ID, coordinator_eui64, 1);
+
+  // Bind relative humidity measurement cluster (0x0405)
+  create_binding(1, ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID, coordinator_eui64, 1);
+
+  // Bind pressure measurement cluster (0x0403)
+  create_binding(1, ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID, coordinator_eui64, 1);
+
+  // Bind power configuration cluster (0x0001) for battery reporting
+  create_binding(1, ZCL_POWER_CONFIG_CLUSTER_ID, coordinator_eui64, 1);
+
+  emberAfCorePrintln("Auto-binding complete");
+}
+
+/**
+ * @brief Print all binding table entries
+ *
+ * Debugging helper to display all configured bindings.
+ */
+static void print_binding_table(void)
+{
+  uint8_t i;
+  EmberBindingTableEntry entry;
+  uint8_t active_bindings = 0;
+
+  emberAfCorePrintln("=== Binding Table (%d max entries) ===", EMBER_BINDING_TABLE_SIZE);
+
+  for (i = 0; i < EMBER_BINDING_TABLE_SIZE; i++) {
+    EmberStatus status = emberGetBinding(i, &entry);
+
+    if (status == EMBER_SUCCESS && entry.type != EMBER_UNUSED_BINDING) {
+      emberAfCorePrint("  [%d] EP %d → Cluster 0x%2X → ",
+                       i, entry.local, entry.clusterId);
+      emberAfPrintBigEndianEui64(entry.identifier);
+      emberAfCorePrintln(" EP %d", entry.remote);
+      active_bindings++;
+    }
+  }
+
+  if (active_bindings == 0) {
+    emberAfCorePrintln("  (No active bindings)");
+  } else {
+    emberAfCorePrintln("Total active bindings: %d", active_bindings);
+  }
+}
+
+/**
+ * @brief Callback when a binding table entry is set
+ *
+ * Called by the stack when a binding is created on this device,
+ * either locally or remotely via ZDO bind command.
+ */
+void emberAfSetBindingCallback(EmberBindingTableEntry *entry)
+{
+  emberAfCorePrint("Binding notification: EP %d → Cluster 0x%2X → ",
+                   entry->local, entry->clusterId);
+  emberAfPrintBigEndianEui64(entry->identifier);
+  emberAfCorePrintln(" EP %d", entry->remote);
+}
+
+/**
+ * @brief Callback when a binding table entry is deleted
+ *
+ * Called by the stack when a binding is removed.
+ */
+void emberAfDeleteBindingCallback(uint8_t index)
+{
+  emberAfCorePrintln("Binding [%d] deleted", index);
 }
 
 /**
