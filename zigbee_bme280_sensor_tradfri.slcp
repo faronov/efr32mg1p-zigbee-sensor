@@ -18,17 +18,18 @@ component:
   - id: zigbee_scan_dispatch
   - id: zigbee_update_tc_link_key
 
-  # OTA bootloader support
-  - id: zigbee_ota_client_policy
-  - id: zigbee_ota_storage_simple        # Required by zigbee_ota_storage_simple_eeprom
-  - id: zigbee_ota_storage_simple_eeprom
-  - id: bootloader_interface
-
-  # External SPI flash for OTA storage
-  - id: mx25_flash_shutdown_usart
-  - id: spidrv
-    instance:
-      - exp
+  # OTA bootloader support - TEMPORARILY DISABLED
+  # TODO: Re-enable once SPIDRV pin configuration is resolved
+  # The SPIDRV component requires proper pin routing configuration
+  # which needs to be done via board files or alternative method
+  # - id: zigbee_ota_client_policy
+  # - id: zigbee_ota_storage_simple
+  # - id: zigbee_ota_storage_simple_eeprom
+  # - id: bootloader_interface
+  # - id: mx25_flash_shutdown_usart
+  # - id: spidrv
+  #   instance:
+  #     - exp
 
   # Hardware drivers
   - id: emlib_i2c
@@ -46,10 +47,7 @@ component:
       - led0
 
   # I/O
-  - id: iostream_usart
-    instance:
-      - vcom
-  - id: iostream_retarget_stdio
+  - id: iostream_recommended_stream
 
 # Device specified via --device flag in build script
 # Target: EFR32MG1P132F256GM32 (IKEA TRÅDFRI)
@@ -85,33 +83,31 @@ configuration:
   - name: SL_PSA_ITS_SUPPORT_V3_DRIVER
     value: 1
 
-  # SPI Flash configuration for IS25LQ020B on TRÅDFRI
-  # CS: PB11, MOSI: PD15, MISO: PD14, CLK: PD13
-  - name: SL_MX25_FLASH_SHUTDOWN_CS_PORT
-    value: gpioPortB
-  - name: SL_MX25_FLASH_SHUTDOWN_CS_PIN
-    value: 11
-
-  # SPIDRV configuration for external flash
-  # SPI pins: PB11 (CS), PD15 (MOSI), PD14 (MISO), PD13 (CLK)
-  - name: SL_SPIDRV_EXP_BITRATE
-    value: 4000000
-  - name: SL_SPIDRV_EXP_CS_PORT
-    value: gpioPortB
-  - name: SL_SPIDRV_EXP_CS_PIN
-    value: 11
-  - name: SL_SPIDRV_EXP_CLK_PORT
-    value: gpioPortD
-  - name: SL_SPIDRV_EXP_CLK_PIN
-    value: 13
-  - name: SL_SPIDRV_EXP_MOSI_PORT
-    value: gpioPortD
-  - name: SL_SPIDRV_EXP_MOSI_PIN
-    value: 15
-  - name: SL_SPIDRV_EXP_MISO_PORT
-    value: gpioPortD
-  - name: SL_SPIDRV_EXP_MISO_PIN
-    value: 14
+  # SPI Flash configuration - TEMPORARILY DISABLED
+  # TODO: Configure once SPIDRV component is properly added
+  # SPI pins on TRÅDFRI: PB11 (CS), PD15 (MOSI), PD14 (MISO), PD13 (CLK)
+  # - name: SL_MX25_FLASH_SHUTDOWN_CS_PORT
+  #   value: gpioPortB
+  # - name: SL_MX25_FLASH_SHUTDOWN_CS_PIN
+  #   value: 11
+  # - name: SL_SPIDRV_EXP_BITRATE
+  #   value: 4000000
+  # - name: SL_SPIDRV_EXP_CS_PORT
+  #   value: gpioPortB
+  # - name: SL_SPIDRV_EXP_CS_PIN
+  #   value: 11
+  # - name: SL_SPIDRV_EXP_CLK_PORT
+  #   value: gpioPortD
+  # - name: SL_SPIDRV_EXP_CLK_PIN
+  #   value: 13
+  # - name: SL_SPIDRV_EXP_MOSI_PORT
+  #   value: gpioPortD
+  # - name: SL_SPIDRV_EXP_MOSI_PIN
+  #   value: 15
+  # - name: SL_SPIDRV_EXP_MISO_PORT
+  #   value: gpioPortD
+  # - name: SL_SPIDRV_EXP_MISO_PIN
+  #   value: 14
 
   # Button configuration - use PB13 (available on TRÅDFRI)
   - name: SL_SIMPLE_BUTTON_BTN0_PORT
@@ -125,11 +121,12 @@ configuration:
   - name: SL_SIMPLE_LED_LED0_PIN
     value: 0
 
-  # OTA configuration
-  - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_START
-    value: 0
-  - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_END
-    value: 262144  # 256KB (2Mbit flash)
+  # OTA configuration - TEMPORARILY DISABLED
+  # TODO: Re-enable when OTA components are added back
+  # - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_START
+  #   value: 0
+  # - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_END
+  #   value: 262144  # 256KB (2Mbit flash)
 
 source:
   - path: main.c
