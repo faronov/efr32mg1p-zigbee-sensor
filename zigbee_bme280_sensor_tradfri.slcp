@@ -20,6 +20,7 @@ component:
 
   # OTA bootloader support
   - id: zigbee_ota_client_policy
+  - id: zigbee_ota_storage_simple        # Required by zigbee_ota_storage_simple_eeprom
   - id: zigbee_ota_storage_simple_eeprom
   - id: bootloader_interface
 
@@ -45,7 +46,10 @@ component:
       - led0
 
   # I/O
-  - id: iostream_recommended_stream
+  - id: iostream_usart
+    instance:
+      - vcom
+  - id: iostream_retarget_stdio
 
 # Device specified via --device flag in build script
 # Target: EFR32MG1P132F256GM32 (IKEA TRÅDFRI)
