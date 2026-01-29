@@ -20,13 +20,17 @@ echo "Creating OTA file for ${VARIANT} v${VERSION}"
 echo "Firmware version: ${FW_VERSION}"
 echo "=========================================="
 
-# Paths - try both possible firmware locations
+# Paths - try multiple possible firmware locations
 if [ -f "firmware/build/release/zigbee_bme280_sensor_${VARIANT}.s37" ]; then
     FIRMWARE_DIR="firmware/build/release"
+elif [ -f "firmware/build/debug/zigbee_bme280_sensor_${VARIANT}.s37" ]; then
+    FIRMWARE_DIR="firmware/build/debug"
 elif [ -f "build/${VARIANT}/release/zigbee_bme280_sensor_${VARIANT}.s37" ]; then
     FIRMWARE_DIR="build/${VARIANT}/release"
+elif [ -f "build/${VARIANT}/debug/zigbee_bme280_sensor_${VARIANT}.s37" ]; then
+    FIRMWARE_DIR="build/${VARIANT}/debug"
 else
-    FIRMWARE_DIR="firmware/build/release"  # Default to GitHub Actions path
+    FIRMWARE_DIR="firmware/build/debug"  # Default to GitHub Actions path
 fi
 
 OUTPUT_DIR="build/${VARIANT}/ota"
