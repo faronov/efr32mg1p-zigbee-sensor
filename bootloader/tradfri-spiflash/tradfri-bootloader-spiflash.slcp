@@ -19,8 +19,8 @@ component:
   # Core bootloader
   - id: bootloader_core
 
-  # SPI flash storage for OTA images
-  - id: bootloader_spiflash_storage
+  # SPI flash storage for OTA images (try alternate component name)
+  - id: bootloader_storage_spiflash
 
   # SPI controller driver for flash communication
   - id: bootloader_spi_controller_usart_driver
@@ -36,6 +36,9 @@ component:
 
   # CRC calculation for image verification
   - id: bootloader_crc
+
+  # Token management for storage operations
+  - id: bootloader_token_management
 
 configuration:
   # Application start address (after bootloader)
