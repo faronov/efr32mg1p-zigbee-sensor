@@ -133,11 +133,12 @@ SLC_CMD="slc generate \"$SAMPLE_SLCP\" -np -d firmware -name \"$PROJECT_NAME\" -
 
 # Handle board/device specification
 if [ "$BOARD" = "custom" ]; then
-  # For custom boards (e.g., TRÅDFRI), specify device directly
-  SLC_CMD="$SLC_CMD --device EFR32MG1P132F256GM32 --force"
-  echo "Using custom device: EFR32MG1P132F256GM32"
+  # For custom boards (e.g., TRÅDFRI), use --with to specify device OPN directly
+  # This is the same approach as NabuCasa: --with <device>
+  SLC_CMD="$SLC_CMD --with EFR32MG1P132F256GM32"
+  echo "Using custom device OPN: EFR32MG1P132F256GM32"
 elif [ -n "$BOARD" ]; then
-  # For standard dev boards, use --with flag
+  # For standard dev boards, use --with flag with board name
   SLC_CMD="$SLC_CMD --with \"$BOARD\""
   echo "Using board: $BOARD"
 fi
