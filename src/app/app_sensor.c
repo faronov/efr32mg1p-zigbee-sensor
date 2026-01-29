@@ -10,23 +10,17 @@
 #include "app/framework/include/af.h"
 #include <stdio.h>
 
-// Zigbee cluster IDs
-// Note: ZCL_POWER_CONFIG_CLUSTER_ID is already defined in zap headers
-#define ZCL_TEMP_MEASUREMENT_CLUSTER_ID      0x0402
-#define ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID  0x0403
-#define ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID  0x0405
-
-// Zigbee attribute IDs
-#define ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID      0x0000
-#define ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID  0x0000
-#define ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID  0x0000
-
-// Power Configuration cluster attribute IDs
-#define ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID              0x0020
-#define ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID 0x0021
-
 // Endpoint where sensor clusters are located
 #define SENSOR_ENDPOINT  1
+
+// Note: All ZCL cluster IDs and attribute IDs are defined in ZAP-generated headers:
+// - ZCL_POWER_CONFIG_CLUSTER_ID (0x0001)
+// - ZCL_TEMP_MEASUREMENT_CLUSTER_ID (0x0402)
+// - ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID (0x0403)
+// - ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID (0x0405)
+// - ZCL_*_MEASURED_VALUE_ATTRIBUTE_ID (0x0000)
+// - ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID (0x0020)
+// - ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID (0x0021)
 
 // Event control for periodic updates
 static sl_zigbee_event_t sensor_update_event;
