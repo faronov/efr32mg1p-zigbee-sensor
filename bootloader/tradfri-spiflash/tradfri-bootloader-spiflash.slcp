@@ -19,6 +19,9 @@ component:
   # Core bootloader
   - id: bootloader_core
 
+  # Storage interface (provides storage_main and storageFunctions)
+  - id: bootloader_storage_slots
+
   # SPI flash storage for OTA images
   - id: bootloader_spiflash_storage
 
