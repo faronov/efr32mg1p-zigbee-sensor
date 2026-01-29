@@ -131,10 +131,15 @@ cd "$PROJECT_ROOT"
 # Build the SLC generate command
 SLC_CMD="slc generate \"$SAMPLE_SLCP\" -np -d firmware -name \"$PROJECT_NAME\" -o makefile"
 
-# Only add --with flag if BOARD is set and not "custom"
-# TRÅDFRI uses device specification in .slcp, so skip --with for it
-if [ -n "$BOARD" ] && [ "$BOARD" != "custom" ]; then
+# Handle board/device specification
+if [ "$BOARD" = "custom" ]; then
+  # For custom boards (e.g., TRÅDFRI), specify device directly
+  SLC_CMD="$SLC_CMD --device EFR32MG1P132F256GM32 --force"
+  echo "Using custom device: EFR32MG1P132F256GM32"
+elif [ -n "$BOARD" ]; then
+  # For standard dev boards, use --with flag
   SLC_CMD="$SLC_CMD --with \"$BOARD\""
+  echo "Using board: $BOARD"
 fi
 
 echo "Running: $SLC_CMD"

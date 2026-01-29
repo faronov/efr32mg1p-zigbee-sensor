@@ -47,8 +47,8 @@ component:
   # I/O
   - id: iostream_recommended_stream
 
-# Device configuration for EFR32MG1P132F256GM32
-device: EFR32MG1P132F256GM32
+# Device specified via --device flag in build script
+# Target: EFR32MG1P132F256GM32 (IKEA TRÅDFRI)
 
 configuration:
   # Disable VCOM (not available on TRÅDFRI)
