@@ -13,17 +13,10 @@
 // Endpoint where sensor clusters are located
 #define SENSOR_ENDPOINT  1
 
-// Note: Most ZCL cluster IDs and attribute IDs are defined in ZAP-generated headers.
-// The following are NOT auto-generated and need to be defined here:
-
-// Humidity Measurement cluster (0x0405) - not auto-generated
-#ifndef ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID
-#define ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID  0x0405
-#endif
-
-#ifndef ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID
-#define ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID  0x0000
-#endif
+// Convenience aliases for ZAP-generated cluster/attribute IDs
+// ZAP uses "RELATIVE_HUMIDITY" not "HUMIDITY", so we create shorter aliases
+#define ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID      ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID
+#define ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID ZCL_RELATIVE_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID
 
 // Event control for periodic updates
 static sl_zigbee_event_t sensor_update_event;
