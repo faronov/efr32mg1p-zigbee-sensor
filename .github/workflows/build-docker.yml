@@ -3,6 +3,8 @@ name: Build Firmware
 on:
   push:
     branches: [ main, develop ]
+    tags:
+      - 'v*'  # Trigger on version tags (v1.0.0, v2.1.3, etc.)
   pull_request:
     branches: [ main ]
   workflow_dispatch:
