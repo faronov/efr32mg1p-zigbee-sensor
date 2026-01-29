@@ -74,16 +74,24 @@ echo "Step 2: Creating Zigbee OTA file from GBL..."
 echo "Input:  ${GBL_FILE}"
 echo "Output: ${OTA_FILE}"
 
-# Note: Many Zigbee coordinators (Zigbee2MQTT, ZHA, deCONZ) can use GBL files directly
-# We'll create .ota and .zigbee files by copying the GBL
-# For full Zigbee OTA format with manufacturer ID and version, use newer commander version
-# or post-process with zigbee-ota-file-generator tool
-
-cp "${GBL_FILE}" "${OTA_FILE}"
+# Create proper Zigbee OTA file with ZCL header using Simplicity Commander
+# This wraps the GBL in a Zigbee OTA format with manufacturer ID, version, etc.
+commander ota create \
+    --upgrade-image "${GBL_FILE}" \
+    --manufacturer-id 0x10F2 \
+    --image-type 0x0000 \
+    --firmware-version ${FW_VERSION} \
+    --string "BME280 Sensor v${VERSION}" \
+    -o "${OTA_FILE}"
 
 if [ $? -eq 0 ]; then
-    echo "✓ OTA file created (GBL format)"
+    echo "✓ Zigbee OTA file created successfully"
     ls -lh "${OTA_FILE}"
+
+    # Show first few bytes to verify OTA header (should start with 0x0BEEF11E)
+    echo ""
+    echo "OTA file header (first 32 bytes):"
+    hexdump -C "${OTA_FILE}" | head -3
 else
     echo "✗ Failed to create OTA file"
     exit 1
