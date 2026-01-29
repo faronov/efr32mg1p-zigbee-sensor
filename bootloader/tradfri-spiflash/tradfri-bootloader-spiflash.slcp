@@ -19,11 +19,11 @@ component:
   # Core bootloader
   - id: bootloader_core
 
-  # Communication interface (SPI for external flash)
-  - id: bootloader_serial_driver
-
   # SPI flash storage for OTA images
   - id: bootloader_spiflash_storage
+
+  # SPI controller driver for flash communication
+  - id: bootloader_spi_controller_usart_driver
 
   # Image parser for application images
   - id: bootloader_image_parser
@@ -99,30 +99,33 @@ define:
 
   # SPI Flash pins (CRITICAL - TRÅDFRI specific)
   # USART0 Location 4 for PD13/14/15
-  - name: BSP_EXTFLASH_USART
+  # SDK expects SL_USART_EXTFLASH_* prefix
+  - name: SL_USART_EXTFLASH_PERIPHERAL
     value: USART0
-  - name: BSP_EXTFLASH_MOSI_PORT
+  - name: SL_USART_EXTFLASH_TX_PORT
     value: gpioPortD
-  - name: BSP_EXTFLASH_MOSI_PIN
+  - name: SL_USART_EXTFLASH_TX_PIN
     value: 15
-  - name: BSP_EXTFLASH_MOSI_LOC
-    value: 4  # USART0 LOC4
-  - name: BSP_EXTFLASH_MISO_PORT
+  - name: SL_USART_EXTFLASH_TX_LOC
+    value: _USART_ROUTELOC0_TXLOC_LOC4
+  - name: SL_USART_EXTFLASH_RX_PORT
     value: gpioPortD
-  - name: BSP_EXTFLASH_MISO_PIN
+  - name: SL_USART_EXTFLASH_RX_PIN
     value: 14
-  - name: BSP_EXTFLASH_MISO_LOC
-    value: 4  # USART0 LOC4
-  - name: BSP_EXTFLASH_CLK_PORT
+  - name: SL_USART_EXTFLASH_RX_LOC
+    value: _USART_ROUTELOC0_RXLOC_LOC4
+  - name: SL_USART_EXTFLASH_CLK_PORT
     value: gpioPortD
-  - name: BSP_EXTFLASH_CLK_PIN
+  - name: SL_USART_EXTFLASH_CLK_PIN
     value: 13
-  - name: BSP_EXTFLASH_CLK_LOC
-    value: 4  # USART0 LOC4
-  - name: BSP_EXTFLASH_CS_PORT
+  - name: SL_USART_EXTFLASH_CLK_LOC
+    value: _USART_ROUTELOC0_CLKLOC_LOC4
+  - name: SL_USART_EXTFLASH_CS_PORT
     value: gpioPortB
-  - name: BSP_EXTFLASH_CS_PIN
+  - name: SL_USART_EXTFLASH_CS_PIN
     value: 11
+  - name: SL_USART_EXTFLASH_FREQUENCY
+    value: 4000000  # 4 MHz
 
   # Flash chip configuration (IS25LQ020B)
   - name: BTL_STORAGE_SPIFLASH_DEVICE_SIZE
