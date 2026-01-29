@@ -1,12 +1,12 @@
 #!/bin/bash
-# Create OTA firmware file for Zigbee updates
-# Usage: ./tools/create_ota_file.sh <variant> <version>
-# Example: ./tools/create_ota_file.sh tradfri 1.0.0
+# Create OTA firmware file for Zigbee updates (TRÅDFRI)
+# Usage: ./tools/create_ota_file.sh <version>
+# Example: ./tools/create_ota_file.sh 1.0.0
 
 set -e
 
-VARIANT=${1:-tradfri}
-VERSION=${2:-1.0.0}
+VERSION=${1:-1.0.0}
+VARIANT="tradfri"
 
 # Convert version to firmware version number (e.g., 1.0.0 → 0x01000000)
 IFS='.' read -ra VER_PARTS <<< "$VERSION"

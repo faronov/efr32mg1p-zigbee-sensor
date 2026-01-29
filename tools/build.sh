@@ -4,9 +4,10 @@
 
 set -e  # Exit on error
 
-# Default values
-BOARD="${BOARD:-brd4151a}"
-PROJECT_NAME="zigbee_bme280_sensor"
+# Default values for TRÅDFRI module
+BOARD="${BOARD:-custom}"
+SLCP_FILE="${SLCP_FILE:-zigbee_bme280_sensor_tradfri.slcp}"
+PROJECT_NAME="zigbee_bme280_sensor_tradfri"
 
 # Color output
 RED='\033[0;31m'
@@ -15,7 +16,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}EFR32MG1P BME280 Zigbee Sensor Builder${NC}"
+echo -e "${GREEN}TRÅDFRI BME280 Zigbee Sensor Builder${NC}"
 echo -e "${GREEN}========================================${NC}"
 
 # Check required environment variables
@@ -36,22 +37,16 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 FIRMWARE_DIR="$PROJECT_ROOT/firmware"
 
-# Use custom project SLCP if not provided
+# Use TRÅDFRI SLCP if not provided
 if [ -z "$SAMPLE_SLCP" ]; then
-  # Check if SLCP_FILE is specified (for TRÅDFRI variant)
-  if [ -n "$SLCP_FILE" ]; then
-    SAMPLE_SLCP="$PROJECT_ROOT/$SLCP_FILE"
-  else
-    # Default to standard variant
-    SAMPLE_SLCP="$PROJECT_ROOT/zigbee_bme280_sensor.slcp"
-  fi
+  SAMPLE_SLCP="$PROJECT_ROOT/$SLCP_FILE"
 
   if [ ! -f "$SAMPLE_SLCP" ]; then
-    echo -e "${RED}Error: Custom SLCP not found: $SAMPLE_SLCP${NC}"
+    echo -e "${RED}Error: TRÅDFRI SLCP not found: $SAMPLE_SLCP${NC}"
     exit 1
   fi
 
-  echo -e "${GREEN}Using custom project: $SAMPLE_SLCP${NC}"
+  echo -e "${GREEN}Using TRÅDFRI project: $SAMPLE_SLCP${NC}"
 else
   echo -e "${YELLOW}Using provided SLCP: $SAMPLE_SLCP${NC}"
 fi
@@ -131,17 +126,10 @@ cd "$PROJECT_ROOT"
 # Build the SLC generate command
 SLC_CMD="slc generate \"$SAMPLE_SLCP\" -np -d firmware -name \"$PROJECT_NAME\" -o makefile --configuration release"
 
-# Handle board/device specification
-if [ "$BOARD" = "custom" ]; then
-  # For custom boards (e.g., TRÅDFRI), use --with to specify device OPN directly
-  # This is the same approach as NabuCasa: --with <device>
-  SLC_CMD="$SLC_CMD --with EFR32MG1P132F256GM32"
-  echo "Using custom device OPN: EFR32MG1P132F256GM32"
-elif [ -n "$BOARD" ]; then
-  # For standard dev boards, use --with flag with board name
-  SLC_CMD="$SLC_CMD --with \"$BOARD\""
-  echo "Using board: $BOARD"
-fi
+# Handle TRÅDFRI device specification
+# Use --with to specify device OPN directly (same approach as NabuCasa)
+SLC_CMD="$SLC_CMD --with EFR32MG1P132F256GM32"
+echo "Using TRÅDFRI device OPN: EFR32MG1P132F256GM32"
 
 echo "Running: $SLC_CMD"
 eval $SLC_CMD

@@ -31,10 +31,10 @@ This guide explains how to create Zigbee OTA firmware files (`.gbl`, `.ota`, `.z
 
 ```bash
 # Build firmware first
-bash tools/build.sh tradfri
+bash tools/build.sh
 
 # Create OTA files (version 1.0.0)
-bash tools/create_ota_file.sh tradfri 1.0.0
+bash tools/create_ota_file.sh 1.0.0
 ```
 
 **Output files** (in `build/tradfri/ota/`):
@@ -47,14 +47,11 @@ bash tools/create_ota_file.sh tradfri 1.0.0
 ### Step 1: Build Firmware
 
 ```bash
-# Build TRÅDFRI variant
-bash tools/build.sh tradfri
-
-# Or build BRD4151A variant
-bash tools/build.sh brd4151a
+# Build TRÅDFRI firmware
+bash tools/build.sh
 ```
 
-This creates: `build/<variant>/release/zigbee_bme280_sensor_<variant>.s37`
+This creates: `firmware/build/release/zigbee_bme280_sensor_tradfri.s37`
 
 ### Step 2: Create GBL File
 
@@ -115,11 +112,10 @@ Some Zigbee coordinators (Zigbee2MQTT, deCONZ) prefer `.zigbee` extension.
 
 ```bash
 # Syntax
-bash tools/create_ota_file.sh <variant> <version>
+bash tools/create_ota_file.sh <version>
 
-# Examples
-bash tools/create_ota_file.sh tradfri 1.0.0
-bash tools/create_ota_file.sh brd4151a 2.3.1
+# Example
+bash tools/create_ota_file.sh 1.0.0
 ```
 
 ### Using commander directly:
@@ -264,8 +260,7 @@ Add OTA file creation to workflow:
 ```yaml
 - name: Create OTA files
   run: |
-    bash tools/create_ota_file.sh tradfri ${{ github.ref_name }}
-    bash tools/create_ota_file.sh brd4151a ${{ github.ref_name }}
+    bash tools/create_ota_file.sh ${{ github.ref_name }}
 
 - name: Upload OTA artifacts
   uses: actions/upload-artifact@v4
@@ -340,10 +335,10 @@ commander gbl create firmware.gbl \
 **Quick workflow**:
 ```bash
 # 1. Build firmware
-bash tools/build.sh tradfri
+bash tools/build.sh
 
 # 2. Create OTA files
-bash tools/create_ota_file.sh tradfri 1.0.0
+bash tools/create_ota_file.sh 1.0.0
 
 # 3. Upload to coordinator
 cp build/tradfri/ota/*.zigbee <zigbee2mqtt-data-dir>/

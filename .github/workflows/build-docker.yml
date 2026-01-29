@@ -80,29 +80,17 @@ jobs:
           cache-to: type=registry,ref=${{ needs.check-container.outputs.container_name }}-cache,mode=max
 
   build-firmware:
-    name: Build firmware - ${{ matrix.variant.name }}
+    name: Build firmware - TRÅDFRI
     needs: [check-container, build-container]
     if: always() && needs.check-container.result == 'success'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          - name: BRD4151A
-            board: brd4151a
-            slcp: zigbee_bme280_sensor.slcp
-            artifact: firmware-brd4151a
-          - name: TRADFRI
-            board: custom
-            slcp: zigbee_bme280_sensor_tradfri.slcp
-            artifact: firmware-tradfri
     container:
       image: ${{ needs.check-container.outputs.container_name }}
       options: --user root
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build firmware - ${{ matrix.variant.name }}
+      - name: Build firmware - TRÅDFRI
         run: |
           # Fix git ownership issue in container
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -112,8 +100,8 @@ jobs:
 
           # Set environment variables
           export GSDK_DIR=/gecko_sdk_4.5.0
-          export BOARD=${{ matrix.variant.board }}
-          export SLCP_FILE=${{ matrix.variant.slcp }}
+          export BOARD=custom
+          export SLCP_FILE=zigbee_bme280_sensor_tradfri.slcp
 
           # Find and add GCC to PATH (CRITICAL for build)
           echo "Looking for GCC ARM toolchain..."
@@ -153,13 +141,13 @@ jobs:
           fi
 
           echo "✓ SLC: $(which slc || echo '/root/.silabs/slt/bin/slc')"
-          echo "✓ Building variant: ${{ matrix.variant.name }}"
-          echo "✓ Using SLCP: ${{ matrix.variant.slcp }}"
+          echo "✓ Building variant: TRÅDFRI"
+          echo "✓ Using SLCP: zigbee_bme280_sensor_tradfri.slcp"
 
           # Run build script
           bash tools/build.sh
 
-      - name: Create OTA files - ${{ matrix.variant.name }}
+      - name: Create OTA files - TRÅDFRI
         if: success()
         shell: bash
         run: |
@@ -175,19 +163,9 @@ jobs:
             echo "Using version from tag: $VERSION"
           fi
 
-          # Map variant name (custom → tradfri, brd4151a → brd4151a)
-          BOARD="${{ matrix.variant.board }}"
-          if [ "$BOARD" = "custom" ]; then
-            VARIANT="tradfri"
-          else
-            VARIANT="$BOARD"
-          fi
-
-          echo "Board: $BOARD, Variant: $VARIANT"
-
-          # Create OTA files
-          echo "Creating OTA files for ${VARIANT} v${VERSION}..."
-          bash tools/create_ota_file.sh "$VARIANT" "$VERSION" || echo "⚠️ OTA file creation failed (non-blocking)"
+          # Create OTA files for TRÅDFRI
+          echo "Creating OTA files for TRÅDFRI v${VERSION}..."
+          bash tools/create_ota_file.sh "$VERSION" || echo "⚠️ OTA file creation failed (non-blocking)"
 
       - name: List build outputs
         if: always()
@@ -195,11 +173,11 @@ jobs:
           echo "Build directory contents:"
           find firmware -type f 2>/dev/null || echo "No firmware directory"
 
-      - name: Upload build artifacts - ${{ matrix.variant.name }}
+      - name: Upload build artifacts - TRÅDFRI
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: ${{ matrix.variant.artifact }}-${{ github.sha }}
+          name: firmware-tradfri-${{ github.sha }}
           path: |
             firmware/build/**/*.out
             firmware/build/**/*.hex
@@ -215,10 +193,10 @@ jobs:
       - name: Build summary
         if: success()
         run: |
-          echo "## ✅ Build Successful - ${{ matrix.variant.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Build Successful - TRÅDFRI" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Board**: ${{ matrix.variant.name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**SLCP**: ${{ matrix.variant.slcp }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Board**: IKEA TRÅDFRI (EFR32MG1P132F256GM32)" >> $GITHUB_STEP_SUMMARY
+          echo "**SLCP**: zigbee_bme280_sensor_tradfri.slcp" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Build Artifacts" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

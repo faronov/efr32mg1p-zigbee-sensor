@@ -14,7 +14,7 @@ git clone https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor.git
 cd efr32mg1p-bme280-zigbee-sensor
 
 # Build firmware (local)
-bash tools/build.sh tradfri  # or: brd4151a
+bash tools/build.sh
 
 # Or download pre-built release
 # See: https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/releases/latest
@@ -23,7 +23,6 @@ bash tools/build.sh tradfri  # or: brd4151a
 ## Features
 
 ### Hardware Support
-- **Silicon Labs BRD4151A** (EFR32MG1P232F256GM48) development board
 - **IKEA TRÅDFRI module** (EFR32MG1P132F256GM32) with OTA support
 
 ### Sensor & Power
@@ -60,7 +59,6 @@ bash tools/build.sh tradfri  # or: brd4151a
 - **GSDK 4.5.0 LTS** (Long Term Support)
 - **Headless CI/CD** with GitHub Actions
 - **Docker containerization** for reproducible builds
-- **Dual-variant builds**: BRD4151A + TRÅDFRI
 - **Automated OTA file generation** on tagged releases
 - **Release optimization** for minimal binary size
 
@@ -95,19 +93,6 @@ All measurement attributes are configured as reportable with:
 
 ## Hardware Setup
 
-### BRD4151A Development Board
-
-```
-BME280 → BRD4151A Expansion Header
-  VCC  → 3.3V (Pin 20)
-  GND  → GND (Pin 1)
-  SDA  → PC10 (Pin 7)
-  SCL  → PC11 (Pin 9)
-
-LED0: PF4 (on-board)
-BTN0: PF6 (on-board)
-```
-
 ### IKEA TRÅDFRI Module
 
 ```
@@ -141,11 +126,8 @@ See [PINOUT.md](PINOUT.md) for detailed hardware connections.
 ### Local Build
 
 ```bash
-# Build TRÅDFRI variant (with OTA)
-bash tools/build.sh tradfri
-
-# Build BRD4151A variant
-bash tools/build.sh brd4151a
+# Build TRÅDFRI firmware
+bash tools/build.sh
 
 # Outputs: firmware/build/release/*.s37
 ```
@@ -163,7 +145,7 @@ bash tools/build_bootloader.sh
 
 ```bash
 # Create OTA update files (.gbl, .ota, .zigbee)
-bash tools/create_ota_file.sh tradfri 1.0.0
+bash tools/create_ota_file.sh 1.0.0
 
 # Outputs: build/tradfri/ota/*.{gbl,ota,zigbee}
 ```
@@ -370,9 +352,9 @@ Edit `src/app/app_sensor.c`:
 
 ### Debug Output
 
-Enable UART debug output (uses SWO on BRD4151A):
+Enable UART debug output via SWO:
 ```bash
-commander studio trace --device EFR32MG1P232F256GM48
+commander studio trace --device EFR32MG1P132F256GM32
 ```
 
 ## Contributing
@@ -412,7 +394,6 @@ Features:
 - Automated CI/CD builds
 
 Hardware:
-- Silicon Labs BRD4151A development board
 - IKEA TRÅDFRI module (EFR32MG1P132F256GM32)
 
 Technical:
