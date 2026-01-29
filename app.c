@@ -67,6 +67,10 @@ static void led_off_event_handler(sl_zigbee_event_t *event);
 static void network_join_retry_event_handler(sl_zigbee_event_t *event);
 static void rejoin_retry_event_handler(sl_zigbee_event_t *event);
 static void start_optimized_rejoin(void);
+static EmberStatus create_binding(uint8_t local_endpoint, uint16_t cluster_id,
+                                   EmberEUI64 dest_eui64, uint8_t dest_endpoint);
+static void auto_bind_to_coordinator(void);
+static void print_binding_table(void);
 static void handle_short_press(void);
 static void handle_long_press(void);
 
