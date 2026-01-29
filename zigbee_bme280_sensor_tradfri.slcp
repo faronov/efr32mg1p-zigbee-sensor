@@ -112,6 +112,21 @@ configuration:
   # - name: SL_SPIDRV_EXP_MISO_PIN
   #   value: 14
 
+  # UART configuration for debug output (using USART0 on TRÅDFRI)
+  # TX: PB12, RX: PB14 (available pins on TRÅDFRI connector)
+  - name: SL_IOSTREAM_USART_VCOM_PERIPHERAL
+    value: USART0
+  - name: SL_IOSTREAM_USART_VCOM_PERIPHERAL_NO
+    value: 0
+  - name: SL_IOSTREAM_USART_VCOM_TX_PORT
+    value: gpioPortB
+  - name: SL_IOSTREAM_USART_VCOM_TX_PIN
+    value: 12
+  - name: SL_IOSTREAM_USART_VCOM_RX_PORT
+    value: gpioPortB
+  - name: SL_IOSTREAM_USART_VCOM_RX_PIN
+    value: 14
+
   # Button configuration - use PB13 (available on TRÅDFRI)
   - name: SL_SIMPLE_BUTTON_BTN0_PORT
     value: gpioPortB
