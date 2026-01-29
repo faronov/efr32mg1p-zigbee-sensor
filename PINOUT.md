@@ -116,13 +116,15 @@ SDO          →  GND              Pin 27          I2C addr 0x76
 
 ### TRÅDFRI SPI Flash (for OTA - currently disabled)
 
-The TRÅDFRI board includes MX25R8035F 1MB SPI flash for OTA:
+The TRÅDFRI board includes **ISSI IS25LQ020B** 256KB (2Mbit) SPI flash for OTA:
 - **PD13**: SPI CLK (Pin 1)
 - **PD14**: SPI MISO (Pin 2)
 - **PD15**: SPI MOSI (Pin 3)
 - **PB11**: SPI CS (Pin 6)
 
-**Note:** OTA functionality is temporarily disabled in firmware pending pin configuration resolution.
+**Correct Flash Chip**: IS25LQ020B (256KB), not MX25R8035F (1MB)
+
+**Note:** OTA functionality is temporarily disabled in firmware pending pin configuration resolution. See [OTA_SETUP_GUIDE.md](OTA_SETUP_GUIDE.md) for complete enablement instructions.
 
 ## Detailed I2C Configuration
 
