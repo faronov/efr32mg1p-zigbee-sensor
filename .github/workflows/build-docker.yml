@@ -191,3 +191,93 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🐳 Built with Silicon Labs tooling via slt" >> $GITHUB_STEP_SUMMARY
+
+  build-bootloader:
+    name: Build bootloader - TRÅDFRI
+    needs: [check-container, build-container]
+    if: always() && needs.check-container.result == 'success'
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.check-container.outputs.container_name }}
+      options: --user root
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build TRÅDFRI bootloader
+        run: |
+          # Fix git ownership issue in container
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+          # Set HOME to /root where Silicon Labs tools are installed
+          export HOME=/root
+
+          # Set environment variables
+          export GSDK_DIR=/gecko_sdk_4.5.0
+
+          # Find and add GCC to PATH
+          echo "Looking for GCC ARM toolchain..."
+          GCC_PKG=$(find /root/.silabs/slt/installs/conan/p -maxdepth 1 -type d -name "gcc-*" 2>/dev/null | grep -v "gcc-a51b5" | head -1)
+
+          if [ -z "$GCC_PKG" ]; then
+            echo "ERROR: GCC package not found!"
+            exit 1
+          fi
+
+          GCC_BIN="$GCC_PKG/p/bin"
+          echo "Found GCC at: $GCC_BIN"
+          export PATH="$GCC_BIN:$PATH"
+
+          # Verify GCC
+          echo "Verifying GCC..."
+          if "$GCC_BIN/arm-none-eabi-gcc" --version > /dev/null 2>&1; then
+            echo "✓ GCC is executable"
+            "$GCC_BIN/arm-none-eabi-gcc" --version | head -1
+          else
+            echo "ERROR: Cannot execute arm-none-eabi-gcc!"
+            exit 1
+          fi
+
+          echo "✓ SLC: $(which slc || echo '/root/.silabs/slt/bin/slc')"
+          echo "✓ Building TRÅDFRI bootloader"
+
+          # Run bootloader build script
+          bash tools/build_bootloader.sh
+
+      - name: List bootloader outputs
+        if: always()
+        run: |
+          echo "Bootloader build directory contents:"
+          find bootloader/tradfri-spiflash/build -type f 2>/dev/null || echo "No bootloader build directory"
+
+      - name: Upload bootloader artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: bootloader-tradfri-${{ github.sha }}
+          path: |
+            bootloader/tradfri-spiflash/build/**/*.s37
+            bootloader/tradfri-spiflash/build/**/*.hex
+            bootloader/tradfri-spiflash/build/**/*.elf
+            bootloader/tradfri-spiflash/build/**/*.map
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Bootloader build summary
+        if: success()
+        run: |
+          echo "## ✅ Bootloader Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Target**: IKEA TRÅDFRI (EFR32MG1P132F256GM32)" >> $GITHUB_STEP_SUMMARY
+          echo "**Flash**: IS25LQ020B 256KB SPI" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Bootloader Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          find bootloader/tradfri-spiflash/build -type f \( -name "*.elf" -o -name "*.hex" -o -name "*.s37" \) -exec ls -lh {} \; 2>/dev/null | awk '{print $9, $5}' || echo "No files found"
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Memory Usage" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          find bootloader/tradfri-spiflash/build -name "*.elf" -exec arm-none-eabi-size {} \; 2>/dev/null || echo "No ELF found"
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🚀 Flash this bootloader once before OTA-enabled firmware" >> $GITHUB_STEP_SUMMARY

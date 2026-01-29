@@ -1,0 +1,167 @@
+project_name: tradfri-bootloader-spiflash
+label: Bootloader - TRÅDFRI SPI Flash Storage
+package: bootloader
+quality: production
+description: >
+  Custom bootloader for IKEA TRÅDFRI board (EFR32MG1P132F256GM32) with
+  external IS25LQ020B (256KB) SPI flash storage for OTA updates.
+
+  This bootloader is specifically configured for TRÅDFRI hardware:
+  - SPI pins: PD13 (CLK), PD14 (MISO), PD15 (MOSI), PB11 (CS)
+  - USART0 Location: LOC4
+  - Flash: IS25LQ020B 256KB (2Mbit)
+
+category: Bootloader|Core
+author: Silicon Labs, Inc. (Modified for TRÅDFRI)
+
+# Bootloader components
+component:
+  # Core bootloader
+  - id: bootloader_core
+
+  # Communication interface (SPI for external flash)
+  - id: bootloader_serial_driver
+
+  # SPI flash storage for OTA images
+  - id: bootloader_spiflash_storage
+
+  # Image parser for application images
+  - id: bootloader_image_parser
+
+  # Compression support (optional, reduces OTA image size)
+  - id: bootloader_compression_lz4
+
+  # Security features
+  - id: bootloader_aes_sha_ecdsa
+
+  # Delay driver for flash operations
+  - id: bootloader_delay_driver
+
+  # GPIO for LED indication (optional)
+  - id: bootloader_gpio_activation
+
+  # UART driver for debug output (optional)
+  - id: bootloader_uart_driver
+
+# Device configuration
+device: EFR32MG1P132F256GM32
+
+configuration:
+  # Application start address (after bootloader)
+  - name: BOOTLOADER_ENFORCE_SIGNED_UPGRADE
+    value: 0
+
+  # Allow bootloader upgrades
+  - name: BOOTLOADER_ROLLBACK_PROTECTION
+    value: 0
+
+  # SPI Flash Configuration
+  - name: BTL_STORAGE_BASE_ADDRESS
+    value: 0x0
+
+  # Storage slot configuration (256KB flash)
+  - name: SLOT0_ENABLE
+    value: 1
+  - name: SLOT0_START
+    value: 0x0
+  - name: SLOT0_SIZE
+    value: 262144  # 256KB
+
+  # GPIO activation (optional - use button for bootloader mode)
+  - name: BTL_GPIO_ACTIVATION_POLARITY
+    value: 0  # Active low (button pressed = 0)
+
+  # LED indication during bootloader operation
+  - name: BTL_PLUGIN_GPIO_ACTIVATION_BUTTON_ENABLE
+    value: 1
+  - name: BTL_PLUGIN_GPIO_ACTIVATION_LED_ENABLE
+    value: 1
+
+# Custom defines for TRÅDFRI hardware
+define:
+  # Bootloader version
+  - name: BOOTLOADER_VERSION_MAIN
+    value: 1
+  - name: BOOTLOADER_VERSION_MAJOR
+    value: 0
+  - name: BOOTLOADER_VERSION_MINOR
+    value: 0
+
+  # TRÅDFRI board identification
+  - name: CUSTOM_BOARD_TRADFRI
+    value: 1
+
+  # Button for bootloader activation (PB13)
+  - name: BSP_BTL_BUTTON_PORT
+    value: gpioPortB
+  - name: BSP_BTL_BUTTON_PIN
+    value: 13
+
+  # LED for bootloader indication (PA0)
+  - name: BSP_BTL_LED_PORT
+    value: gpioPortA
+  - name: BSP_BTL_LED_PIN
+    value: 0
+
+  # SPI Flash pins (CRITICAL - TRÅDFRI specific)
+  # USART0 Location 4 for PD13/14/15
+  - name: BSP_EXTFLASH_USART
+    value: USART0
+  - name: BSP_EXTFLASH_MOSI_PORT
+    value: gpioPortD
+  - name: BSP_EXTFLASH_MOSI_PIN
+    value: 15
+  - name: BSP_EXTFLASH_MOSI_LOC
+    value: 4  # USART0 LOC4
+  - name: BSP_EXTFLASH_MISO_PORT
+    value: gpioPortD
+  - name: BSP_EXTFLASH_MISO_PIN
+    value: 14
+  - name: BSP_EXTFLASH_MISO_LOC
+    value: 4  # USART0 LOC4
+  - name: BSP_EXTFLASH_CLK_PORT
+    value: gpioPortD
+  - name: BSP_EXTFLASH_CLK_PIN
+    value: 13
+  - name: BSP_EXTFLASH_CLK_LOC
+    value: 4  # USART0 LOC4
+  - name: BSP_EXTFLASH_CS_PORT
+    value: gpioPortB
+  - name: BSP_EXTFLASH_CS_PIN
+    value: 11
+
+  # Flash chip configuration (IS25LQ020B)
+  - name: BTL_STORAGE_SPIFLASH_DEVICE_SIZE
+    value: 262144  # 256KB
+  - name: BTL_STORAGE_SPIFLASH_PAGE_SIZE
+    value: 256
+  - name: BTL_STORAGE_SPIFLASH_SECTOR_SIZE
+    value: 4096
+
+# Include custom configuration headers
+config_file:
+  - path: config/btl_spiflash_storage_cfg.h
+    file_id: btl_spiflash_storage_config
+  - path: config/btl_spi_peripheral_usart_driver_cfg.h
+    file_id: btl_spi_driver_config
+
+# Toolchain
+toolchain_settings:
+  - option: gcc_linker_option
+    value: -Wl,--no-warn-rwx-segments
+
+readme:
+  - path: README_BOOTLOADER.md
+
+ui_hints:
+  highlight:
+    - path: README_BOOTLOADER.md
+      focus: true
+
+filter:
+  - name: Device Type
+    value: [SoC]
+  - name: Project Difficulty
+    value: [Advanced]
+  - name: Bootloader
+    value: [Storage]
