@@ -310,10 +310,12 @@ bool hal_i2c_write_read(addr, reg_addr, data, len)   // Write-then-read
 ```
 
 **Device Configuration:**
-- Device Type: `SLI_ZIGBEE_NETWORK_DEVICE_TYPE_SLEEPY_END_DEVICE`
-- Security: `SLI_ZIGBEE_NETWORK_SECURITY_TYPE_3_0` (Zigbee 3.0)
-- Binding Table Size: 2 (minimal)
-- NVM Size: 24KB (reduced for Series 1)
+```
+Device Type: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_SLEEPY_END_DEVICE
+Security: SLI_ZIGBEE_NETWORK_SECURITY_TYPE_3_0 (Zigbee 3.0)
+Binding Table Size: 2 (minimal)
+NVM Size: 24KB (reduced for Series 1)
+```
 
 ### 6. Build System (tools/build.sh)
 
@@ -419,21 +421,12 @@ The device supports **Configure Reporting** commands from the coordinator:
 - Coordinator can set reportable change thresholds
 - Device automatically sends reports when configured
 
-**Example Zigbee2MQTT Configuration:**
-```yaml
+**Example Zigbee2MQTT Discovery:**
+```
 # Automatically discovered by Zigbee2MQTT as generic sensor
-temperature:
-  - endpoint: 1
-  - cluster: 0x0402
-  - attribute: 0x0000
-humidity:
-  - endpoint: 1
-  - cluster: 0x0405
-  - attribute: 0x0000
-pressure:
-  - endpoint: 1
-  - cluster: 0x0403
-  - attribute: 0x0000
+# Temperature from cluster 0x0402, attribute 0x0000, endpoint 1
+# Humidity from cluster 0x0405, attribute 0x0000, endpoint 1
+# Pressure from cluster 0x0403, attribute 0x0000, endpoint 1
 ```
 
 ### Data Type Conversions
@@ -648,7 +641,7 @@ zigbee2mqtt/[device_name]/pressure
 
 **Home Assistant:**
 ```yaml
-# Automatically added as climate sensor entity
+# Automatically added as a climate sensor entity
 sensor:
   - platform: mqtt
     state_topic: "zigbee2mqtt/[device_name]"
@@ -732,7 +725,7 @@ sensor:
 
 **Sleep Mode (EM2):**
 - Current: 1.2 µA (RTC + RAM retention)
-- Duration: ~99% of time
+- Duration: ~99% of the time
 
 **Average Current (5-minute interval):**
 - (50ms × 35mA + 299.95s × 0.0012mA) / 300s ≈ 6 µA
@@ -756,7 +749,7 @@ sensor:
 - Check Zigbee coordinator is in pairing mode
 - Verify coordinator supports Zigbee 3.0
 - Check if network is full (max devices reached)
-- Try factory reset (hold button for 10+ seconds if implemented)
+- Re-flash firmware to reset device (factory reset not currently implemented)
 - Check LED: blinking = trying to join, solid = success
 
 **3. No Sensor Readings in Coordinator**
@@ -856,5 +849,5 @@ This codebase serves as an excellent reference implementation for Zigbee sensor 
 ---
 
 **Analysis Prepared By:** GitHub Copilot AI Agent  
-**Date:** January 29, 2026  
+**Date:** 2026-01-29  
 **Version:** 1.0
