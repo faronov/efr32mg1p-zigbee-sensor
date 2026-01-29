@@ -14,10 +14,16 @@ description: >
 category: Bootloader|Core
 author: Silicon Labs, Inc. (Modified for TRÅDFRI)
 
-# Bootloader components - MINIMAL for external storage
+# Bootloader components for external SPI flash storage
 component:
   # Core bootloader
   - id: bootloader_core
+
+  # Storage slots management (provides storage_main interface)
+  - id: bootloader_storage_slots
+
+  # Application properties interface
+  - id: bootloader_app_properties
 
   # Application upgrade version check
   - id: bootloader_app_upgrade_version
@@ -31,11 +37,17 @@ component:
   # SPI controller driver for flash communication
   - id: bootloader_spi_controller_usart_driver
 
+  # GPIO activation (button and LED support)
+  - id: bootloader_gpio_activation
+
   # Image parser for application images
   - id: bootloader_image_parser
 
   # Delay driver for flash operations
   - id: bootloader_delay_driver
+
+  # CRC calculation for integrity checking
+  - id: bootloader_crc
 
 configuration:
   # Application start address (after bootloader)
