@@ -1,0 +1,150 @@
+project_name: zigbee_bme280_sensor_tradfri
+label: Zigbee - BME280 Sensor for IKEA TRÅDFRI
+package: Zigbee
+category: Zigbee Application
+quality: production
+description: >
+  Zigbee 3.0 End Device sensor application for IKEA TRÅDFRI board (EFR32MG1P132)
+  with BME280 sensor via I2C. Includes OTA update support using external SPI flash.
+author: Silicon Laboratories, Inc.
+
+component:
+  # Core Zigbee stack (leaf stack for end device)
+  - id: zigbee_pro_leaf_stack
+  - id: zigbee_zcl_framework_core
+
+  # Network joining
+  - id: zigbee_network_steering
+  - id: zigbee_scan_dispatch
+  - id: zigbee_update_tc_link_key
+
+  # OTA bootloader support
+  - id: zigbee_ota_client_policy
+  - id: zigbee_ota_storage_simple_eeprom
+  - id: bootloader_interface
+
+  # External SPI flash for OTA storage
+  - id: mx25_flash_shutdown_usart
+  - id: spidrv
+    instance:
+      - exp
+
+  # Hardware drivers
+  - id: emlib_i2c
+  - id: emlib_gpio
+  - id: emlib_cmu
+  - id: emlib_usart
+  - id: sleeptimer
+
+  # User interface (custom pins for TRÅDFRI)
+  - id: simple_button
+    instance:
+      - btn0
+  - id: simple_led
+    instance:
+      - led0
+
+  # I/O
+  - id: iostream_recommended_stream
+
+# Device configuration for EFR32MG1P132F256GM32
+device: EFR32MG1P132F256GM32
+
+configuration:
+  # Disable VCOM (not available on TRÅDFRI)
+  - name: SL_BOARD_ENABLE_VCOM
+    value: 0
+
+  # Configure as Zigbee End Device (sleepy, battery-powered)
+  - name: SLI_ZIGBEE_PRIMARY_NETWORK_DEVICE_TYPE
+    value: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_SLEEPY_END_DEVICE
+
+  # Zigbee 3.0 security
+  - name: SLI_ZIGBEE_PRIMARY_NETWORK_SECURITY_TYPE
+    value: SLI_ZIGBEE_NETWORK_SECURITY_TYPE_3_0
+
+  # Minimal binding table
+  - name: EMBER_BINDING_TABLE_SIZE
+    value: 2
+
+  # Reduced NVM size for Series 1
+  - name: NVM3_DEFAULT_NVM_SIZE
+    value: 24576
+    condition:
+      - device_series_1
+
+  # PSA ITS configuration (save code space)
+  - name: SL_PSA_ITS_SUPPORT_V1_DRIVER
+    value: 0
+  - name: SL_PSA_ITS_SUPPORT_V2_DRIVER
+    value: 0
+  - name: SL_PSA_ITS_SUPPORT_V3_DRIVER
+    value: 1
+
+  # SPI Flash configuration for IS25LQ020B on TRÅDFRI
+  # CS: PB11, MOSI: PD15, MISO: PD14, CLK: PD13
+  - name: SL_MX25_FLASH_SHUTDOWN_CS_PORT
+    value: gpioPortB
+  - name: SL_MX25_FLASH_SHUTDOWN_CS_PIN
+    value: 11
+
+  - name: SL_SPIDRV_EXP_BITRATE
+    value: 4000000
+
+  # Button configuration - use PB13 (available on TRÅDFRI)
+  - name: SL_SIMPLE_BUTTON_BTN0_PORT
+    value: gpioPortB
+  - name: SL_SIMPLE_BUTTON_BTN0_PIN
+    value: 13
+
+  # LED configuration - use PA0 (available on TRÅDFRI)
+  - name: SL_SIMPLE_LED_LED0_PORT
+    value: gpioPortA
+  - name: SL_SIMPLE_LED_LED0_PIN
+    value: 0
+
+  # OTA configuration
+  - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_START
+    value: 0
+  - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_END
+    value: 262144  # 256KB (2Mbit flash)
+
+source:
+  - path: main.c
+  - path: app.c
+  - path: src/app/app_sensor.c
+  - path: src/drivers/hal_i2c.c
+  - path: src/drivers/bme280/bme280_min.c
+
+include:
+  - path: ./
+  - path: include
+  - path: src/app
+  - path: src/drivers
+  - path: src/drivers/bme280
+
+config_file:
+  - path: config/zcl/zcl_config.zap
+    file_id: zap_configuration_file_id
+    directory: zcl
+
+readme:
+  - path: README.md
+
+ui_hints:
+  highlight:
+    - path: README.md
+      focus: true
+
+filter:
+  - name: Wireless Technology
+    value: [Zigbee]
+  - name: Device Type
+    value: [SoC]
+  - name: Project Difficulty
+    value: [Advanced]
+
+# Custom TRÅDFRI board definitions
+define:
+  - name: CUSTOM_BOARD_TRADFRI
+    value: 1

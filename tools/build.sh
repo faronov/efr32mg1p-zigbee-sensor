@@ -38,7 +38,13 @@ FIRMWARE_DIR="$PROJECT_ROOT/firmware"
 
 # Use custom project SLCP if not provided
 if [ -z "$SAMPLE_SLCP" ]; then
-  SAMPLE_SLCP="$PROJECT_ROOT/zigbee_bme280_sensor.slcp"
+  # Check if SLCP_FILE is specified (for TRÅDFRI variant)
+  if [ -n "$SLCP_FILE" ]; then
+    SAMPLE_SLCP="$PROJECT_ROOT/$SLCP_FILE"
+  else
+    # Default to standard variant
+    SAMPLE_SLCP="$PROJECT_ROOT/zigbee_bme280_sensor.slcp"
+  fi
 
   if [ ! -f "$SAMPLE_SLCP" ]; then
     echo -e "${RED}Error: Custom SLCP not found: $SAMPLE_SLCP${NC}"

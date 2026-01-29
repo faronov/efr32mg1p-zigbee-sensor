@@ -4,7 +4,9 @@ A Zigbee 3.0 end device sensor application for Silicon Labs EFR32MG1P (Wireless 
 
 ## Features
 
-- **Target MCU**: Silicon Labs EFR32MG1P232F256GM48 (BRD4151A)
+- **Target MCUs**:
+  - Silicon Labs EFR32MG1P232F256GM48 (BRD4151A dev board)
+  - EFR32MG1P132F256GM32 (IKEA TRÅDFRI board) with OTA support
 - **SDK**: Gecko SDK (GSDK) 4.5 LTS
 - **Sensor**: Bosch BME280 (Temperature, Humidity, Pressure) via I2C
 - **Zigbee Profile**: Zigbee 3.0 Sleepy End Device
@@ -17,6 +19,7 @@ A Zigbee 3.0 end device sensor application for Silicon Labs EFR32MG1P (Wireless 
 - **User Interface**:
   - Button (BTN0): Join network / Trigger sensor reading
   - LED (LED0): Network status indication
+- **OTA Updates**: TRÅDFRI variant includes OTA bootloader support with external SPI flash
 - **Headless Build**: Fully reproducible CI/CD pipeline using GNU Arm GCC and SLC CLI
 
 ## Zigbee Clusters
@@ -58,16 +61,17 @@ The LED automatically turns off after joining to conserve battery power on this 
 
 ## Hardware Setup
 
-### Required Components
+This project supports two board variants:
 
-1. Silicon Labs EFR32MG1P Development Board (BRD4151A recommended)
+### BRD4151A Development Board (Standard)
+
+**Required Components:**
+1. Silicon Labs EFR32MG1P Development Board (BRD4151A)
 2. Bosch BME280 sensor module
 3. 2x 4.7kΩ pull-up resistors (for I2C SDA and SCL lines)
 4. Breadboard and jumper wires
 
-### Wiring Diagram
-
-Connect the BME280 to the EFR32MG1P as follows:
+**Wiring for BRD4151A:**
 
 | BME280 Pin | EFR32MG1P Pin | Function | Notes |
 |------------|---------------|----------|-------|
@@ -80,6 +84,17 @@ Connect the BME280 to the EFR32MG1P as follows:
 **Default Configuration**: The firmware is configured for BME280 I2C address 0x76 (SDO connected to GND).
 
 To change pin assignments or I2C address, edit `include/bme280_board_config.h`.
+
+### IKEA TRÅDFRI Board (Custom)
+
+**For TRÅDFRI board setup, see [TRADFRI_SETUP.md](TRADFRI_SETUP.md)** for complete instructions including:
+- Hardware pinout and connections
+- BME280 wiring (same I2C pins: PC10/PC11)
+- SWD flashing instructions
+- OTA bootloader configuration
+- Troubleshooting guide
+
+The TRÅDFRI variant uses the same I2C pins (PC10/PC11) and includes OTA update support via external SPI flash.
 
 ## Prerequisites
 
@@ -122,10 +137,19 @@ To build this project locally, you need:
    ```
 
 2. Set environment variables:
+
+   **For BRD4151A (standard dev board):**
    ```bash
    export GSDK_DIR=/path/to/gecko_sdk
-   export SAMPLE_SLCP="$GSDK_DIR/protocol/zigbee/app/zigbee_app/z3EndDeviceSensor/z3EndDeviceSensor.slcp"
    export BOARD=brd4151a
+   # SLCP_FILE is optional, defaults to zigbee_bme280_sensor.slcp
+   ```
+
+   **For TRÅDFRI board:**
+   ```bash
+   export GSDK_DIR=/path/to/gecko_sdk
+   export BOARD=custom
+   export SLCP_FILE=zigbee_bme280_sensor_tradfri.slcp
    ```
 
 3. Run the build script:
@@ -133,25 +157,27 @@ To build this project locally, you need:
    ./tools/build.sh
    ```
 
-4. Build outputs will be in `firmware/build/debug/` (or similar path):
+4. Build outputs will be in `firmware/build/release/`:
    - `*.elf` - Executable and Linkable Format (for debugging)
    - `*.hex` - Intel HEX format (for flashing)
    - `*.s37` - Motorola S-record format
+   - `*.bin` - Raw binary format
    - `*.map` - Memory map file
 
 ### CI/CD Build
 
-The project includes a GitHub Actions workflow that automatically builds the firmware on every push or pull request. The workflow:
+The project includes a GitHub Actions workflow that automatically builds **both board variants** on every push or pull request. The workflow:
 
-1. Checks out the repository
-2. Installs GNU Arm toolchain
-3. Installs SLC CLI
-4. Clones GSDK 4.5
-5. Generates the project using SLC
-6. Builds with make
-7. Uploads build artifacts
+1. Builds Docker container with Silicon Labs tooling (cached for fast builds)
+2. Builds **BRD4151A variant** (`zigbee_bme280_sensor.slcp`)
+3. Builds **TRÅDFRI variant** (`zigbee_bme280_sensor_tradfri.slcp`) with OTA support
+4. Uploads separate artifacts for each board
 
-Build artifacts are available in the Actions tab for 30 days.
+**Build artifacts** are available in the Actions tab for 30 days:
+- `firmware-brd4151a-{sha}` - Standard development board firmware
+- `firmware-tradfri-{sha}` - TRÅDFRI board firmware with OTA
+
+Each artifact contains `.hex`, `.s37`, `.bin`, `.elf`, and `.map` files ready for flashing.
 
 ## Flashing the Firmware
 
@@ -175,25 +201,36 @@ JLinkExe -device EFR32MG1P232F256GM48 -if SWD -speed 4000
 efr32mg1p-bme280-zigbee-sensor/
 ├── .github/
 │   └── workflows/
-│       └── build.yml              # CI/CD workflow
-├── firmware/                      # Generated project (gitignored)
+│       └── build-docker.yml          # CI/CD workflow (builds both variants)
+├── config/
+│   └── zcl/
+│       └── zcl_config.zap            # Zigbee cluster configuration
+├── firmware/                         # Generated project (gitignored)
 ├── include/
-│   └── bme280_board_config.h     # I2C pin configuration
+│   ├── bme280_board_config.h         # I2C config for BRD4151A
+│   └── bme280_board_config_tradfri.h # I2C config for TRÅDFRI
 ├── src/
 │   ├── app/
-│   │   ├── app_sensor.c          # Sensor integration
+│   │   ├── app_sensor.c              # Sensor integration
 │   │   └── app_sensor.h
 │   └── drivers/
-│       ├── hal_i2c.c             # I2C HAL
+│       ├── hal_i2c.c                 # I2C HAL (multi-board support)
 │       ├── hal_i2c.h
 │       └── bme280/
-│           ├── bme280_min.c      # BME280 driver
+│           ├── bme280_min.c          # BME280 driver
 │           └── bme280_min.h
 ├── tools/
-│   └── build.sh                  # Build automation script
+│   └── build.sh                      # Build automation script
+├── zigbee_bme280_sensor.slcp         # BRD4151A project config
+├── zigbee_bme280_sensor_tradfri.slcp # TRÅDFRI project config with OTA
+├── Dockerfile                        # Docker build environment
+├── POWER_OPTIMIZATION.md             # Battery optimization guide
+├── TRADFRI_SETUP.md                  # TRÅDFRI board setup guide
 ├── .gitignore
-├── LICENSE                       # MIT License
-└── README.md                     # This file
+├── LICENSE                           # MIT License
+├── main.c                            # Application entry point
+├── app.c                             # Application logic
+└── README.md                         # This file
 ```
 
 ## Configuration

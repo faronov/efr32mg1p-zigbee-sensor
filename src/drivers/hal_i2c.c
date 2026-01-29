@@ -4,20 +4,34 @@
  */
 
 #include "hal_i2c.h"
-#include "bme280_board_config.h"
+
+// Select board-specific configuration
+#ifdef CUSTOM_BOARD_TRADFRI
+  #include "bme280_board_config_tradfri.h"
+#else
+  #include "bme280_board_config.h"
+#endif
+
 #include "em_i2c.h"
 #include "em_cmu.h"
 #include "em_gpio.h"
 
 // Determine which I2C instance to use
-#if BME280_I2C_INSTANCE == 0
-  #define I2C_PERIPHERAL    I2C0
-  #define I2C_CLOCK         cmuClock_I2C0
-#elif BME280_I2C_INSTANCE == 1
-  #define I2C_PERIPHERAL    I2C1
-  #define I2C_CLOCK         cmuClock_I2C1
+#ifdef CUSTOM_BOARD_TRADFRI
+  // TRÅDFRI config directly defines peripheral
+  #define I2C_PERIPHERAL    BME280_I2C_PERIPHERAL
+  #define I2C_CLOCK         BME280_I2C_CLOCK
 #else
-  #error "Invalid I2C instance"
+  // BRD4151A config uses instance number
+  #if BME280_I2C_INSTANCE == 0
+    #define I2C_PERIPHERAL    I2C0
+    #define I2C_CLOCK         cmuClock_I2C0
+  #elif BME280_I2C_INSTANCE == 1
+    #define I2C_PERIPHERAL    I2C1
+    #define I2C_CLOCK         cmuClock_I2C1
+  #else
+    #error "Invalid I2C instance"
+  #endif
 #endif
 
 static bool i2c_initialized = false;
@@ -41,12 +55,17 @@ bool hal_i2c_init(void)
   I2C_PERIPHERAL->ROUTEPEN = I2C_ROUTEPEN_SDAPEN | I2C_ROUTEPEN_SCLPEN;
   I2C_PERIPHERAL->ROUTELOC0 = (I2C_PERIPHERAL->ROUTELOC0 & ~(_I2C_ROUTELOC0_SDALOC_MASK | _I2C_ROUTELOC0_SCLLOC_MASK));
 
-  // For EFR32MG1P, location routing depends on the specific pins
-  // PC10/PC11 typically use location 14 or 15 on I2C0
-  // This may need adjustment based on your exact part number
-  #if BME280_I2C_INSTANCE == 0
-    I2C_PERIPHERAL->ROUTELOC0 |= (14 << _I2C_ROUTELOC0_SDALOC_SHIFT) |
-                                  (14 << _I2C_ROUTELOC0_SCLLOC_SHIFT);
+  // Set route location from board config
+  #ifdef BME280_I2C_ROUTE_LOCATION
+    // TRÅDFRI or other boards with explicit route location
+    I2C_PERIPHERAL->ROUTELOC0 |= (BME280_I2C_ROUTE_LOCATION << _I2C_ROUTELOC0_SDALOC_SHIFT) |
+                                  (BME280_I2C_ROUTE_LOCATION << _I2C_ROUTELOC0_SCLLOC_SHIFT);
+  #else
+    // BRD4151A default: PC10/PC11 on I2C0 location 14
+    #if BME280_I2C_INSTANCE == 0
+      I2C_PERIPHERAL->ROUTELOC0 |= (14 << _I2C_ROUTELOC0_SDALOC_SHIFT) |
+                                    (14 << _I2C_ROUTELOC0_SCLLOC_SHIFT);
+    #endif
   #endif
 
   // Initialize I2C

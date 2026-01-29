@@ -78,17 +78,29 @@ jobs:
           cache-to: type=registry,ref=${{ needs.check-container.outputs.container_name }}-cache,mode=max
 
   build-firmware:
-    name: Build firmware
+    name: Build firmware - ${{ matrix.variant.name }}
     needs: [check-container, build-container]
     if: always() && needs.check-container.result == 'success'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - name: BRD4151A
+            board: brd4151a
+            slcp: zigbee_bme280_sensor.slcp
+            artifact: firmware-brd4151a
+          - name: TRADFRI
+            board: custom
+            slcp: zigbee_bme280_sensor_tradfri.slcp
+            artifact: firmware-tradfri
     container:
       image: ${{ needs.check-container.outputs.container_name }}
       options: --user root
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build firmware
+      - name: Build firmware - ${{ matrix.variant.name }}
         run: |
           # Fix git ownership issue in container
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -98,7 +110,8 @@ jobs:
 
           # Set environment variables
           export GSDK_DIR=/gecko_sdk_4.5.0
-          export BOARD=brd4151a
+          export BOARD=${{ matrix.variant.board }}
+          export SLCP_FILE=${{ matrix.variant.slcp }}
 
           # Find and add GCC to PATH (CRITICAL for build)
           echo "Looking for GCC ARM toolchain..."
@@ -138,9 +151,10 @@ jobs:
           fi
 
           echo "✓ SLC: $(which slc || echo '/root/.silabs/slt/bin/slc')"
-          echo "✓ Using custom BME280 sensor project"
+          echo "✓ Building variant: ${{ matrix.variant.name }}"
+          echo "✓ Using SLCP: ${{ matrix.variant.slcp }}"
 
-          # Run build script (will use zigbee_bme280_sensor.slcp)
+          # Run build script
           bash tools/build.sh
 
       - name: List build outputs
@@ -149,11 +163,11 @@ jobs:
           echo "Build directory contents:"
           find firmware -type f 2>/dev/null || echo "No firmware directory"
 
-      - name: Upload build artifacts
+      - name: Upload build artifacts - ${{ matrix.variant.name }}
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: firmware-${{ github.sha }}
+          name: ${{ matrix.variant.artifact }}-${{ github.sha }}
           path: |
             firmware/build/**/*.out
             firmware/build/**/*.hex
@@ -166,7 +180,10 @@ jobs:
       - name: Build summary
         if: success()
         run: |
-          echo "## ✅ Build Successful" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Build Successful - ${{ matrix.variant.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Board**: ${{ matrix.variant.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**SLCP**: ${{ matrix.variant.slcp }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Build Artifacts" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
