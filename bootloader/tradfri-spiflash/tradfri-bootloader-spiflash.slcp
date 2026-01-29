@@ -86,15 +86,16 @@ define:
     value: 1
 
   # Button for bootloader activation (PB13)
-  - name: BSP_BTL_BUTTON_PORT
+  # SDK expects SL_BTL_* prefix
+  - name: SL_BTL_BUTTON_PORT
     value: gpioPortB
-  - name: BSP_BTL_BUTTON_PIN
+  - name: SL_BTL_BUTTON_PIN
     value: 13
 
   # LED for bootloader indication (PA0)
-  - name: BSP_BTL_LED_PORT
+  - name: SL_BTL_LED_PORT
     value: gpioPortA
-  - name: BSP_BTL_LED_PIN
+  - name: SL_BTL_LED_PIN
     value: 0
 
   # SPI Flash pins (CRITICAL - TRÅDFRI specific)
