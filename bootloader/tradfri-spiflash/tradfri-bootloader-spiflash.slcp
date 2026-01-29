@@ -14,7 +14,7 @@ description: >
 category: Bootloader|Core
 author: Silicon Labs, Inc. (Modified for TRÅDFRI)
 
-# Bootloader components - MINIMAL CONFIGURATION
+# Bootloader components
 component:
   # Core bootloader
   - id: bootloader_core
@@ -30,6 +30,12 @@ component:
 
   # Delay driver for flash operations
   - id: bootloader_delay_driver
+
+  # Debug support (generates btl_debug_cfg.h)
+  - id: bootloader_debug
+
+  # CRC calculation for image verification
+  - id: bootloader_crc
 
 configuration:
   # Application start address (after bootloader)
