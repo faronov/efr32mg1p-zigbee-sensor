@@ -85,6 +85,10 @@ configuration:
   # SPI Flash configuration for IS25LQ020B (256KB) on TRÅDFRI
   # SPI pins: PB11 (CS), PD15 (MOSI), PD14 (MISO), PD13 (CLK)
   # CRITICAL: USART0 Location 4 (LOC4) required for PD13/14/15
+
+  # MX25 flash shutdown configuration
+  - name: SL_MX25_FLASH_SHUTDOWN_USART
+    value: USART0
   - name: SL_MX25_FLASH_SHUTDOWN_CS_PORT
     value: gpioPortB
   - name: SL_MX25_FLASH_SHUTDOWN_CS_PIN
