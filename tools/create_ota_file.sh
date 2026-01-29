@@ -80,14 +80,15 @@ MANUFACTURER_CODE="0x10F2"  # IKEA TRÅDFRI
 IMAGE_TYPE="0x0000"          # Application image
 HEADER_STRING="BME280 Sensor v${VERSION}"
 
-# Create Zigbee OTA file using commander
-commander gbl parse "${GBL_FILE}" \
-    --ota "${OTA_FILE}" \
-    --manufacturer "${MANUFACTURER_CODE}" \
-    --imagetype "${IMAGE_TYPE}" \
-    --version ${FW_VERSION} \
-    --device EFR32MG1P132F256GM32 \
-    --string "${HEADER_STRING}"
+# Create Zigbee OTA file - use correct commander syntax
+# The --ota-* options must be used during GBL creation
+commander gbl create "${OTA_FILE}" \
+    --gbl "${GBL_FILE}" \
+    --ota \
+    --ota-manufacturer ${MANUFACTURER_CODE} \
+    --ota-imagetype ${IMAGE_TYPE} \
+    --ota-version ${FW_VERSION} \
+    --ota-string "${HEADER_STRING}"
 
 if [ $? -eq 0 ]; then
     echo "✓ Zigbee OTA file created successfully"
