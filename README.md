@@ -1,366 +1,428 @@
 # EFR32MG1P BME280 Zigbee Sensor
 
-A Zigbee 3.0 end device sensor application for Silicon Labs EFR32MG1P (Wireless Gecko Series 1) that reads temperature, humidity, and pressure data from a Bosch BME280 sensor via I2C and exposes the measurements through standard Zigbee clusters.
+[![Release](https://img.shields.io/github/v/release/faronov/efr32mg1p-bme280-zigbee-sensor)](https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/faronov/efr32mg1p-bme280-zigbee-sensor/build-docker.yml?branch=main)](https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/actions)
+[![License](https://img.shields.io/github/license/faronov/efr32mg1p-bme280-zigbee-sensor)](LICENSE)
+
+A Zigbee 3.0 sleepy end device sensor for Silicon Labs EFR32MG1P (Wireless Gecko Series 1) that reads temperature, humidity, and pressure data from a Bosch BME280 sensor and reports via standard Zigbee clusters. Features OTA firmware updates, optimized power consumption, and automated CI/CD builds.
+
+## Quick Start
+
+```bash
+# Clone repository
+git clone https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor.git
+cd efr32mg1p-bme280-zigbee-sensor
+
+# Build firmware (local)
+bash tools/build.sh tradfri  # or: brd4151a
+
+# Or download pre-built release
+# See: https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/releases/latest
+```
 
 ## Features
 
-- **Target MCUs**:
-  - Silicon Labs EFR32MG1P232F256GM48 (BRD4151A dev board)
-  - EFR32MG1P132F256GM32 (IKEA TRÅDFRI board) with OTA support
-- **SDK**: Gecko SDK (GSDK) 4.5 LTS
-- **Sensor**: Bosch BME280 (Temperature, Humidity, Pressure) via I2C
-- **Power**: 2xAAA batteries (3.0V nominal)
-- **Zigbee Profile**: Zigbee 3.0 Sleepy End Device
-- **Update Interval**: 1 minute (configurable, optimized for 2xAAA battery life)
-- **Battery Monitoring**: Real-time voltage and percentage reporting via Power Configuration cluster
-- **Power Optimization**:
-  - Sensor readings suspended when network down
-  - Exponential backoff for network join retries (30s → 10min)
-  - LED auto-off after 3 seconds
-  - Event-driven operation in low power mode
-- **User Interface**:
-  - Button (BTN0):
-    - Short press (<2s): Trigger immediate sensor reading / Join network
-    - Long press (≥2s): Leave and rejoin network
-  - LED (LED0): Network status indication
-- **OTA Updates**: TRÅDFRI variant includes OTA bootloader support with external SPI flash
-- **Headless Build**: Fully reproducible CI/CD pipeline using GNU Arm GCC and SLC CLI
+### Hardware Support
+- **Silicon Labs BRD4151A** (EFR32MG1P232F256GM48) development board
+- **IKEA TRÅDFRI module** (EFR32MG1P132F256GM32) with OTA support
+
+### Sensor & Power
+- **BME280 sensor** via I2C (temperature, humidity, pressure)
+- **2xAAA batteries** (3.0V nominal, ~2.0V cutoff)
+- **Battery monitoring** with real-time voltage and percentage reporting
+- **5-minute update interval** optimized for battery life
+- **Automatic sleep** between measurements
+
+### Zigbee 3.0 Compliance
+- **Sleepy end device** with optimized power consumption
+- **Standard clusters**: Temperature (0x0402), Humidity (0x0405), Pressure (0x0403), Power Configuration (0x0001)
+- **Coordinator-side binding** ready for Zigbee2MQTT, ZHA, deCONZ
+- **Optimized network rejoin**: 138ms (7x faster than default 2.2s)
+- **Automatic network recovery** with exponential backoff (30s → 10min)
+
+### OTA Firmware Updates
+- **External SPI flash** storage (IS25LQ020B 256KB on TRÅDFRI)
+- **Custom bootloader** (35KB) with application upgrade support
+- **Standard Zigbee OTA format** (.gbl, .ota, .zigbee files)
+- **Compressed images** with LZMA support
+- **Compatible** with Zigbee2MQTT, Home Assistant ZHA, deCONZ
+
+### User Interface
+- **Button (BTN0)**:
+  - Short press (<2s): Trigger immediate sensor reading and report
+  - Long press (≥2s): Leave and rejoin network
+  - Network join trigger when not connected
+- **LED (LED0)**:
+  - Network status indication
+  - Auto-off after 30 seconds to save power
+
+### Build System
+- **GSDK 4.5.0 LTS** (Long Term Support)
+- **Headless CI/CD** with GitHub Actions
+- **Docker containerization** for reproducible builds
+- **Dual-variant builds**: BRD4151A + TRÅDFRI
+- **Automated OTA file generation** on tagged releases
+- **Release optimization** for minimal binary size
 
 ## Zigbee Clusters
 
-The sensor exposes the following server clusters on Endpoint 1:
+Sensor exposes the following server clusters on **Endpoint 1**:
 
 | Cluster ID | Cluster Name                | Attribute | Data Type | Unit | Update Rate |
 |------------|----------------------------|-----------|-----------|------|-------------|
 | 0x0000     | Basic                      | -         | -         | -    | -           |
-| 0x0001     | Power Configuration        | 0x0020    | uint8     | 100mV | 1min       |
-|            |                            | 0x0021    | uint8     | 0.5% | 1min        |
+| 0x0001     | Power Configuration        | 0x0020    | uint8     | 100mV | 5min       |
+|            |                            | 0x0021    | uint8     | 0.5% | 5min        |
 | 0x0003     | Identify                   | -         | -         | -    | -           |
-| 0x0402     | Temperature Measurement    | 0x0000    | int16     | 0.01°C | 1min       |
-| 0x0405     | Relative Humidity          | 0x0000    | uint16    | 0.01%RH | 1min      |
-| 0x0403     | Pressure Measurement       | 0x0000    | int16     | kPa  | 1min         |
+| 0x0402     | Temperature Measurement    | 0x0000    | int16     | 0.01°C | 5min       |
+| 0x0405     | Relative Humidity          | 0x0000    | uint16    | 0.01%RH | 5min      |
+| 0x0403     | Pressure Measurement       | 0x0000    | int16     | kPa  | 5min         |
 
 ### Attribute Details
 
-- **Temperature**: Signed 16-bit integer in hundredths of degrees Celsius (0.01°C resolution)
-- **Humidity**: Unsigned 16-bit integer in hundredths of percent RH (0.01%RH resolution)
-- **Pressure**: Signed 16-bit integer in kilopascals (kPa)
-- **Battery Voltage (0x0020)**: Unsigned 8-bit integer in 100mV units (e.g., 30 = 3.0V)
-- **Battery Percentage (0x0021)**: Unsigned 8-bit integer, 0-200 range (200 = 100%, 0.5% resolution)
+- **Temperature**: Signed 16-bit, hundredths of °C (e.g., 2345 = 23.45°C)
+- **Humidity**: Unsigned 16-bit, hundredths of %RH (e.g., 4520 = 45.20%RH)
+- **Pressure**: Signed 16-bit, kilopascals (e.g., 101 = 101 kPa = 1010 mbar)
+- **Battery Voltage (0x0020)**: Unsigned 8-bit, 100mV units (e.g., 30 = 3.0V)
+- **Battery Percentage (0x0021)**: Unsigned 8-bit, 0-200 range (200 = 100%)
 
-### Battery Configuration
+### Reportable Attributes
 
-The device is configured for 2xAAA alkaline batteries:
-- **Full**: 3.2V (2x 1.6V fresh alkaline) = 100% (200)
-- **Nominal**: 3.0V (2x 1.5V) = ~86% (172)
-- **Empty**: 1.8V (2x 0.9V depleted) = 0% (0)
-
-Battery voltage is measured using the EFR32MG1P internal ADC and reported every minute or when voltage changes by ≥0.1V.
-
-The device supports Zigbee attribute reporting (Configure Reporting), allowing a coordinator to receive automatic updates when values change.
-
-## User Interface
-
-### Button (BTN0)
-
-**Short Press (<2 seconds):**
-- **Not joined to network**: Start network joining (LED will blink)
-- **Joined to network**: Trigger immediate sensor reading and report (LED will flash briefly)
-
-**Long Press (≥2 seconds):**
-- **Joined to network**: Leave current network and immediately rejoin (useful for switching coordinators)
-- **Not joined**: No action
-
-### LED (LED0)
-
-- **Off**: Default state (not joined or joined and idle to save power)
-- **Blinking (500ms)**: Network joining in progress
-- **Solid on (3 seconds)**: Successfully joined to network (turns off after 3s to save power)
-- **Brief flash (200ms)**: Sensor reading triggered by button press
-- **Rapid flash (100ms x10)**: Sensor initialization error
-
-The LED automatically turns off after joining to conserve battery power on this sleepy end device.
+All measurement attributes are configured as reportable with:
+- **Min interval**: 60 seconds (don't report more frequently)
+- **Max interval**: 3600 seconds (force report at least hourly)
+- **Reportable change**: Threshold-based updates (e.g., ±0.5°C temperature change)
 
 ## Hardware Setup
 
-This project supports two board variants:
+### BRD4151A Development Board
 
-### BRD4151A Development Board (Standard)
+```
+BME280 → BRD4151A Expansion Header
+  VCC  → 3.3V (Pin 20)
+  GND  → GND (Pin 1)
+  SDA  → PC10 (Pin 7)
+  SCL  → PC11 (Pin 9)
 
-**Required Components:**
-1. Silicon Labs EFR32MG1P Development Board (BRD4151A)
-2. Bosch BME280 sensor module
-3. 2x 4.7kΩ pull-up resistors (for I2C SDA and SCL lines)
-4. Breadboard and jumper wires
+LED0: PF4 (on-board)
+BTN0: PF6 (on-board)
+```
 
-**Wiring for BRD4151A:**
+### IKEA TRÅDFRI Module
 
-| BME280 Pin | EFR32MG1P Pin | Function | Notes |
-|------------|---------------|----------|-------|
-| VCC        | 3.3V          | Power    | 3.3V only |
-| GND        | GND           | Ground   | -     |
-| SDA        | PC10          | I2C Data | Add 4.7kΩ pull-up to 3.3V |
-| SCL        | PC11          | I2C Clock | Add 4.7kΩ pull-up to 3.3V |
-| SDO        | GND or 3.3V   | I2C Addr | GND=0x76, 3.3V=0x77 |
+```
+BME280 → TRÅDFRI Module (QFN32)
+  VCC  → AVDD (Pin 5) - 3.3V
+  GND  → GND (Pin 6, 14, 17, 32)
+  SDA  → PC10 (Pin 24)
+  SCL  → PC11 (Pin 25)
 
-**Default Configuration**: The firmware is configured for BME280 I2C address 0x76 (SDO connected to GND).
+External Flash: IS25LQ020B (256KB SPI)
+  CS   → PB11 (Pin 16)
+  CLK  → PD13 (Pin 27)
+  MISO → PD14 (Pin 28)
+  MOSI → PD15 (Pin 29)
 
-To change pin assignments or I2C address, edit `include/bme280_board_config.h`.
+LED0: PA0 (Pin 2)
+BTN0: PB13 (Pin 19)
+```
 
-### IKEA TRÅDFRI Board (Custom)
+See [PINOUT.md](PINOUT.md) for detailed hardware connections.
 
-**For TRÅDFRI board setup, see [TRADFRI_SETUP.md](TRADFRI_SETUP.md)** for complete instructions including:
-- Hardware pinout and connections
-- BME280 wiring (same I2C pins: PC10/PC11)
-- SWD flashing instructions
-- OTA bootloader configuration
-- Troubleshooting guide
+## Building Firmware
 
-The TRÅDFRI variant uses the same I2C pins (PC10/PC11) and includes OTA update support via external SPI flash.
+### Prerequisites
 
-## Prerequisites
-
-### Local Development
-
-To build this project locally, you need:
-
-1. **Gecko SDK 4.5**
-   ```bash
-   git clone --depth 1 --branch gsdk_4.5 https://github.com/SiliconLabs/gecko_sdk.git
-   ```
-
-2. **Silicon Labs SLC CLI** (Simplicity Commander CLI)
-   - Download from [Silicon Labs Developer Portal](https://www.silabs.com/developers/simplicity-studio)
-   - Install and add to your PATH
-
-3. **GNU Arm Embedded Toolchain** (version 10.3 or compatible)
-   - Download from [ARM Developer](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm)
-   - Or install via package manager:
-     ```bash
-     # Ubuntu/Debian
-     sudo apt-get install gcc-arm-none-eabi
-
-     # macOS
-     brew install gcc-arm-embedded
-     ```
-
-4. **Build Tools**
-   - make
-   - git
-
-## Building the Firmware
+- **Simplicity Studio v5** with GSDK 4.5.0 LTS
+- **SLC CLI** (Simplicity Commander Line Interface)
+- **GNU Arm Embedded Toolchain** (version 12.2.rel1 or compatible)
+- **Git** for version control
 
 ### Local Build
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor.git
-   cd efr32mg1p-bme280-zigbee-sensor
-   ```
+```bash
+# Build TRÅDFRI variant (with OTA)
+bash tools/build.sh tradfri
 
-2. Set environment variables:
+# Build BRD4151A variant
+bash tools/build.sh brd4151a
 
-   **For BRD4151A (standard dev board):**
-   ```bash
-   export GSDK_DIR=/path/to/gecko_sdk
-   export BOARD=brd4151a
-   # SLCP_FILE is optional, defaults to zigbee_bme280_sensor.slcp
-   ```
+# Outputs: firmware/build/release/*.s37
+```
 
-   **For TRÅDFRI board:**
-   ```bash
-   export GSDK_DIR=/path/to/gecko_sdk
-   export BOARD=custom
-   export SLCP_FILE=zigbee_bme280_sensor_tradfri.slcp
-   ```
-
-3. Run the build script:
-   ```bash
-   ./tools/build.sh
-   ```
-
-4. Build outputs will be in `firmware/build/release/`:
-   - `*.elf` - Executable and Linkable Format (for debugging)
-   - `*.hex` - Intel HEX format (for flashing)
-   - `*.s37` - Motorola S-record format
-   - `*.bin` - Raw binary format
-   - `*.map` - Memory map file
-
-### CI/CD Build
-
-The project includes a GitHub Actions workflow that automatically builds **both board variants** on every push or pull request. The workflow:
-
-1. Builds Docker container with Silicon Labs tooling (cached for fast builds)
-2. Builds **BRD4151A variant** (`zigbee_bme280_sensor.slcp`)
-3. Builds **TRÅDFRI variant** (`zigbee_bme280_sensor_tradfri.slcp`) with OTA support
-4. Uploads separate artifacts for each board
-
-**Build artifacts** are available in the Actions tab for 30 days:
-- `firmware-brd4151a-{sha}` - Standard development board firmware
-- `firmware-tradfri-{sha}` - TRÅDFRI board firmware with OTA
-
-Each artifact contains `.hex`, `.s37`, `.bin`, `.elf`, and `.map` files ready for flashing.
-
-## Flashing the Firmware
-
-Use Simplicity Commander or J-Link tools to flash the firmware:
+### Build Bootloader
 
 ```bash
-# Using Simplicity Commander
-commander flash firmware/build/debug/zigbee_bme280_sensor.s37
+# Build custom bootloader for TRÅDFRI
+bash tools/build_bootloader.sh
 
-# Using J-Link
-JLinkExe -device EFR32MG1P232F256GM48 -if SWD -speed 4000
-> loadfile firmware/build/debug/zigbee_bme280_sensor.hex
-> reset
-> go
-> exit
+# Output: bootloader/tradfri-spiflash/build/**/*.s37
 ```
+
+### Create OTA Files
+
+```bash
+# Create OTA update files (.gbl, .ota, .zigbee)
+bash tools/create_ota_file.sh tradfri 1.0.0
+
+# Outputs: build/tradfri/ota/*.{gbl,ota,zigbee}
+```
+
+### CI/CD Builds
+
+Automated builds run on every push to `main` and on version tags:
+
+```bash
+# Create release
+git tag v1.0.1 -m "Release v1.0.1"
+git push origin v1.0.1
+
+# Download artifacts from GitHub Actions
+# See: https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/actions
+```
+
+## Flashing Firmware
+
+### Flash with Simplicity Commander
+
+```bash
+# Flash bootloader (TRÅDFRI only)
+commander flash bootloader/tradfri-spiflash/build/**/*.s37 \
+  --device EFR32MG1P132F256GM32
+
+# Flash application
+commander flash firmware/build/release/zigbee_bme280_sensor_tradfri.s37 \
+  --device EFR32MG1P132F256GM32
+```
+
+### Flash with J-Link
+
+```bash
+# Using JLinkExe
+JLinkExe -device EFR32MG1P132F256GM32 -if SWD -speed 4000
+  > erase
+  > loadfile firmware.s37
+  > r
+  > q
+```
+
+## OTA Firmware Updates
+
+### Zigbee2MQTT
+
+```bash
+# 1. Copy OTA file to Zigbee2MQTT data directory
+cp build/tradfri/ota/*.zigbee ~/zigbee2mqtt/data/
+
+# 2. Web UI → Devices → Select sensor → OTA Updates → Check for updates
+```
+
+### Home Assistant (ZHA)
+
+```bash
+# 1. Copy OTA file to Home Assistant
+cp build/tradfri/ota/*.ota /config/ota/
+
+# 2. ZHA → Device → Reconfigure → Check for updates
+```
+
+### deCONZ
+
+```bash
+# 1. Copy OTA file to deCONZ otau directory
+cp build/tradfri/ota/*.ota ~/.local/share/dresden-elektronik/deCONZ/otau/
+
+# 2. Trigger update from deCONZ UI
+```
+
+See [OTA_FILE_CREATION.md](OTA_FILE_CREATION.md) for detailed OTA setup.
+
+## Network Integration
+
+### Pairing Mode
+
+1. **Power on device** (or press button if already powered)
+2. **LED blinks** indicating network search
+3. **Put coordinator in pairing mode**
+4. **Device joins** automatically (LED stays on)
+5. **LED turns off** after 30 seconds (power saving)
+
+### Force Rejoin
+
+- **Long press button** (≥2s) to leave and rejoin network
+- Useful after coordinator replacement or network issues
+
+### Binding Clusters
+
+The sensor supports **coordinator-side binding** for direct reporting:
+
+**Zigbee2MQTT:**
+```bash
+mosquitto_pub -t 'zigbee2mqtt/bridge/request/device/bind' \
+  -m '{"from":"sensor_ieee","to":"coordinator","clusters":["msTemperatureMeasurement","msRelativeHumidity","msPressureMeasurement"]}'
+```
+
+**ZHA/deCONZ:** Use GUI binding options
+
+See [BINDING_GUIDE.md](BINDING_GUIDE.md) for details.
+
+## Power Consumption
+
+### Battery Life Estimates
+
+| Configuration | Sleep Current | Avg Current | Battery Life (2xAAA) |
+|--------------|---------------|-------------|---------------------|
+| 5min updates | ~5μA          | ~50μA       | **~2 years**        |
+| 1min updates | ~5μA          | ~120μA      | **~10 months**      |
+
+### Power Optimization Features
+
+- **Sleepy end device** mode (deep sleep between measurements)
+- **Sensor power-down** when network unavailable
+- **LED auto-off** after 30 seconds
+- **Exponential backoff** for join retries (reduces radio activity)
+- **Optimized rejoin** - single channel attempt first (138ms vs 2.2s)
+- **Event-driven** operation (no polling loops)
+
+See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for analysis.
 
 ## Project Structure
 
 ```
-efr32mg1p-bme280-zigbee-sensor/
-├── .github/
-│   └── workflows/
-│       └── build-docker.yml          # CI/CD workflow (builds both variants)
-├── config/
-│   └── zcl/
-│       └── zcl_config.zap            # Zigbee cluster configuration
-├── firmware/                         # Generated project (gitignored)
-├── include/
-│   ├── bme280_board_config.h         # I2C config for BRD4151A
-│   └── bme280_board_config_tradfri.h # I2C config for TRÅDFRI
+.
+├── app.c                      # Main application logic
+├── main.c                     # Entry point
 ├── src/
 │   ├── app/
-│   │   ├── app_sensor.c              # Sensor integration
+│   │   ├── app_sensor.c       # Sensor reading and reporting
 │   │   └── app_sensor.h
 │   └── drivers/
-│       ├── hal_i2c.c                 # I2C HAL (multi-board support)
-│       ├── hal_i2c.h
-│       └── bme280/
-│           ├── bme280_min.c          # BME280 driver
-│           └── bme280_min.h
+│       ├── bme280/            # BME280 driver (minimal)
+│       ├── hal_i2c.c          # I2C hardware abstraction
+│       └── battery.c          # Battery monitoring (ADC)
+├── config/
+│   └── zcl/zcl_config.zap     # Zigbee cluster configuration
+├── bootloader/
+│   └── tradfri-spiflash/      # Custom OTA bootloader
 ├── tools/
-│   └── build.sh                      # Build automation script
-├── zigbee_bme280_sensor.slcp         # BRD4151A project config
-├── zigbee_bme280_sensor_tradfri.slcp # TRÅDFRI project config with OTA
-├── Dockerfile                        # Docker build environment
-├── POWER_OPTIMIZATION.md             # Battery optimization guide
-├── TRADFRI_SETUP.md                  # TRÅDFRI board setup guide
-├── .gitignore
-├── LICENSE                           # MIT License
-├── main.c                            # Application entry point
-├── app.c                             # Application logic
-└── README.md                         # This file
+│   ├── build.sh               # Firmware build script
+│   ├── build_bootloader.sh    # Bootloader build script
+│   └── create_ota_file.sh     # OTA file generator
+├── .github/workflows/         # CI/CD automation
+└── README.md                  # This file
 ```
 
-## Configuration
+## Documentation
 
-### Power Optimization
-
-See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for detailed power saving strategies.
-
-**Key power features**:
-- **No sensor reads when network down**: Saves power when not connected
-- **Exponential backoff**: Network join retries increase from 30s to 10min intervals
-- **1-minute sensor interval**: Default reading interval optimized for 2xAAA battery life
-- **LED auto-off**: Turns off after 3s to conserve power
-- **Battery monitoring**: Real-time voltage and percentage tracking
-
-**Estimated battery life on 2xAAA alkaline (~2400 mAh)**:
-- Current configuration (1min updates): ~6-12 months
-- With 5-minute updates: ~12-18 months
-- Event-driven only: ~18-24 months
-
-### Sensor Update Interval
-
-To change the sensor reading interval, edit `src/app/app_sensor.h`:
-
-```c
-// For testing (30 seconds):
-#define SENSOR_UPDATE_INTERVAL_MS   30000
-
-// For responsive updates (1 minute - default for 2xAAA):
-#define SENSOR_UPDATE_INTERVAL_MS   60000
-
-// For balanced operation (5 minutes):
-#define SENSOR_UPDATE_INTERVAL_MS   300000
-
-// For maximum battery life (15 minutes):
-#define SENSOR_UPDATE_INTERVAL_MS   900000
-```
-
-### I2C Pin Configuration
-
-To use different I2C pins, edit `include/bme280_board_config.h`:
-
-```c
-#define BME280_I2C_SDA_PORT       gpioPortC
-#define BME280_I2C_SDA_PIN        10
-
-#define BME280_I2C_SCL_PORT       gpioPortC
-#define BME280_I2C_SCL_PIN        11
-```
-
-### BME280 I2C Address
-
-The default address is 0x76. To use 0x77, connect BME280 SDO pin to 3.3V and edit `include/bme280_board_config.h`:
-
-```c
-#define BME280_I2C_ADDR           0x77
-```
+- **[PINOUT.md](PINOUT.md)** - Hardware connections and pin mappings
+- **[TRADFRI_SETUP.md](TRADFRI_SETUP.md)** - TRÅDFRI module specific setup
+- **[OTA_FILE_CREATION.md](OTA_FILE_CREATION.md)** - Creating OTA update files
+- **[OTA_SETUP_GUIDE.md](OTA_SETUP_GUIDE.md)** - OTA bootloader configuration
+- **[BINDING_GUIDE.md](BINDING_GUIDE.md)** - Zigbee cluster binding setup
+- **[POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md)** - Power consumption analysis
+- **[BATTERY_AND_BUTTON_FEATURES.md](BATTERY_AND_BUTTON_FEATURES.md)** - UI features
 
 ## Troubleshooting
 
-### Build Issues
+### Device Won't Join Network
 
-**Problem**: SLC CLI not found
-**Solution**: Ensure SLC CLI is installed and in your PATH. Run `slc --version` to verify.
+1. **Check LED**: Should blink during join
+2. **Reset device**: Long press button (≥2s)
+3. **Check coordinator**: Ensure pairing mode is active
+4. **Check distance**: Move closer to coordinator
+5. **Check logs**: Use Zigbee sniffer or coordinator logs
 
-**Problem**: ARM toolchain not found
-**Solution**: Install gcc-arm-none-eabi and ensure it's in your PATH. Run `arm-none-eabi-gcc --version` to verify.
+### Sensor Values Not Updating
 
-**Problem**: GSDK not found
-**Solution**: Clone GSDK 4.5 and set `GSDK_DIR` environment variable correctly.
+1. **Check I2C connections**: Verify SDA/SCL wiring
+2. **Check power**: Ensure BME280 has 3.3V
+3. **Check binding**: Verify cluster bindings in coordinator
+4. **Check battery**: Low battery (<2.1V) may cause issues
 
-### Runtime Issues
+### OTA Update Fails
 
-**Problem**: BME280 initialization fails
-**Solution**:
-- Check I2C wiring (SDA, SCL, VCC, GND)
-- Verify pull-up resistors are installed (4.7kΩ)
-- Check I2C address (0x76 vs 0x77)
-- Verify BME280 power supply is 3.3V (not 5V)
+1. **Check flash chip**: Verify SPI connections (TRÅDFRI only)
+2. **Check file format**: Must be proper Zigbee OTA format (.ota or .zigbee)
+3. **Check version**: OTA only upgrades to higher version numbers
+4. **Check bootloader**: Ensure custom bootloader is flashed first
 
-**Problem**: No sensor readings
-**Solution**:
-- Check serial console output for error messages
-- Verify BME280 is properly initialized
-- Ensure Zigbee network is joined
+### Build Errors
 
-## License
+1. **Check GSDK version**: Must be 4.5.0 LTS
+2. **Check toolchain**: GCC Arm version 12.2.rel1 recommended
+3. **Clean build**: Delete `firmware/build/` and rebuild
+4. **Check SLC**: Ensure SLC CLI is in PATH
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+## Development
 
-**Note**: This project depends on the Silicon Labs Gecko SDK, which is licensed separately under the Zlib license. The GSDK is not included in this repository and must be obtained from:
-https://github.com/SiliconLabs/gecko_sdk
+### Modify Sensor Update Interval
+
+Edit `src/app/app_sensor.c`:
+```c
+#define SENSOR_UPDATE_INTERVAL_MS  (5 * 60 * 1000)  // 5 minutes
+```
+
+### Add Custom Clusters
+
+1. Edit `config/zcl/zcl_config.zap` using Simplicity Studio ZAP tool
+2. Regenerate with `slc generate`
+3. Implement handlers in `app.c`
+
+### Debug Output
+
+Enable UART debug output (uses SWO on BRD4151A):
+```bash
+commander studio trace --device EFR32MG1P232F256GM48
+```
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request.
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Commit changes with clear messages
+4. Submit a pull request
 
-## Resources
+## License
 
-- [Silicon Labs EFR32MG1P Datasheet](https://www.silabs.com/wireless/zigbee/efr32mg1-series-1-socs)
-- [Gecko SDK Documentation](https://docs.silabs.com/)
-- [BME280 Datasheet](https://www.bosch-sensortec.com/products/environmental-sensors/humidity-sensors-bme280/)
-- [Zigbee Cluster Library Specification](https://zigbeealliance.org/developer_resources/zigbee-cluster-library/)
+This project is licensed under the **Apache License 2.0** - see [LICENSE](LICENSE) file.
 
-## Author
+## Acknowledgments
 
-Created by faronov - [GitHub](https://github.com/faronov)
+- **Silicon Labs** for GSDK 4.5.0 LTS and development tools
+- **Bosch Sensortec** for BME280 sensor documentation
+- **IKEA** for TRÅDFRI module hardware (used as platform, not affiliated)
+- **Zigbee Alliance** for Zigbee 3.0 specification
 
-## Support
+## Release Notes
 
-For issues and questions, please open an issue on the [GitHub repository](https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/issues).
+### v1.0.0 (2026-01-29)
+
+**Initial Release**
+
+Features:
+- BME280 sensor support (temperature, humidity, pressure)
+- Zigbee 3.0 sleepy end device implementation
+- 2xAAA battery support with monitoring
+- OTA firmware updates via SPI flash
+- Custom bootloader (35KB) for TRÅDFRI
+- Optimized network rejoin (7x faster)
+- Coordinator-side cluster binding
+- Power-optimized 5-minute update interval
+- Automated CI/CD builds
+
+Hardware:
+- Silicon Labs BRD4151A development board
+- IKEA TRÅDFRI module (EFR32MG1P132F256GM32)
+
+Technical:
+- GSDK 4.5.0 LTS
+- Release builds with size optimization
+- Silicon Labs manufacturer ID (0x1049)
+- Firmware size: ~155KB
+- Bootloader size: 35KB
+
+## Contact
+
+- **Issues**: https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/issues
+- **Discussions**: https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/discussions
