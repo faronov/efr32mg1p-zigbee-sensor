@@ -41,7 +41,7 @@ static uint8_t join_attempt_count = 0;
 // Button press duration tracking
 static uint32_t button_press_start_tick = 0;
 static bool button_pressed = false;
-#define LONG_PRESS_THRESHOLD_MS 2000
+#define LONG_PRESS_THRESHOLD_MS 5000  // 5 seconds for long press (leave/rejoin network)
 
 // Optimized rejoin state machine (TEMPORARILY DISABLED - event queue issue)
 // typedef enum {
