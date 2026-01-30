@@ -19,9 +19,6 @@ component:
   # Core bootloader
   - id: bootloader_core
 
-  # First stage bootloader (resides at 0x000-0x7FF, allows main bootloader upgrades)
-  - id: bootloader_apploader
-
   # CRITICAL: Common storage implementation (provides storage_main)
   - id: bootloader_common_storage_single
 
