@@ -18,6 +18,9 @@ component:
   - id: zigbee_scan_dispatch
   - id: zigbee_update_tc_link_key
 
+  # Identify cluster support (LED blink when identified)
+  - id: zigbee_identify
+
   # OTA bootloader support
   - id: zigbee_ota_client_policy
   - id: zigbee_ota_storage_simple
