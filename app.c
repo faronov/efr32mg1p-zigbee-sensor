@@ -8,6 +8,7 @@
 #include "app/framework/include/af.h"
 #include "app/framework/plugin/network-steering/network-steering.h"
 #include "app_sensor.h"
+#include "app_config.h"
 
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
 #include "sl_simple_button_instances.h"
@@ -91,6 +92,9 @@ void emberAfInitCallback(void)
 
   // Initialize optimized rejoin event
   sl_zigbee_event_init(&rejoin_retry_event, rejoin_retry_event_handler);
+
+  // Initialize configuration from NVM
+  app_config_init();
 
   // Initialize BME280 sensor
   if (!app_sensor_init()) {

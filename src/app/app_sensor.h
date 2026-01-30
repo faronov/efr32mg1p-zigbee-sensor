@@ -48,4 +48,14 @@ void app_sensor_update(void);
  */
 void app_sensor_start_periodic_updates(void);
 
+/**
+ * @brief Set sensor reading interval
+ *
+ * Updates the periodic sensor update interval. The new interval takes
+ * effect on the next scheduled update.
+ *
+ * @param interval_ms New interval in milliseconds (must be >= 10000)
+ */
+void app_sensor_set_interval(uint32_t interval_ms);
+
 #endif // APP_SENSOR_H

@@ -4,6 +4,7 @@
  */
 
 #include "app_sensor.h"
+#include "app_config.h"
 #include "bme280_min.h"
 #include "battery.h"
 #include "af.h"
@@ -20,6 +21,9 @@
 
 // Event control for periodic updates
 static sl_zigbee_event_t sensor_update_event;
+
+// Configurable sensor update interval
+static uint32_t sensor_update_interval_ms = SENSOR_UPDATE_INTERVAL_MS;
 
 // Forward declaration
 static void sensor_update_event_handler(sl_zigbee_event_t *event);
@@ -42,9 +46,15 @@ bool app_sensor_init(void)
 
   emberAfCorePrintln("Battery monitoring initialized successfully");
 
+  // Load configured interval from NVM
+  const app_config_t* config = app_config_get();
+  sensor_update_interval_ms = config->sensor_read_interval_seconds * 1000;
+
   // Initialize and schedule the event for periodic updates
   sl_zigbee_event_init(&sensor_update_event, sensor_update_event_handler);
-  sl_zigbee_event_set_delay_ms(&sensor_update_event, SENSOR_UPDATE_INTERVAL_MS);
+  sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
+
+  emberAfCorePrintln("Sensor update interval: %d seconds", config->sensor_read_interval_seconds);
 
   return true;
 }
@@ -53,8 +63,8 @@ void app_sensor_start_periodic_updates(void)
 {
   // (Re)start the periodic sensor update event
   emberAfCorePrintln("Starting periodic sensor updates (interval: %d seconds)",
-                     SENSOR_UPDATE_INTERVAL_MS / 1000);
-  sl_zigbee_event_set_delay_ms(&sensor_update_event, SENSOR_UPDATE_INTERVAL_MS);
+                     sensor_update_interval_ms / 1000);
+  sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
 }
 
 static void sensor_update_event_handler(sl_zigbee_event_t *event)
@@ -65,12 +75,26 @@ static void sensor_update_event_handler(sl_zigbee_event_t *event)
     app_sensor_update();
 
     // Reschedule for next update
-    sl_zigbee_event_set_delay_ms(&sensor_update_event, SENSOR_UPDATE_INTERVAL_MS);
+    sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
   } else {
     // Network down - stop periodic reads to save power
     emberAfCorePrintln("Network down: sensor reads suspended");
     // Event will be restarted by app_sensor_start_periodic_updates() when network comes back up
   }
+}
+
+void app_sensor_set_interval(uint32_t interval_ms)
+{
+  if (interval_ms < 10000) {
+    emberAfCorePrintln("Warning: Interval too short, using minimum 10 seconds");
+    interval_ms = 10000;
+  }
+
+  sensor_update_interval_ms = interval_ms;
+  emberAfCorePrintln("Sensor update interval changed to %d seconds", interval_ms / 1000);
+
+  // Restart the timer with new interval
+  sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
 }
 
 void app_sensor_update(void)
@@ -84,16 +108,31 @@ void app_sensor_update(void)
     return;
   }
 
-  emberAfCorePrintln("Sensor read: T=%d.%02d C, RH=%d.%02d %%, P=%d Pa",
+  emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=%d.%02d %%, P=%d Pa",
                      sensor_data.temperature / 100,
                      sensor_data.temperature % 100,
                      sensor_data.humidity / 100,
                      sensor_data.humidity % 100,
                      sensor_data.pressure);
 
+  // Get configuration and apply calibration offsets
+  const app_config_t* config = app_config_get();
+
+  // Apply calibration offsets
+  int32_t temp_calibrated = sensor_data.temperature + config->temperature_offset_centidegrees;
+  int32_t humidity_calibrated = sensor_data.humidity + config->humidity_offset_centipercent;
+  int32_t pressure_calibrated = sensor_data.pressure + (config->pressure_offset_centikilopascals * 10); // Convert 0.01 kPa to Pa
+
+  emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=%d.%02d %%, P=%d Pa",
+                     (int)(temp_calibrated / 100),
+                     (int)(temp_calibrated % 100),
+                     (int)(humidity_calibrated / 100),
+                     (int)(humidity_calibrated % 100),
+                     (int)pressure_calibrated);
+
   // Update Temperature Measurement cluster (0x0402)
   // MeasuredValue is int16, in 0.01°C units
-  int16_t temp_value = (int16_t)sensor_data.temperature;
+  int16_t temp_value = (int16_t)temp_calibrated;
   status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
                                        ZCL_TEMP_MEASUREMENT_CLUSTER_ID,
                                        ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID,
@@ -105,7 +144,7 @@ void app_sensor_update(void)
 
   // Update Relative Humidity Measurement cluster (0x0405)
   // MeasuredValue is uint16, in 0.01%RH units
-  uint16_t humidity_value = (uint16_t)sensor_data.humidity;
+  uint16_t humidity_value = (uint16_t)humidity_calibrated;
   status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
                                        ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
                                        ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
@@ -118,7 +157,7 @@ void app_sensor_update(void)
   // Update Pressure Measurement cluster (0x0403)
   // MeasuredValue is int16, in kPa units (divide Pa by 1000)
   // Zigbee spec: signed 16-bit integer in kPa
-  int16_t pressure_value = (int16_t)(sensor_data.pressure / 1000);
+  int16_t pressure_value = (int16_t)(pressure_calibrated / 1000);
   status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
                                        ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID,
                                        ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID,
