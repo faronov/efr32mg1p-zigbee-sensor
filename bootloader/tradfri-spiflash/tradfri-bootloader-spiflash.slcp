@@ -149,6 +149,14 @@ define:
 
 # Toolchain
 toolchain_settings:
+  - option: gcc_compiler_option
+    value: -Os
+  - option: gcc_compiler_option
+    value: -ffunction-sections
+  - option: gcc_compiler_option
+    value: -fdata-sections
+  - option: gcc_linker_option
+    value: -Wl,--gc-sections
   - option: gcc_linker_option
     value: -Wl,--no-warn-rwx-segments
 
