@@ -74,21 +74,26 @@ configuration:
   - name: EMBER_AF_PRINT_CORE
     value: 1
 
-  # Configure as Zigbee End Device (sleepy, battery-powered)
+  # Configure as Zigbee End Device (non-sleepy for testing/debugging)
+  # TODO: Change back to SLEEPY after event queue issue resolved
   - name: SLI_ZIGBEE_PRIMARY_NETWORK_DEVICE_TYPE
-    value: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_SLEEPY_END_DEVICE
+    value: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_END_DEVICE
 
-  # Increase event queue and stack sizes (fix event-queue.c:294 assert)
+  # Increase stack sizes and reduce event usage (fix event-queue.c:294 assert)
   - name: EMBER_AF_PLUGIN_IDLE_SLEEP_USE_BUTTONS
     value: 1
   - name: EMBER_AF_PLUGIN_NETWORK_STEERING_OPTIMIZE_SCANS
-    value: 0
+    value: 1
   - name: EMBER_PACKET_BUFFER_COUNT
-    value: 255
+    value: 100
   - name: EMBER_AF_PLUGIN_NETWORK_STEERING_CHANNEL_MASK
     value: 0x07FFF800
   - name: EMBER_AF_PLUGIN_NETWORK_STEERING_SCAN_DURATION
     value: 3
+  - name: EMBER_MAX_END_DEVICE_CHILDREN
+    value: 0
+  - name: EMBER_CHILD_TABLE_SIZE
+    value: 0
 
   # Zigbee 3.0 security
   - name: SLI_ZIGBEE_PRIMARY_NETWORK_SECURITY_TYPE

@@ -25,35 +25,35 @@ static bool led_blink_active = false;
 // LED off timer - turn off LED after network join confirmation
 static sl_zigbee_event_t led_off_event;
 
-// Network join retry with exponential backoff
-static sl_zigbee_event_t network_join_retry_event;
+// Network join retry with exponential backoff (TEMPORARILY DISABLED - event queue issue)
+// static sl_zigbee_event_t network_join_retry_event;
 static uint8_t join_attempt_count = 0;
-static const uint32_t join_retry_delays_ms[] = {
-  0,        // First attempt: immediate
-  30000,    // 30 seconds
-  60000,    // 1 minute
-  120000,   // 2 minutes
-  300000,   // 5 minutes
-  600000    // 10 minutes (max backoff)
-};
-#define MAX_JOIN_RETRY_DELAY_INDEX (sizeof(join_retry_delays_ms) / sizeof(join_retry_delays_ms[0]) - 1)
+// static const uint32_t join_retry_delays_ms[] = {
+//   0,        // First attempt: immediate
+//   30000,    // 30 seconds
+//   60000,    // 1 minute
+//   120000,   // 2 minutes
+//   300000,   // 5 minutes
+//   600000    // 10 minutes (max backoff)
+// };
+// #define MAX_JOIN_RETRY_DELAY_INDEX (sizeof(join_retry_delays_ms) / sizeof(join_retry_delays_ms[0]) - 1)
 
 // Button press duration tracking
 static uint32_t button_press_start_tick = 0;
 static bool button_pressed = false;
 #define LONG_PRESS_THRESHOLD_MS 2000
 
-// Optimized rejoin state machine
-typedef enum {
-  REJOIN_STATE_IDLE,
-  REJOIN_STATE_CURRENT_CHANNEL,
-  REJOIN_STATE_ALL_CHANNELS,
-  REJOIN_STATE_DONE
-} RejoinState_t;
+// Optimized rejoin state machine (TEMPORARILY DISABLED - event queue issue)
+// typedef enum {
+//   REJOIN_STATE_IDLE,
+//   REJOIN_STATE_CURRENT_CHANNEL,
+//   REJOIN_STATE_ALL_CHANNELS,
+//   REJOIN_STATE_DONE
+// } RejoinState_t;
 
-static sl_zigbee_event_t rejoin_retry_event;
-static RejoinState_t rejoin_state = REJOIN_STATE_IDLE;
-static uint8_t saved_channel = 0;
+// static sl_zigbee_event_t rejoin_retry_event;
+// static RejoinState_t rejoin_state = REJOIN_STATE_IDLE;
+// static uint8_t saved_channel = 0;
 
 // Rejoin timeout configuration
 #define REJOIN_CURRENT_CHANNEL_TIMEOUT_MS  500   // Wait 500ms before trying all channels
@@ -87,11 +87,11 @@ void emberAfInitCallback(void)
   sl_zigbee_event_init(&led_blink_event, led_blink_event_handler);
   sl_zigbee_event_init(&led_off_event, led_off_event_handler);
 
-  // Initialize network join retry event
-  sl_zigbee_event_init(&network_join_retry_event, network_join_retry_event_handler);
+  // Initialize network join retry event (TEMPORARILY DISABLED - event queue issue)
+  // sl_zigbee_event_init(&network_join_retry_event, network_join_retry_event_handler);
 
-  // Initialize optimized rejoin event
-  sl_zigbee_event_init(&rejoin_retry_event, rejoin_retry_event_handler);
+  // Initialize optimized rejoin event (TEMPORARILY DISABLED - event queue issue)
+  // sl_zigbee_event_init(&rejoin_retry_event, rejoin_retry_event_handler);
 
   // Initialize configuration from NVM
   app_config_init();
@@ -121,11 +121,11 @@ void emberAfStackStatusCallback(EmberStatus status)
 
     // Reset join attempt counter on success
     join_attempt_count = 0;
-    sl_zigbee_event_set_inactive(&network_join_retry_event);
+    // sl_zigbee_event_set_inactive(&network_join_retry_event);
 
-    // Cancel any pending rejoin attempts - network is up
-    rejoin_state = REJOIN_STATE_DONE;
-    sl_zigbee_event_set_inactive(&rejoin_retry_event);
+    // Cancel any pending rejoin attempts - network is up (TEMPORARILY DISABLED)
+    // rejoin_state = REJOIN_STATE_DONE;
+    // sl_zigbee_event_set_inactive(&rejoin_retry_event);
 
     // Stop LED blinking
     led_blink_active = false;
@@ -161,10 +161,10 @@ void emberAfStackStatusCallback(EmberStatus status)
     // Sensor timer will automatically stop reading when event handler checks network state
     // Device will use minimal power while waiting for network
 
-    // Start optimized rejoin after a short delay to allow stack to stabilize
-    emberAfCorePrintln("Scheduling optimized rejoin in 100ms...");
-    rejoin_state = REJOIN_STATE_IDLE;
-    sl_zigbee_event_set_delay_ms(&rejoin_retry_event, 100);
+    // Optimized rejoin TEMPORARILY DISABLED - event queue issue
+    // emberAfCorePrintln("Scheduling optimized rejoin in 100ms...");
+    // rejoin_state = REJOIN_STATE_IDLE;
+    // sl_zigbee_event_set_delay_ms(&rejoin_retry_event, 100);
   }
 }
 
@@ -244,38 +244,9 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
  */
 static void network_join_retry_event_handler(sl_zigbee_event_t *event)
 {
-  emberAfCorePrintln("Auto-retry: Attempting to join network (attempt %d)...",
-                     join_attempt_count + 1);
-
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-  // Start LED blinking to indicate joining
-  led_blink_active = true;
-  sl_zigbee_event_set_active(&led_blink_event);
-#endif
-
-  // Attempt to join
-  EmberStatus join_status = emberAfPluginNetworkSteeringStart();
-
-  if (join_status != EMBER_SUCCESS) {
-    emberAfCorePrintln("Join attempt failed: 0x%x", join_status);
-
-    // Schedule next retry with exponential backoff
-    uint8_t delay_index = (join_attempt_count < MAX_JOIN_RETRY_DELAY_INDEX)
-                          ? join_attempt_count
-                          : MAX_JOIN_RETRY_DELAY_INDEX;
-    uint32_t retry_delay = join_retry_delays_ms[delay_index];
-
-    emberAfCorePrintln("Will retry in %d seconds", retry_delay / 1000);
-    sl_zigbee_event_set_delay_ms(&network_join_retry_event, retry_delay);
-    join_attempt_count++;
-
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-    // Stop LED blinking on failure
-    led_blink_active = false;
-    sl_zigbee_event_set_inactive(&led_blink_event);
-    sl_led_turn_off(&sl_led_led0);
-#endif
-  }
+  // TEMPORARILY DISABLED - event queue issue
+  // Auto-retry functionality removed to reduce event usage
+  (void)event;  // Unused parameter
 }
 
 /**
@@ -287,40 +258,9 @@ static void network_join_retry_event_handler(sl_zigbee_event_t *event)
  */
 static void rejoin_retry_event_handler(sl_zigbee_event_t *event)
 {
-  switch (rejoin_state) {
-    case REJOIN_STATE_IDLE:
-      // Start the optimized rejoin process
-      start_optimized_rejoin();
-      break;
-
-    case REJOIN_STATE_CURRENT_CHANNEL:
-      // Timeout waiting for rejoin on current channel - try all channels
-      emberAfCorePrintln("Rejoin on channel %d timed out, trying all channels...", saved_channel);
-      rejoin_state = REJOIN_STATE_ALL_CHANNELS;
-
-      // Try all channels (fallback)
-      EmberStatus status = emberFindAndRejoinNetwork(true, EMBER_ALL_802_15_4_CHANNELS_MASK);
-      if (status == EMBER_SUCCESS) {
-        emberAfCorePrintln("Full channel scan started");
-        // Set timeout for full scan
-        sl_zigbee_event_set_delay_ms(&rejoin_retry_event, REJOIN_FULL_SCAN_TIMEOUT_MS);
-      } else {
-        emberAfCorePrintln("Full channel scan failed to start: 0x%x", status);
-        rejoin_state = REJOIN_STATE_IDLE;
-      }
-      break;
-
-    case REJOIN_STATE_ALL_CHANNELS:
-      // Timeout on full scan - give up for now
-      emberAfCorePrintln("Rejoin failed on all channels after timeout");
-      rejoin_state = REJOIN_STATE_IDLE;
-      // Could retry here, but for now we wait for network to come back
-      break;
-
-    default:
-      rejoin_state = REJOIN_STATE_IDLE;
-      break;
-  }
+  // TEMPORARILY DISABLED - event queue issue
+  // Optimized rejoin functionality removed to reduce event usage
+  (void)event;  // Unused parameter
 }
 
 /**
@@ -337,30 +277,8 @@ static void rejoin_retry_event_handler(sl_zigbee_event_t *event)
  */
 static void start_optimized_rejoin(void)
 {
-  // Get current channel from radio
-  saved_channel = emberGetRadioChannel();
-
-  emberAfCorePrintln("=== Starting Optimized Rejoin ===");
-  emberAfCorePrintln("Trying current channel %d first (fast path)", saved_channel);
-
-  // Create channel mask for current channel only
-  uint32_t channel_mask = BIT32(saved_channel);
-
-  rejoin_state = REJOIN_STATE_CURRENT_CHANNEL;
-
-  // Try current channel only (fast path ~138ms if successful)
-  EmberStatus status = emberFindAndRejoinNetwork(true, channel_mask);
-
-  if (status == EMBER_SUCCESS) {
-    emberAfCorePrintln("Rejoin request sent on channel %d", saved_channel);
-    // Schedule timeout to try all channels if current fails
-    sl_zigbee_event_set_delay_ms(&rejoin_retry_event, REJOIN_CURRENT_CHANNEL_TIMEOUT_MS);
-  } else {
-    emberAfCorePrintln("Rejoin failed to start: 0x%x, will retry all channels", status);
-    // Failed to start - try all channels immediately
-    rejoin_state = REJOIN_STATE_ALL_CHANNELS;
-    sl_zigbee_event_set_delay_ms(&rejoin_retry_event, 10);
-  }
+  // TEMPORARILY DISABLED - event queue issue
+  // Optimized rejoin functionality removed to reduce event usage
 }
 
 /**
@@ -402,14 +320,8 @@ static void handle_short_press(void)
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
 
-      // Schedule retry with exponential backoff
-      uint8_t delay_index = (join_attempt_count < MAX_JOIN_RETRY_DELAY_INDEX)
-                            ? join_attempt_count
-                            : MAX_JOIN_RETRY_DELAY_INDEX;
-      uint32_t retry_delay = join_retry_delays_ms[delay_index];
-
-      emberAfCorePrintln("Will retry in %d seconds", retry_delay / 1000);
-      sl_zigbee_event_set_delay_ms(&network_join_retry_event, retry_delay);
+      // Auto-retry TEMPORARILY DISABLED - event queue issue
+      // Just stop LED and wait for user to press button again
       join_attempt_count++;
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
