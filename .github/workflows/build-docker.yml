@@ -303,3 +303,120 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🚀 Flash this bootloader once before OTA-enabled firmware" >> $GITHUB_STEP_SUMMARY
+
+  release:
+    name: Upload artifacts to release
+    needs: [build-firmware, build-bootloader]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware-tradfri-${{ github.sha }}
+          path: artifacts/firmware
+
+      - name: Download bootloader artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bootloader-tradfri-${{ github.sha }}
+          path: artifacts/bootloader
+
+      - name: Create release package
+        run: |
+          # Extract version from tag
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Creating release package for version: $VERSION"
+
+          # Create release directory structure
+          mkdir -p release/firmware release/bootloader release/ota
+
+          # Copy firmware files
+          find artifacts/firmware -name "*.hex" -exec cp {} release/firmware/ \;
+          find artifacts/firmware -name "*.s37" -exec cp {} release/firmware/ \;
+          find artifacts/firmware -name "*.out" -exec cp {} release/firmware/ \;
+
+          # Copy OTA files
+          find artifacts/firmware -name "*.gbl" -exec cp {} release/ota/ \; 2>/dev/null || true
+          find artifacts/firmware -name "*.ota" -exec cp {} release/ota/ \; 2>/dev/null || true
+          find artifacts/firmware -name "*.zigbee" -exec cp {} release/ota/ \; 2>/dev/null || true
+
+          # Copy bootloader files
+          find artifacts/bootloader -name "*.hex" -exec cp {} release/bootloader/ \;
+          find artifacts/bootloader -name "*.s37" -exec cp {} release/bootloader/ \;
+
+          # Create README for release
+          cat > release/README.txt <<EOF
+          EFR32MG1P BME280 Zigbee Sensor - Release ${VERSION}
+          =====================================================
+
+          IKEA TRÅDFRI Board (EFR32MG1P132F256GM32)
+
+          Files:
+          ------
+          firmware/     - Main application firmware (.hex, .s37)
+          bootloader/   - Gecko bootloader for OTA support (.hex, .s37)
+          ota/          - OTA update files (.gbl, .ota, .zigbee)
+
+          Installation:
+          ------------
+          1. Flash bootloader ONCE: bootloader/bootloader-storage-internal-single-*.s37
+          2. Flash application firmware: firmware/*.s37
+          3. For OTA updates, use files from ota/ directory
+
+          Documentation: https://github.com/${GITHUB_REPOSITORY}
+          EOF
+
+          # Create ZIP archive
+          cd release
+          zip -r ../efr32mg1p-bme280-zigbee-sensor-v${VERSION}.zip .
+          cd ..
+
+          ls -lh *.zip
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            efr32mg1p-bme280-zigbee-sensor-*.zip
+            release/firmware/*.hex
+            release/firmware/*.s37
+            release/bootloader/*.hex
+            release/bootloader/*.s37
+            release/ota/*.gbl
+            release/ota/*.ota
+            release/ota/*.zigbee
+          fail_on_unmatched_files: false
+          body: |
+            ## EFR32MG1P BME280 Zigbee Sensor
+
+            ### What's New
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+
+            ### Installation
+
+            **First-time setup:**
+            1. Flash the bootloader: `bootloader-storage-internal-single-*.s37`
+            2. Flash the application: `zigbee_bme280_sensor_tradfri*.s37`
+
+            **OTA Updates:**
+            - Use the `.gbl` file with Silicon Labs tools
+            - Use the `.ota` or `.zigbee` file with Zigbee2MQTT/ZHA
+
+            ### Hardware
+            - **Board**: IKEA TRÅDFRI (EFR32MG1P132F256GM32)
+            - **Sensor**: Bosch BME280 (I2C)
+            - **Flash**: IS25LQ020B 256KB SPI
+
+            ### Features
+            - Temperature, humidity, and pressure measurement
+            - Battery voltage monitoring
+            - OTA firmware updates
+            - Direct device-to-device binding support
+            - Power-optimized sleepy end device
+
+            📦 Download the ZIP file for a complete package with all firmware files.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
