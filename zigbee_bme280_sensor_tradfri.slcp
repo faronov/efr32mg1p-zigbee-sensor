@@ -18,6 +18,10 @@ component:
   - id: zigbee_scan_dispatch
   - id: zigbee_update_tc_link_key
 
+  # Binding support (device-side for device-to-device binding)
+  - id: zigbee_binding_table
+  - id: zigbee_end_device_bind
+
   # OTA bootloader support
   - id: zigbee_ota_client_policy
   - id: zigbee_ota_storage_simple
