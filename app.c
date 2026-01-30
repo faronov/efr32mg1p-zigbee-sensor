@@ -141,9 +141,8 @@ void emberAfStackStatusCallback(EmberStatus status)
     // Restart periodic sensor updates
     app_sensor_start_periodic_updates();
 
-    // Device-side binding is now supported for device-to-device communication
-    // Bindings can be created via ZHA or other coordinators
-    // See BINDING_GUIDE.md for usage
+    // Note: Binding is handled by coordinator (Zigbee2MQTT/ZHA/deCONZ)
+    // No device-side binding code needed - see BINDING_GUIDE.md
 
   } else if (status == EMBER_NETWORK_DOWN) {
     emberAfCorePrintln("Network down - will attempt optimized rejoin");
@@ -473,34 +472,4 @@ static void handle_long_press(void)
   } else {
     emberAfCorePrintln("Not joined to network - long press ignored");
   }
-}
-
-/**
- * @brief Binding table entry set callback
- *
- * Called when a binding table entry is created.
- * This happens when the coordinator or another device requests binding.
- */
-void emberAfSetBindingCallback(EmberBindingTableEntry *entry)
-{
-  emberAfCorePrintln("Binding created:");
-  emberAfCorePrintln("  Type: %d", entry->type);
-  emberAfCorePrintln("  Local EP: %d", entry->local);
-  emberAfCorePrintln("  Remote EP: %d", entry->remote);
-  emberAfCorePrintln("  Cluster: 0x%2X", entry->clusterId);
-
-  // Print remote EUI64
-  emberAfCorePrint("  Remote EUI64: ");
-  emberAfPrintBigEndianEui64(entry->identifier);
-  emberAfCorePrintln("");
-}
-
-/**
- * @brief Binding table entry deleted callback
- *
- * Called when a binding table entry is removed.
- */
-void emberAfDeleteBindingCallback(uint8_t index)
-{
-  emberAfCorePrintln("Binding %d deleted", index);
 }

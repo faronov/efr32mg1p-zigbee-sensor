@@ -1,10 +1,6 @@
 # Zigbee Cluster Binding Guide
 
-> **Status**: ✅ **Both options implemented!**
-> - **Option 1 (Coordinator-side)**: Available since v1.0.0 - no firmware changes needed
-> - **Option 2 (Device-side)**: **Now available in v1.0.1+** - full device-to-device binding support
->
-> 📖 For device-to-device binding (sensor → smart plug), see **[DEVICE_TO_DEVICE_BINDING.md](DEVICE_TO_DEVICE_BINDING.md)**
+> **Status**: ✅ Implemented in v1.0.0 using **coordinator-side binding** (Option 1). The sensor is ready for binding - no firmware changes needed. Coordinators like Zigbee2MQTT, ZHA, and deCONZ can bind clusters directly.
 
 ## Overview
 Enable your TRÅDFRI BME280 sensor to bind its measurement clusters to other Zigbee devices (coordinators, smart home hubs, or other devices) for direct reporting.
