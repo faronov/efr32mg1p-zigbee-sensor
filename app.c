@@ -6,9 +6,10 @@
 #include "sl_component_catalog.h"
 #include "zigbee_app_framework_event.h"
 #include "app/framework/include/af.h"
-#include "app/framework/plugin/network-steering/network-steering.h"
+// #include "app/framework/plugin/network-steering/network-steering.h" // REMOVED - causes event queue crash
 #include "app_sensor.h"
 #include "app_config.h"
+#include "stack/include/network-formation.h"  // For manual network join
 
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
 #include "sl_simple_button_instances.h"
@@ -62,6 +63,9 @@ static bool button_pressed = false;
 // Channel mask helper macro
 #define BIT32(n) (((uint32_t)1) << (n))
 
+// Zigbee 3.0 channels (11-26)
+#define ZIGBEE_CHANNELS_MASK 0x07FFF800
+
 // Forward declarations
 static void led_blink_event_handler(sl_zigbee_event_t *event);
 static void led_off_event_handler(sl_zigbee_event_t *event);
@@ -70,6 +74,7 @@ static void rejoin_retry_event_handler(sl_zigbee_event_t *event);
 static void start_optimized_rejoin(void);
 static void handle_short_press(void);
 static void handle_long_press(void);
+static EmberStatus manual_network_join(void);
 
 /**
  * @brief Zigbee application init callback
@@ -285,7 +290,28 @@ static void start_optimized_rejoin(void)
 }
 
 /**
- * @brief Handle short button press (<2 seconds)
+ * @brief Manual network join using low-level Zigbee APIs
+ *
+ * Replacement for network steering plugin that caused event queue overflow.
+ * Uses emberFindAndRejoinNetwork() which scans channels sequentially.
+ */
+static EmberStatus manual_network_join(void)
+{
+  // Use emberFindAndRejoinNetwork with all Zigbee channels (11-26)
+  // This scans sequentially instead of scheduling all channel events at once
+  EmberStatus status = emberFindAndRejoinNetwork(true, ZIGBEE_CHANNELS_MASK);
+
+  if (status == EMBER_SUCCESS) {
+    emberAfCorePrintln("Network scan started successfully");
+  } else {
+    emberAfCorePrintln("Failed to start network scan: 0x%x", status);
+  }
+
+  return status;
+}
+
+/**
+ * @brief Handle short button press (<5 seconds)
  *
  * Short press triggers immediate sensor read and report.
  * If not joined to network, starts network joining.
@@ -307,7 +333,7 @@ static void handle_short_press(void)
 #endif
 
   } else {
-    // Not on network - start network steering
+    // Not on network - start manual network join
     emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
                        join_attempt_count + 1);
 
@@ -317,8 +343,8 @@ static void handle_short_press(void)
     sl_zigbee_event_set_active(&led_blink_event);
 #endif
 
-    // Start network steering
-    EmberStatus join_status = emberAfPluginNetworkSteeringStart();
+    // Start manual network join (no longer using network steering plugin)
+    EmberStatus join_status = manual_network_join();
 
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
@@ -338,7 +364,7 @@ static void handle_short_press(void)
 }
 
 /**
- * @brief Handle long button press (>=2 seconds)
+ * @brief Handle long button press (>=5 seconds)
  *
  * Long press causes the device to leave the current network
  * and immediately attempt to rejoin (useful for moving to a new coordinator).
@@ -375,8 +401,8 @@ static void handle_long_press(void)
       sl_zigbee_event_set_active(&led_blink_event);
 #endif
 
-      // Start network steering to rejoin
-      EmberStatus join_status = emberAfPluginNetworkSteeringStart();
+      // Start manual network join to rejoin (no longer using network steering plugin)
+      EmberStatus join_status = manual_network_join();
       if (join_status != EMBER_SUCCESS) {
         emberAfCorePrintln("Failed to start rejoin: 0x%x", join_status);
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
