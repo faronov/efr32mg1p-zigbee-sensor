@@ -270,41 +270,8 @@ jobs:
           # Run build script
           bash tools/build.sh
 
-      - name: Create OTA files - TRÅDFRI (Debug)
-        if: success()
-        shell: bash
-        run: |
-          # Set HOME for commander
-          export HOME=/root
-
-          # Extract version from git tag or use default
-          VERSION="${GITHUB_REF_NAME#v}"
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            VERSION="1.0.0"
-            echo "No valid version tag found, using default: $VERSION"
-          fi
-
-          echo "Creating OTA files with version: $VERSION"
-
-          # Find the firmware ELF file
-          FIRMWARE_ELF=$(find firmware/build -name "*.out" -type f | head -1)
-
-          if [ -z "$FIRMWARE_ELF" ]; then
-            echo "ERROR: Firmware ELF not found!"
-            exit 1
-          fi
-
-          echo "Found firmware ELF: $FIRMWARE_ELF"
-
-          # Create OTA GBL file
-          mkdir -p build
-          commander gbl create "build/zigbee_bme280_sensor_tradfri_debug.gbl" \
-            --app "$FIRMWARE_ELF" \
-            --bootloader bootloader/tradfri-spiflash/build/tradfri-bootloader-spiflash.s37 \
-            --compress lz4
-
-          echo "✓ OTA files created successfully"
-          ls -lh build/*.gbl
+      # OTA file creation skipped for debug builds - OTA components disabled
+      # Debug builds are for testing via SWD/JTAG, not for OTA updates
 
       - name: Upload firmware artifacts (Debug)
         uses: actions/upload-artifact@v4
@@ -317,7 +284,6 @@ jobs:
             firmware/build/**/*.bin
             firmware/build/**/*.s37
             firmware/build/**/*.map
-            build/**/*.gbl
           retention-days: 30
           if-no-files-found: error
 
@@ -329,22 +295,15 @@ jobs:
           echo "**Board**: IKEA TRÅDFRI (EFR32MG1P132F256GM32)" >> $GITHUB_STEP_SUMMARY
           echo "**SLCP**: zigbee_bme280_sensor_tradfri_debug.slcp" >> $GITHUB_STEP_SUMMARY
           echo "**Features**: SWO debug output on PF2 @ 115200 baud" >> $GITHUB_STEP_SUMMARY
+          echo "**OTA Status**: Disabled (SPI flash not responding)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Debug Artifacts" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          find firmware -type f \( -name "*.elf" -o -name "*.hex" -o -name "*.s37" \) -exec ls -lh {} \; 2>/dev/null | awk '{print $9, $5}' || echo "No files found"
+          find firmware -type f \( -name "*.out" -o -name "*.hex" -o -name "*.s37" \) -exec ls -lh {} \; 2>/dev/null | awk '{print $9, $5}' || echo "No files found"
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### OTA Files (Debug)" >> $GITHUB_STEP_SUMMARY
-          if find build -type f -name "*.gbl" 2>/dev/null | grep -q .; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            find build -type f -name "*.gbl" -exec ls -lh {} \; 2>/dev/null | awk '{print $9, $5}'
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "_No OTA files generated_" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "🔍 Debug build includes SWO output for troubleshooting" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️  OTA updates disabled - flash via SWD/JTAG only" >> $GITHUB_STEP_SUMMARY
 
   build-bootloader:
     name: Build bootloader - TRÅDFRI
