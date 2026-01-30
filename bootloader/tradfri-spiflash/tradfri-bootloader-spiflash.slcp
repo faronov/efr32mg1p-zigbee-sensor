@@ -47,8 +47,8 @@ component:
   # Delay driver for flash operations
   - id: bootloader_delay_driver
 
-  # Debug output
-  - id: bootloader_debug
+  # Debug output removed to save space for UART components
+  # - id: bootloader_debug
 
   # UART serial communication for firmware updates
   - id: bootloader_uart_driver
