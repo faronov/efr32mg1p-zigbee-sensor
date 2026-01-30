@@ -48,9 +48,10 @@ component:
     instance:
       - led0
 
-  # I/O disabled for TRÅDFRI to simplify configuration
-  # UART requires pin configuration which complicates custom board setup
-  # For debugging, use SWO or RTT instead
+  # Debug output via SWO (PF2)
+  - id: iostream_retarget_stdio
+  - id: iostream_swo
+  - id: zigbee_debug_print
 
 # Device specified via --device flag in build script
 # Target: EFR32MG1P132F256GM32 (IKEA TRÅDFRI)
@@ -59,6 +60,18 @@ configuration:
   # Disable VCOM (not available on TRÅDFRI)
   - name: SL_BOARD_ENABLE_VCOM
     value: 0
+
+  # SWO debug output configuration
+  - name: SL_IOSTREAM_SWO_BAUDRATE
+    value: 115200
+  - name: SL_IOSTREAM_SWO_RESTRICT_ENERGY_MODE_TO_ALLOW_RECEPTION
+    value: 0
+
+  # Enable Zigbee debug printing
+  - name: EMBER_AF_PRINT_ENABLE
+    value: 1
+  - name: EMBER_AF_PRINT_CORE
+    value: 1
 
   # Configure as Zigbee End Device (sleepy, battery-powered)
   - name: SLI_ZIGBEE_PRIMARY_NETWORK_DEVICE_TYPE
