@@ -10,7 +10,6 @@ description: >
   - SPI pins: PD13 (CLK), PD14 (MISO), PD15 (MOSI), PB11 (CS)
   - USART0 Location: LOC4
   - Flash: IS25LQ020B 256KB (2Mbit)
-  - UART serial: PB14 (TX), PB15 (RX) at 115200 baud for firmware updates
 
 category: Bootloader|Core
 author: Silicon Labs, Inc. (Modified for TRÅDFRI)
@@ -38,23 +37,17 @@ component:
   # CRC validation for image verification
   - id: bootloader_crc
 
-  # Cryptographic support removed to save space for UART
-  # Disabled since BOOTLOADER_ENFORCE_SIGNED_UPGRADE = 0
-  # - id: bootloader_aes_sha_ecdsa
+  # Cryptographic support (AES, SHA, ECDSA)
+  - id: bootloader_aes_sha_ecdsa
 
-  # Token management removed to save space
-  # - id: bootloader_token_management
+  # Token management for security keys
+  - id: bootloader_token_management
 
   # Delay driver for flash operations
   - id: bootloader_delay_driver
 
-  # Debug output removed to save space for UART components
-  # - id: bootloader_debug
-
-  # UART serial communication for firmware updates
-  - id: bootloader_uart_driver
-  - id: bootloader_xmodem_parser
-  - id: bootloader_uart_xmodem
+  # Debug output
+  - id: bootloader_debug
 
 configuration:
   # Application start address (after bootloader)
@@ -76,10 +69,6 @@ configuration:
     value: 0x0
   - name: SLOT0_SIZE
     value: 262144  # 256KB
-
-  # UART bootloader timeout (5 seconds)
-  - name: BTL_UART_ENABLE_TIMEOUT
-    value: 5000
 
 # Custom defines for TRÅDFRI hardware
 define:
@@ -125,39 +114,8 @@ define:
   - name: BTL_STORAGE_SPIFLASH_SECTOR_SIZE
     value: 4096
 
-  # UART serial communication pins (PB14 TX, PB15 RX)
-  # Uses USART1 for serial bootloader (USART0 used by SPI flash)
-  - name: SL_SERIAL_UART_PERIPHERAL
-    value: USART1
-  - name: SL_SERIAL_UART_PERIPHERAL_NO
-    value: 1
-  - name: SL_SERIAL_UART_TX_PORT
-    value: gpioPortB
-  - name: SL_SERIAL_UART_TX_PIN
-    value: 14
-  - name: SL_SERIAL_UART_TX_LOC
-    value: _USART_ROUTELOC0_TXLOC_LOC4
-  - name: SL_SERIAL_UART_RX_PORT
-    value: gpioPortB
-  - name: SL_SERIAL_UART_RX_PIN
-    value: 15
-  - name: SL_SERIAL_UART_RX_LOC
-    value: _USART_ROUTELOC0_RXLOC_LOC4
-  - name: SL_SERIAL_UART_BAUD_RATE
-    value: 115200
-  - name: SL_SERIAL_UART_FLOW_CONTROL
-    value: usartHwFlowControlNone
-
 # Toolchain
 toolchain_settings:
-  - option: gcc_compiler_option
-    value: -Os
-  - option: gcc_compiler_option
-    value: -ffunction-sections
-  - option: gcc_compiler_option
-    value: -fdata-sections
-  - option: gcc_linker_option
-    value: -Wl,--gc-sections
   - option: gcc_linker_option
     value: -Wl,--no-warn-rwx-segments
 
