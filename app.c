@@ -443,6 +443,11 @@ static void handle_short_press(void)
 #endif
 
   } else {
+    if (network_join_in_progress) {
+      emberAfCorePrintln("Join already in progress - ignoring button press");
+      return;
+    }
+
     // Not on network - start manual network join
     emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
                        join_attempt_count + 1);
