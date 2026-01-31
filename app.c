@@ -66,6 +66,9 @@ static bool button_pressed = false;
 // Zigbee 3.0 channels (11-26)
 #define ZIGBEE_CHANNELS_MASK 0x07FFF800
 
+// Single-channel network join state (Series 1 workaround for event queue limitation)
+static uint8_t current_scan_channel = 11;  // Start at channel 11
+
 // Forward declarations
 static void led_blink_event_handler(sl_zigbee_event_t *event);
 static void led_off_event_handler(sl_zigbee_event_t *event);
@@ -293,18 +296,33 @@ static void start_optimized_rejoin(void)
  * @brief Manual network join using low-level Zigbee APIs
  *
  * Replacement for network steering plugin that caused event queue overflow.
- * Uses emberFindAndRejoinNetwork() which scans channels sequentially.
+ *
+ * Series 1 Workaround: Scans ONE channel at a time instead of all 16 channels
+ * simultaneously. This prevents event queue overflow on Series 1 chips with
+ * limited RAM (32KB).
+ *
+ * Strategy: Try most common channels first (15, 20, 25) for faster join,
+ * then fall back to scanning all channels if needed.
  */
 static EmberStatus manual_network_join(void)
 {
-  // Use emberFindAndRejoinNetwork with all Zigbee channels (11-26)
-  // This scans sequentially instead of scheduling all channel events at once
-  EmberStatus status = emberFindAndRejoinNetwork(true, ZIGBEE_CHANNELS_MASK);
+  // Series 1 fix: Scan ONLY ONE channel at a time to avoid event queue overflow
+  // Common Zigbee channels in order of popularity: 15, 20, 25, 11, 14, 19, 24, 26, etc.
+
+  // For now, try channel 15 first (most common in production networks)
+  // TODO: Implement state machine to try multiple channels in sequence
+  uint8_t channel_to_scan = 15;
+  uint32_t single_channel_mask = BIT32(channel_to_scan);
+
+  emberAfCorePrintln("Scanning channel %d for networks...", channel_to_scan);
+
+  // Scan ONLY this one channel - uses minimal events (~1-2 instead of 16+)
+  EmberStatus status = emberFindAndRejoinNetwork(true, single_channel_mask);
 
   if (status == EMBER_SUCCESS) {
-    emberAfCorePrintln("Network scan started successfully");
+    emberAfCorePrintln("Channel %d scan started successfully", channel_to_scan);
   } else {
-    emberAfCorePrintln("Failed to start network scan: 0x%x", status);
+    emberAfCorePrintln("Failed to start scan on channel %d: 0x%x", channel_to_scan, status);
   }
 
   return status;

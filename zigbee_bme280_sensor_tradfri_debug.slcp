@@ -196,6 +196,12 @@ define:
   - name: CUSTOM_BOARD_TRADFRI
     value: 1
 
+  # Increase event queue capacity for Series 1 (fixes event-queue.c:294 crash)
+  # Series 1 has limited RAM (32KB) and smaller default event queue
+  # Default is 5, increase to 8 to allow network scanning
+  - name: EMBER_TASK_COUNT
+    value: 8
+
   # LED pin configuration
   - name: SL_SIMPLE_LED_LED0_PORT
     value: gpioPortA
