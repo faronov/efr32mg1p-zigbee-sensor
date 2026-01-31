@@ -181,7 +181,20 @@ fi
 
 echo "Building with $JOBS parallel jobs..."
 # Build release configuration which has size optimizations
-make -f "$MAKEFILE_NAME" -j"$JOBS" CONF=release
+# Ensure GPIO/SPIDRV macros are visible during compilation to avoid config warnings.
+EXTRA_CPPFLAGS=(
+  "-DSL_SIMPLE_BUTTON_BTN0_PORT=gpioPortB"
+  "-DSL_SIMPLE_BUTTON_BTN0_PIN=13"
+  "-DSL_SIMPLE_LED_LED0_PORT=gpioPortA"
+  "-DSL_SIMPLE_LED_LED0_PIN=0"
+  "-DSL_SPIDRV_EXP_PERIPHERAL=USART0"
+  "-DSL_SPIDRV_EXP_TX_LOC=4"
+  "-DSL_SPIDRV_EXP_RX_LOC=4"
+  "-DSL_SPIDRV_EXP_CLK_LOC=4"
+)
+EXTRA_CPPFLAGS_STR="${EXTRA_CPPFLAGS[*]}"
+
+make -f "$MAKEFILE_NAME" -j"$JOBS" CONF=release CPPFLAGS="$CPPFLAGS $EXTRA_CPPFLAGS_STR"
 
 # Find and report build outputs
 echo ""
