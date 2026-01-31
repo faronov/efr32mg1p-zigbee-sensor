@@ -26,18 +26,10 @@ static bool led_blink_active = false;
 // LED off timer - turn off LED after network join confirmation
 static sl_zigbee_event_t led_off_event;
 
-// Network join retry with exponential backoff (TEMPORARILY DISABLED - event queue issue)
-// static sl_zigbee_event_t network_join_retry_event;
+// Network join channel scan timeout
+static sl_zigbee_event_t channel_scan_timeout_event;
 static uint8_t join_attempt_count = 0;
-// static const uint32_t join_retry_delays_ms[] = {
-//   0,        // First attempt: immediate
-//   30000,    // 30 seconds
-//   60000,    // 1 minute
-//   120000,   // 2 minutes
-//   300000,   // 5 minutes
-//   600000    // 10 minutes (max backoff)
-// };
-// #define MAX_JOIN_RETRY_DELAY_INDEX (sizeof(join_retry_delays_ms) / sizeof(join_retry_delays_ms[0]) - 1)
+#define CHANNEL_SCAN_TIMEOUT_MS 8000  // Wait 8 seconds per channel before trying next
 
 // Button press duration tracking
 static uint32_t button_press_start_tick = 0;
@@ -67,17 +59,21 @@ static bool button_pressed = false;
 #define ZIGBEE_CHANNELS_MASK 0x07FFF800
 
 // Single-channel network join state (Series 1 workaround for event queue limitation)
-static uint8_t current_scan_channel = 11;  // Start at channel 11
+// Try channels in order of popularity: 15, 20, 25, 11, 14, 19, 24, 26, 12, 13, 16, 17, 18, 21, 22, 23
+static const uint8_t channel_scan_order[] = {15, 20, 25, 11, 14, 19, 24, 26, 12, 13, 16, 17, 18, 21, 22, 23};
+static uint8_t current_channel_index = 0;  // Index into channel_scan_order array
+static bool network_join_in_progress = false;
 
 // Forward declarations
 static void led_blink_event_handler(sl_zigbee_event_t *event);
 static void led_off_event_handler(sl_zigbee_event_t *event);
-static void network_join_retry_event_handler(sl_zigbee_event_t *event);
+static void channel_scan_timeout_event_handler(sl_zigbee_event_t *event);
 static void rejoin_retry_event_handler(sl_zigbee_event_t *event);
 static void start_optimized_rejoin(void);
 static void handle_short_press(void);
 static void handle_long_press(void);
 static EmberStatus manual_network_join(void);
+static void try_next_channel(void);
 
 /**
  * @brief Zigbee application init callback
@@ -95,8 +91,8 @@ void emberAfInitCallback(void)
   sl_zigbee_event_init(&led_blink_event, led_blink_event_handler);
   sl_zigbee_event_init(&led_off_event, led_off_event_handler);
 
-  // Initialize network join retry event (TEMPORARILY DISABLED - event queue issue)
-  // sl_zigbee_event_init(&network_join_retry_event, network_join_retry_event_handler);
+  // Initialize channel scan timeout event for sequential scanning
+  sl_zigbee_event_init(&channel_scan_timeout_event, channel_scan_timeout_event_handler);
 
   // Initialize optimized rejoin event (TEMPORARILY DISABLED - event queue issue)
   // sl_zigbee_event_init(&rejoin_retry_event, rejoin_retry_event_handler);
@@ -129,9 +125,13 @@ void emberAfStackStatusCallback(EmberStatus status)
   if (status == EMBER_NETWORK_UP) {
     emberAfCorePrintln("Network joined successfully");
 
-    // Reset join attempt counter on success
+    // Reset join attempt counter and scan state on success
     join_attempt_count = 0;
-    // sl_zigbee_event_set_inactive(&network_join_retry_event);
+    current_channel_index = 0;
+    network_join_in_progress = false;
+
+    // Cancel channel scan timeout - we found a network!
+    sl_zigbee_event_set_inactive(&channel_scan_timeout_event);
 
     // Cancel any pending rejoin attempts - network is up (TEMPORARILY DISABLED)
     // rejoin_state = REJOIN_STATE_DONE;
@@ -248,16 +248,27 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
 }
 
 /**
- * @brief Network join retry event handler
+ * @brief Channel scan timeout handler
  *
- * Automatically retries network joining with exponential backoff
- * when network is not available.
+ * If we haven't joined after scanning current channel, try the next channel.
+ * This implements sequential channel scanning for Series 1 chips.
  */
-static void network_join_retry_event_handler(sl_zigbee_event_t *event)
+static void channel_scan_timeout_event_handler(sl_zigbee_event_t *event)
 {
-  // TEMPORARILY DISABLED - event queue issue
-  // Auto-retry functionality removed to reduce event usage
   (void)event;  // Unused parameter
+
+  // Check if we joined while waiting
+  EmberNetworkStatus network_state = emberAfNetworkState();
+  if (network_state == EMBER_JOINED_NETWORK) {
+    emberAfCorePrintln("Network joined during scan - stopping");
+    network_join_in_progress = false;
+    current_channel_index = 0;
+    return;
+  }
+
+  // Not joined yet - try next channel
+  emberAfCorePrintln("Channel scan timeout - trying next channel");
+  try_next_channel();
 }
 
 /**
@@ -293,6 +304,40 @@ static void start_optimized_rejoin(void)
 }
 
 /**
+ * @brief Try next channel in the scan sequence
+ *
+ * Move to next channel and attempt join. If all channels exhausted,
+ * report failure and stop scanning.
+ */
+static void try_next_channel(void)
+{
+  const uint8_t total_channels = sizeof(channel_scan_order) / sizeof(channel_scan_order[0]);
+
+  // Move to next channel
+  current_channel_index++;
+
+  if (current_channel_index >= total_channels) {
+    // Exhausted all channels - give up
+    emberAfCorePrintln("All channels scanned - no network found");
+    network_join_in_progress = false;
+    current_channel_index = 0;
+    join_attempt_count++;
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+    // Stop LED blinking
+    led_blink_active = false;
+    sl_zigbee_event_set_inactive(&led_blink_event);
+    sl_led_turn_off(&sl_led_led0);
+#endif
+
+    return;
+  }
+
+  // Try next channel
+  manual_network_join();
+}
+
+/**
  * @brief Manual network join using low-level Zigbee APIs
  *
  * Replacement for network steering plugin that caused event queue overflow.
@@ -301,28 +346,40 @@ static void start_optimized_rejoin(void)
  * simultaneously. This prevents event queue overflow on Series 1 chips with
  * limited RAM (32KB).
  *
- * Strategy: Try most common channels first (15, 20, 25) for faster join,
- * then fall back to scanning all channels if needed.
+ * Strategy: Try channels in order of popularity (15, 20, 25, 11, ...) with
+ * 8-second timeout between channels. If network found, scanning stops.
+ * If all 16 channels scanned with no network, gives up.
  */
 static EmberStatus manual_network_join(void)
 {
-  // Series 1 fix: Scan ONLY ONE channel at a time to avoid event queue overflow
-  // Common Zigbee channels in order of popularity: 15, 20, 25, 11, 14, 19, 24, 26, etc.
+  const uint8_t total_channels = sizeof(channel_scan_order) / sizeof(channel_scan_order[0]);
 
-  // For now, try channel 15 first (most common in production networks)
-  // TODO: Implement state machine to try multiple channels in sequence
-  uint8_t channel_to_scan = 15;
+  if (current_channel_index >= total_channels) {
+    emberAfCorePrintln("ERROR: Invalid channel index %d", current_channel_index);
+    return EMBER_INVALID_CALL;
+  }
+
+  uint8_t channel_to_scan = channel_scan_order[current_channel_index];
   uint32_t single_channel_mask = BIT32(channel_to_scan);
 
-  emberAfCorePrintln("Scanning channel %d for networks...", channel_to_scan);
+  emberAfCorePrintln("Scanning channel %d (%d of %d)...",
+                     channel_to_scan,
+                     current_channel_index + 1,
+                     total_channels);
 
   // Scan ONLY this one channel - uses minimal events (~1-2 instead of 16+)
   EmberStatus status = emberFindAndRejoinNetwork(true, single_channel_mask);
 
   if (status == EMBER_SUCCESS) {
-    emberAfCorePrintln("Channel %d scan started successfully", channel_to_scan);
+    emberAfCorePrintln("Channel %d scan started", channel_to_scan);
+    network_join_in_progress = true;
+
+    // Set timeout to try next channel if this one doesn't work
+    sl_zigbee_event_set_delay_ms(&channel_scan_timeout_event, CHANNEL_SCAN_TIMEOUT_MS);
   } else {
     emberAfCorePrintln("Failed to start scan on channel %d: 0x%x", channel_to_scan, status);
+    // Try next channel immediately
+    try_next_channel();
   }
 
   return status;
@@ -355,6 +412,9 @@ static void handle_short_press(void)
     emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
                        join_attempt_count + 1);
 
+    // Reset to start of channel list
+    current_channel_index = 0;
+
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Start LED blinking to indicate joining
     led_blink_active = true;
@@ -366,9 +426,6 @@ static void handle_short_press(void)
 
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
-
-      // Auto-retry TEMPORARILY DISABLED - event queue issue
-      // Just stop LED and wait for user to press button again
       join_attempt_count++;
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
@@ -407,8 +464,9 @@ static void handle_long_press(void)
     if (leave_status == EMBER_SUCCESS) {
       emberAfCorePrintln("Left network successfully");
 
-      // Reset join attempt counter for new join
+      // Reset join attempt counter and channel index for new join
       join_attempt_count = 0;
+      current_channel_index = 0;
 
       // Small delay to ensure leave completes
       sl_sleeptimer_delay_millisecond(500);
