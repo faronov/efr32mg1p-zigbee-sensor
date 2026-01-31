@@ -7,7 +7,6 @@ set -e  # Exit on error
 # Default values for TRÅDFRI module
 BOARD="${BOARD:-custom}"
 SLCP_FILE="${SLCP_FILE:-zigbee_bme280_sensor_tradfri.slcp}"
-PROJECT_NAME="zigbee_bme280_sensor_tradfri"
 
 # Color output
 RED='\033[0;31m'
@@ -49,6 +48,11 @@ if [ -z "$SAMPLE_SLCP" ]; then
   echo -e "${GREEN}Using TRÅDFRI project: $SAMPLE_SLCP${NC}"
 else
   echo -e "${YELLOW}Using provided SLCP: $SAMPLE_SLCP${NC}"
+fi
+
+# Name the project based on the SLCP file unless explicitly overridden.
+if [ -z "$PROJECT_NAME" ]; then
+  PROJECT_NAME="$(basename "$SAMPLE_SLCP" .slcp)"
 fi
 
 # Check for required tools
