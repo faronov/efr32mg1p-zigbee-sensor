@@ -29,10 +29,6 @@ static sl_zigbee_event_t led_off_event;
 // Network join channel scan timeout
 static sl_zigbee_event_t channel_scan_timeout_event;
 
-// Button action polling event (runs periodically to check button flags)
-static sl_zigbee_event_t button_poll_event;
-#define BUTTON_POLL_INTERVAL_MS 100  // Check button flags every 100ms
-
 static uint8_t join_attempt_count = 0;
 #define CHANNEL_SCAN_TIMEOUT_MS 8000  // Wait 8 seconds per channel before trying next
 
@@ -78,7 +74,6 @@ static bool network_join_in_progress = false;
 static void led_blink_event_handler(sl_zigbee_event_t *event);
 static void led_off_event_handler(sl_zigbee_event_t *event);
 static void channel_scan_timeout_event_handler(sl_zigbee_event_t *event);
-static void button_poll_event_handler(sl_zigbee_event_t *event);
 static void rejoin_retry_event_handler(sl_zigbee_event_t *event);
 static void start_optimized_rejoin(void);
 static void handle_short_press(void);
@@ -105,11 +100,7 @@ void emberAfInitCallback(void)
   // Initialize channel scan timeout event for sequential scanning
   sl_zigbee_event_init(&channel_scan_timeout_event, channel_scan_timeout_event_handler);
 
-  // Initialize button polling event (polls button flags set by ISR)
-  // This runs periodically in main context to check for button presses
-  sl_zigbee_event_init(&button_poll_event, button_poll_event_handler);
-  // Start polling immediately and repeat every 100ms
-  sl_zigbee_event_set_delay_ms(&button_poll_event, BUTTON_POLL_INTERVAL_MS);
+  // Button handling uses emberAfTickCallback() to check flags - no events needed
 
   // Initialize optimized rejoin event (TEMPORARILY DISABLED - event queue issue)
   // sl_zigbee_event_init(&rejoin_retry_event, rejoin_retry_event_handler);
@@ -269,32 +260,26 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
 }
 
 /**
- * @brief Button polling event handler
+ * @brief Main tick callback - runs every main loop iteration
  *
- * Runs periodically (every 100ms) in main context to check button flags
- * set by the button ISR. This is the ONLY safe way to handle button events
- * since we cannot call ANY Zigbee functions or schedule ANY events from ISR.
+ * This is called from main context and is perfect for checking button flags
+ * set by the button ISR. No event scheduling needed!
  */
-static void button_poll_event_handler(sl_zigbee_event_t *event)
+void emberAfTickCallback(void)
 {
-  (void)event;  // Unused parameter
-
   // Check for short press
   if (button_short_press_pending) {
     button_short_press_pending = false;  // Clear flag
-    emberAfCorePrintln("Button: Short press detected (polled from main)");
+    emberAfCorePrintln("Button: Short press detected (tick callback)");
     handle_short_press();
   }
 
   // Check for long press
   if (button_long_press_pending) {
     button_long_press_pending = false;  // Clear flag
-    emberAfCorePrintln("Button: Long press detected (polled from main)");
+    emberAfCorePrintln("Button: Long press detected (tick callback)");
     handle_long_press();
   }
-
-  // Reschedule to run again in 100ms (continuous polling)
-  sl_zigbee_event_set_delay_ms(&button_poll_event, BUTTON_POLL_INTERVAL_MS);
 }
 
 /**
