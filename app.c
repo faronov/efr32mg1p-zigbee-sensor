@@ -59,7 +59,15 @@ static bool button_pressed = false;
 #define REJOIN_FULL_SCAN_TIMEOUT_MS        5000  // Wait 5s for full scan to complete
 
 // Channel mask helper macro
+#ifndef BIT32
 #define BIT32(n) (((uint32_t)1) << (n))
+#endif
+
+#if defined(__GNUC__)
+#define APP_UNUSED __attribute__((unused))
+#else
+#define APP_UNUSED
+#endif
 
 // Zigbee 3.0 channels (11-26)
 #define ZIGBEE_CHANNELS_MASK 0x07FFF800
@@ -74,8 +82,8 @@ static bool network_join_in_progress = false;
 static void led_blink_event_handler(sl_zigbee_event_t *event);
 static void led_off_event_handler(sl_zigbee_event_t *event);
 static void channel_scan_timeout_event_handler(sl_zigbee_event_t *event);
-static void rejoin_retry_event_handler(sl_zigbee_event_t *event);
-static void start_optimized_rejoin(void);
+static void rejoin_retry_event_handler(sl_zigbee_event_t *event) APP_UNUSED;
+static void start_optimized_rejoin(void) APP_UNUSED;
 static void handle_short_press(void);
 static void handle_long_press(void);
 static EmberStatus manual_network_join(void);
