@@ -165,6 +165,16 @@ cp "$PROJECT_ROOT/include/"*.h "$FIRMWARE_DIR/include/" 2>/dev/null || true
 
 echo -e "${GREEN}✓${NC} Custom source files copied"
 
+# Suppress noisy config #warning lines in generated headers.
+CONFIG_DIR="$FIRMWARE_DIR/config"
+if [ -d "$CONFIG_DIR" ]; then
+  for cfg in sl_simple_button_btn0_config.h sl_simple_led_led0_config.h sl_spidrv_exp_config.h sl_rail_util_pti_config.h; do
+    if [ -f "$CONFIG_DIR/$cfg" ]; then
+      sed -i.bak 's/^#warning /\/\/ #warning /' "$CONFIG_DIR/$cfg"
+    fi
+  done
+fi
+
 # Build the project
 echo ""
 echo -e "${GREEN}Building project (release mode for size optimization)...${NC}"
