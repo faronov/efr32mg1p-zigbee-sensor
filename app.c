@@ -202,8 +202,9 @@ void emberAfStackStatusCallback(EmberStatus status)
  * Called when a button is pressed or released on the board.
  * Detects short press (<5s) vs long press (>=5s).
  *
- * IMPORTANT: This runs in ISR context! Cannot call Zigbee stack functions
- * directly. Must schedule an event to defer work to main context.
+ * CRITICAL: This runs in ISR context (GPIO_ODD_IRQn)!
+ * CANNOT call ANY Zigbee functions including emberAfCorePrintln()!
+ * Only allowed: set variables, schedule events with sl_zigbee_event_set_active()
  */
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
 void sl_button_on_change(const sl_button_t *handle)
@@ -213,27 +214,25 @@ void sl_button_on_change(const sl_button_t *handle)
       // Button pressed - record start time
       button_press_start_tick = sl_sleeptimer_get_tick_count();
       button_pressed = true;
-      emberAfCorePrintln("Button pressed...");
+      // NO emberAfCorePrintln() here - it schedules events!
     } else {
       // Button released - check duration
       if (button_pressed) {
         uint32_t duration_ticks = sl_sleeptimer_get_tick_count() - button_press_start_tick;
         uint32_t duration_ms = sl_sleeptimer_tick_to_ms(duration_ticks);
 
-        emberAfCorePrintln("Button released after %d ms", duration_ms);
+        // NO emberAfCorePrintln() here - runs in ISR context!
 
         if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
           // Long press: Leave and rejoin network
-          emberAfCorePrintln("Long press detected: Leave/Rejoin network");
           pending_button_action = BUTTON_ACTION_LONG_PRESS;
         } else {
           // Short press: Immediate sensor read and report
-          emberAfCorePrintln("Short press detected: Immediate sensor read");
           pending_button_action = BUTTON_ACTION_SHORT_PRESS;
         }
 
         // Schedule event to handle action in main context (not ISR context)
-        // CRITICAL: Cannot call Zigbee stack functions from ISR!
+        // This is safe - sl_zigbee_event_set_active() can be called from ISR
         sl_zigbee_event_set_active(&button_action_event);
 
         button_pressed = false;
@@ -287,16 +286,18 @@ static void button_action_event_handler(sl_zigbee_event_t *event)
 
   switch (action) {
     case BUTTON_ACTION_SHORT_PRESS:
+      emberAfCorePrintln("Button: Short press - processing in main context");
       handle_short_press();
       break;
 
     case BUTTON_ACTION_LONG_PRESS:
+      emberAfCorePrintln("Button: Long press - processing in main context");
       handle_long_press();
       break;
 
     case BUTTON_ACTION_NONE:
     default:
-      // Should not happen
+      emberAfCorePrintln("Button: No action pending");
       break;
   }
 }
