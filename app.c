@@ -28,8 +28,21 @@ static sl_zigbee_event_t led_off_event;
 
 // Network join channel scan timeout
 static sl_zigbee_event_t channel_scan_timeout_event;
+
+// Button action deferred event (to get out of ISR context)
+static sl_zigbee_event_t button_action_event;
+
 static uint8_t join_attempt_count = 0;
 #define CHANNEL_SCAN_TIMEOUT_MS 8000  // Wait 8 seconds per channel before trying next
+
+// Button action types
+typedef enum {
+  BUTTON_ACTION_NONE,
+  BUTTON_ACTION_SHORT_PRESS,
+  BUTTON_ACTION_LONG_PRESS
+} ButtonAction_t;
+
+static ButtonAction_t pending_button_action = BUTTON_ACTION_NONE;
 
 // Button press duration tracking
 static uint32_t button_press_start_tick = 0;
@@ -68,6 +81,7 @@ static bool network_join_in_progress = false;
 static void led_blink_event_handler(sl_zigbee_event_t *event);
 static void led_off_event_handler(sl_zigbee_event_t *event);
 static void channel_scan_timeout_event_handler(sl_zigbee_event_t *event);
+static void button_action_event_handler(sl_zigbee_event_t *event);
 static void rejoin_retry_event_handler(sl_zigbee_event_t *event);
 static void start_optimized_rejoin(void);
 static void handle_short_press(void);
@@ -93,6 +107,9 @@ void emberAfInitCallback(void)
 
   // Initialize channel scan timeout event for sequential scanning
   sl_zigbee_event_init(&channel_scan_timeout_event, channel_scan_timeout_event_handler);
+
+  // Initialize button action event (defers work out of ISR context)
+  sl_zigbee_event_init(&button_action_event, button_action_event_handler);
 
   // Initialize optimized rejoin event (TEMPORARILY DISABLED - event queue issue)
   // sl_zigbee_event_init(&rejoin_retry_event, rejoin_retry_event_handler);
@@ -183,7 +200,10 @@ void emberAfStackStatusCallback(EmberStatus status)
  * @brief Button press callback
  *
  * Called when a button is pressed or released on the board.
- * Detects short press (<2s) vs long press (>=2s).
+ * Detects short press (<5s) vs long press (>=5s).
+ *
+ * IMPORTANT: This runs in ISR context! Cannot call Zigbee stack functions
+ * directly. Must schedule an event to defer work to main context.
  */
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
 void sl_button_on_change(const sl_button_t *handle)
@@ -205,12 +225,17 @@ void sl_button_on_change(const sl_button_t *handle)
         if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
           // Long press: Leave and rejoin network
           emberAfCorePrintln("Long press detected: Leave/Rejoin network");
-          handle_long_press();
+          pending_button_action = BUTTON_ACTION_LONG_PRESS;
         } else {
           // Short press: Immediate sensor read and report
           emberAfCorePrintln("Short press detected: Immediate sensor read");
-          handle_short_press();
+          pending_button_action = BUTTON_ACTION_SHORT_PRESS;
         }
+
+        // Schedule event to handle action in main context (not ISR context)
+        // CRITICAL: Cannot call Zigbee stack functions from ISR!
+        sl_zigbee_event_set_active(&button_action_event);
+
         button_pressed = false;
       }
     }
@@ -245,6 +270,35 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
   sl_led_turn_off(&sl_led_led0);
   emberAfCorePrintln("LED turned off to save power");
 #endif
+}
+
+/**
+ * @brief Button action event handler
+ *
+ * Handles button actions deferred from ISR context. This runs in main
+ * context where it's safe to call Zigbee stack functions.
+ */
+static void button_action_event_handler(sl_zigbee_event_t *event)
+{
+  (void)event;  // Unused parameter
+
+  ButtonAction_t action = pending_button_action;
+  pending_button_action = BUTTON_ACTION_NONE;
+
+  switch (action) {
+    case BUTTON_ACTION_SHORT_PRESS:
+      handle_short_press();
+      break;
+
+    case BUTTON_ACTION_LONG_PRESS:
+      handle_long_press();
+      break;
+
+    case BUTTON_ACTION_NONE:
+    default:
+      // Should not happen
+      break;
+  }
 }
 
 /**
