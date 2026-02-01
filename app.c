@@ -71,6 +71,9 @@ static bool button_pressed = false;
 #define APP_UNUSED
 #endif
 
+#ifndef APP_DEBUG_DIAG_ALWAYS
+#define APP_DEBUG_DIAG_ALWAYS 0
+#endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
 // Zigbee 3.0 channels (11-26)
@@ -290,6 +293,12 @@ void emberAfTickCallback(void)
     APP_DEBUG_PRINTF("Heartbeat: net=%d join_in_progress=%d\n",
                      emberAfNetworkState(),
                      network_join_in_progress);
+    if (APP_DEBUG_DIAG_ALWAYS) {
+      EmberNetworkStatus state = emberAfNetworkState();
+      APP_DEBUG_PRINTF("Zigbee state=%d, joined=%d\n",
+                       state,
+                       (state == EMBER_JOINED_NETWORK));
+    }
   }
 
   // Check for short press
@@ -428,9 +437,13 @@ static EmberStatus manual_network_join(void)
                      channel_to_scan,
                      current_channel_index + 1,
                      total_channels);
+  APP_DEBUG_PRINTF("Join: start scan channel %d mask 0x%08lx\n",
+                   channel_to_scan,
+                   (unsigned long)single_channel_mask);
 
   // Scan ONLY this one channel - uses minimal events (~1-2 instead of 16+)
   EmberStatus status = emberFindAndRejoinNetwork(true, single_channel_mask);
+  APP_DEBUG_PRINTF("Join: emberFindAndRejoinNetwork -> 0x%02x\n", status);
 
   if (status == EMBER_SUCCESS) {
     emberAfCorePrintln("Channel %d scan started", channel_to_scan);
@@ -472,12 +485,14 @@ static void handle_short_press(void)
   } else {
     if (network_join_in_progress) {
       emberAfCorePrintln("Join already in progress - ignoring button press");
+      APP_DEBUG_PRINTF("Join: already in progress\n");
       return;
     }
 
     // Not on network - start manual network join
     emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
                        join_attempt_count + 1);
+    APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
 
     // Reset to start of channel list
     current_channel_index = 0;
