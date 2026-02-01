@@ -76,6 +76,8 @@ static bool button_pressed = false;
 #endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
+static void handle_short_press(void);
+
 void app_debug_sanity(void)
 {
   APP_DEBUG_PRINTF("app_debug_sanity\n");
