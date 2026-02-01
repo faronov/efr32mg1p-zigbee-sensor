@@ -459,7 +459,7 @@ static EmberStatus start_join_scan(void)
 /**
  * @brief Scan result callback (called for each network found)
  */
-void emberNetworkFoundHandler(EmberZigbeeNetwork *networkFound, uint8_t lqi, int8_t rssi)
+void emberAfNetworkFoundCallback(EmberZigbeeNetwork *networkFound, uint8_t lqi, int8_t rssi)
 {
   if (!network_join_in_progress || networkFound == NULL) {
     return;
@@ -488,7 +488,7 @@ void emberNetworkFoundHandler(EmberZigbeeNetwork *networkFound, uint8_t lqi, int
 /**
  * @brief Scan completion callback
  */
-void emberScanCompleteHandler(uint8_t channel, EmberStatus status)
+void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
 {
   if (!network_join_in_progress) {
     return;
