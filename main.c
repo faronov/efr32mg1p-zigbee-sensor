@@ -103,11 +103,6 @@ int main(void)
     // Run event handlers
     sl_system_process_action();
 
-#if APP_DEBUG_FORCE_AF_INIT
-    // Ensure AF tick runs even if not wired through sl_system_process_action.
-    emberAfTick();
-#endif
-
 #if defined(APP_DEBUG_MAIN_HEARTBEAT) && (APP_DEBUG_MAIN_HEARTBEAT != 0)
     // Throttled main-loop heartbeat for SWO debugging.
     static uint32_t last_heartbeat_tick = 0;
