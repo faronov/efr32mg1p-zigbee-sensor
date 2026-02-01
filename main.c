@@ -8,6 +8,7 @@
 #include "sl_event_handler.h"
 #include "sl_sleeptimer.h"
 #include <stdio.h>
+#include <stdint.h>
 #include "app/framework/include/af.h"
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
@@ -50,8 +51,16 @@ int main(void)
 
 #if APP_DEBUG_FORCE_AF_INIT
   // Force AF init in debug builds in case the framework init isn't wired.
-  emberAfInit();
-  printf("Debug: forced emberAfInit\n");
+  uint8_t init_level = 0;
+#if defined(EMBER_AF_INIT_LEVEL_DONE)
+  init_level = EMBER_AF_INIT_LEVEL_DONE;
+#elif defined(EMBER_AF_INIT_LEVEL_APP)
+  init_level = EMBER_AF_INIT_LEVEL_APP;
+#elif defined(EMBER_AF_INIT_LEVEL_MAX)
+  init_level = EMBER_AF_INIT_LEVEL_MAX;
+#endif
+  emberAfInit(init_level);
+  printf("Debug: forced emberAfInit level=%u\n", init_level);
 #endif
 
   // Early SWO sanity print (debug builds should show this).
