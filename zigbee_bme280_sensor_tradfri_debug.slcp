@@ -73,6 +73,13 @@ configuration:
     value: 1
   - name: EMBER_AF_PRINT_CORE
     value: 1
+  # Debug-only runtime tweaks
+  - name: APP_DEBUG_NO_SLEEP
+    value: 1
+  - name: APP_DEBUG_MAIN_HEARTBEAT
+    value: 1
+  - name: APP_DEBUG_POLL_BUTTON
+    value: 1
 
   # Configure as Zigbee End Device (non-sleepy for testing/debugging)
   # TODO: Change back to SLEEPY after event queue issue resolved

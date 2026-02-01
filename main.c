@@ -6,6 +6,7 @@
 #include "sl_component_catalog.h"
 #include "sl_system_init.h"
 #include "sl_event_handler.h"
+#include "sl_sleeptimer.h"
 #include <stdio.h>
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
@@ -18,6 +19,10 @@
 void sl_system_process_action(void);
 #endif
 
+#if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) && defined(APP_DEBUG_POLL_BUTTON) && (APP_DEBUG_POLL_BUTTON != 0)
+#include "sl_simple_button_instances.h"
+#endif
+
 int main(void)
 {
   // Initialize Silicon Labs system
@@ -25,6 +30,12 @@ int main(void)
 
   // Early SWO sanity print (debug builds should show this).
   printf("SWO OK: main start\n");
+
+#if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && defined(APP_DEBUG_NO_SLEEP) && (APP_DEBUG_NO_SLEEP != 0)
+  // Keep the CPU in EM0 for debug so SWO and logs are reliable.
+  sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM0);
+  printf("Debug: sleep disabled (EM0 requirement)\n");
+#endif
 
 #if defined(SL_CATALOG_KERNEL_PRESENT)
   // Start kernel
@@ -34,6 +45,28 @@ int main(void)
   while (1) {
     // Run event handlers
     sl_system_process_action();
+
+#if defined(APP_DEBUG_MAIN_HEARTBEAT) && (APP_DEBUG_MAIN_HEARTBEAT != 0)
+    // Throttled main-loop heartbeat for SWO debugging.
+    static uint32_t last_heartbeat_tick = 0;
+    uint32_t now = sl_sleeptimer_get_tick_count();
+    if (last_heartbeat_tick == 0 ||
+        sl_sleeptimer_tick_to_ms(now - last_heartbeat_tick) >= 2000) {
+      last_heartbeat_tick = now;
+      printf("Main loop heartbeat\n");
+    }
+#endif
+
+#if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) && defined(APP_DEBUG_POLL_BUTTON) && (APP_DEBUG_POLL_BUTTON != 0)
+    // Simple polling to confirm BTN0 is wired and readable in debug.
+    static sl_button_state_t last_state = SL_SIMPLE_BUTTON_RELEASED;
+    sl_button_state_t state = sl_button_get_state(&sl_button_btn0);
+    if (state != last_state) {
+      last_state = state;
+      printf("BTN0: %s\n",
+             (state == SL_SIMPLE_BUTTON_PRESSED) ? "PRESSED" : "RELEASED");
+    }
+#endif
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
     // Sleep until next event
