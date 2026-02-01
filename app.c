@@ -550,8 +550,7 @@ static void handle_short_press(void)
 
   } else {
     if (!af_init_seen) {
-      APP_DEBUG_PRINTF("Join: AF init not ready - ignoring press\n");
-      return;
+      APP_DEBUG_PRINTF("Join: AF init not ready - proceeding anyway\n");
     }
     if (network_join_in_progress) {
       emberAfCorePrintln("Join already in progress - ignoring button press");
@@ -581,7 +580,14 @@ static void handle_short_press(void)
 
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
-      try_next_channel();
+      if (join_status == EMBER_INVALID_CALL) {
+        emberAfCorePrintln("Join aborted: stack not ready");
+        network_join_in_progress = false;
+        join_scan_in_progress = false;
+        join_network_found = false;
+      } else {
+        try_next_channel();
+      }
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
       // Stop LED blinking on failure
