@@ -50,8 +50,8 @@ int main(void)
 
 #if APP_DEBUG_FORCE_AF_INIT
   // Force AF init in debug builds in case the framework init isn't wired.
-  emberAfMainInit();
-  printf("Debug: forced emberAfMainInit\n");
+  emberAfInit();
+  printf("Debug: forced emberAfInit\n");
 #endif
 
   // Early SWO sanity print (debug builds should show this).
@@ -96,7 +96,7 @@ int main(void)
 
 #if APP_DEBUG_FORCE_AF_INIT
     // Ensure AF tick runs even if not wired through sl_system_process_action.
-    emberAfMainTick();
+    emberAfTick();
 #endif
 
 #if defined(APP_DEBUG_MAIN_HEARTBEAT) && (APP_DEBUG_MAIN_HEARTBEAT != 0)
