@@ -19,6 +19,9 @@
 void sl_system_process_action(void);
 #endif
 
+void app_debug_sanity(void);
+void app_debug_trigger_short_press(void);
+
 #ifndef APP_DEBUG_DIAG_ALWAYS
 #define APP_DEBUG_DIAG_ALWAYS 0
 #endif
@@ -53,6 +56,10 @@ int main(void)
   printf("Power manager: present\n");
 #else
   printf("Power manager: absent\n");
+#endif
+
+#if APP_DEBUG_DIAG_ALWAYS
+  app_debug_sanity();
 #endif
 #endif
 
@@ -96,6 +103,9 @@ int main(void)
       last_state = state;
       printf("BTN0: %s\n",
              (state == SL_SIMPLE_BUTTON_PRESSED) ? "PRESSED" : "RELEASED");
+      if (state == SL_SIMPLE_BUTTON_PRESSED) {
+        app_debug_trigger_short_press();
+      }
     }
 #endif
 

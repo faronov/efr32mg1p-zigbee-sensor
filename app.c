@@ -76,6 +76,17 @@ static bool button_pressed = false;
 #endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
+void app_debug_sanity(void)
+{
+  APP_DEBUG_PRINTF("app_debug_sanity\n");
+}
+
+void app_debug_trigger_short_press(void)
+{
+  APP_DEBUG_PRINTF("app_debug_trigger_short_press\n");
+  handle_short_press();
+}
+
 // Zigbee 3.0 channels (11-26)
 #define ZIGBEE_CHANNELS_MASK 0x07FFF800
 
