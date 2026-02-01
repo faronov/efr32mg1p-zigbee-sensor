@@ -10,6 +10,7 @@
 #include "app_sensor.h"
 #include "app_config.h"
 #include "stack/include/network-formation.h"  // For manual network join
+#include "stack/include/security.h"
 #include "sl_sleeptimer.h"
 #include <stdio.h>
 #include <string.h>
@@ -101,6 +102,16 @@ static EmberZigbeeNetwork join_candidate;
 static bool af_init_seen = false;
 static bool af_init_reported = false;
 static bool join_pending = false;
+static bool join_security_configured = false;
+
+#ifndef EMBER_ENCRYPTION_KEY_SIZE
+#define EMBER_ENCRYPTION_KEY_SIZE 16
+#endif
+
+static const uint8_t zigbee_alliance_key[EMBER_ENCRYPTION_KEY_SIZE] = {
+  0x5A, 0x69, 0x67, 0x42, 0x65, 0x65, 0x41, 0x6C,
+  0x6C, 0x69, 0x61, 0x6E, 0x63, 0x65, 0x30, 0x39
+};
 
 // Forward declarations
 static void led_blink_event_handler(sl_zigbee_event_t *event);
@@ -111,6 +122,7 @@ static void handle_short_press(void);
 static void handle_long_press(void);
 static EmberStatus start_join_scan(void);
 static void try_next_channel(void);
+static void configure_join_security(void);
 
 /**
  * @brief Zigbee application init callback
@@ -585,6 +597,7 @@ static void handle_short_press(void)
     emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
                        join_attempt_count + 1);
     APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
+    configure_join_security();
 
     // Reset to start of channel list
     current_channel_index = 0;
@@ -622,6 +635,30 @@ static void handle_short_press(void)
 #endif
     }
   }
+}
+
+static void configure_join_security(void)
+{
+  if (join_security_configured) {
+    return;
+  }
+
+#if defined(EMBER_HAVE_PRECONFIGURED_KEY) && defined(EMBER_TRUST_CENTER_GLOBAL_LINK_KEY)
+  EmberInitialSecurityState state;
+  memset(&state, 0, sizeof(state));
+  memcpy(state.preconfiguredKey.contents, zigbee_alliance_key, EMBER_ENCRYPTION_KEY_SIZE);
+  state.bitmask = (EMBER_HAVE_PRECONFIGURED_KEY
+                   | EMBER_REQUIRE_ENCRYPTED_KEY
+                   | EMBER_TRUST_CENTER_GLOBAL_LINK_KEY);
+
+  EmberStatus st = emberSetInitialSecurityState(&state);
+  APP_DEBUG_PRINTF("Join: set security state -> 0x%02x\n", st);
+  if (st == EMBER_SUCCESS) {
+    join_security_configured = true;
+  }
+#else
+  APP_DEBUG_PRINTF("Join: security macros missing - skipping key setup\n");
+#endif
 }
 
 /**
