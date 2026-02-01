@@ -488,14 +488,15 @@ void emberNetworkFoundHandler(EmberZigbeeNetwork *networkFound, uint8_t lqi, int
 /**
  * @brief Scan completion callback
  */
-void emberScanCompleteHandler(EmberStatus status)
+void emberScanCompleteHandler(uint8_t channel, EmberStatus status)
 {
   if (!network_join_in_progress) {
     return;
   }
 
   join_scan_in_progress = false;
-  APP_DEBUG_PRINTF("Join: scan complete 0x%02x found=%d\n",
+  APP_DEBUG_PRINTF("Join: scan complete ch=%u status=0x%02x found=%d\n",
+                   channel,
                    status,
                    join_network_found ? 1 : 0);
 
@@ -510,7 +511,6 @@ void emberScanCompleteHandler(EmberStatus status)
     params.nwkManagerId = 0x0000;
     params.nwkUpdateId = join_candidate.nwkUpdateId;
     params.channels = BIT32(join_candidate.channel);
-    params.stackProfile = join_candidate.stackProfile;
 
     EmberStatus join_status = emberJoinNetwork(EMBER_END_DEVICE, &params);
     APP_DEBUG_PRINTF("Join: emberJoinNetwork -> 0x%02x\n", join_status);
