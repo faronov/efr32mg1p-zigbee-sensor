@@ -10,6 +10,8 @@
 #include "app_sensor.h"
 #include "app_config.h"
 #include "stack/include/network-formation.h"  // For manual network join
+#include "sl_sleeptimer.h"
+#include <stdio.h>
 
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
 #include "sl_simple_button_instances.h"
@@ -69,6 +71,12 @@ static bool button_pressed = false;
 #define APP_UNUSED
 #endif
 
+#ifdef SL_CATALOG_IOSTREAM_SWO_PRESENT
+#define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
+#else
+#define APP_DEBUG_PRINTF(...)
+#endif
+
 // Zigbee 3.0 channels (11-26)
 #define ZIGBEE_CHANNELS_MASK 0x07FFF800
 
@@ -97,6 +105,7 @@ static void try_next_channel(void);
  */
 void emberAfInitCallback(void)
 {
+  APP_DEBUG_PRINTF("AF init callback\n");
   emberAfCorePrintln("Zigbee BME280 Sensor Application");
   emberAfCorePrintln("Silicon Labs EFR32MG1P + Bosch BME280");
   emberAfCorePrintln("Press BTN0 to join network or trigger sensor reading");
@@ -138,6 +147,7 @@ void emberAfInitCallback(void)
  */
 void emberAfStackStatusCallback(EmberStatus status)
 {
+  APP_DEBUG_PRINTF("Stack status: 0x%02x\n", status);
   if (status == EMBER_NETWORK_UP) {
     emberAfCorePrintln("Network joined successfully");
 
@@ -275,9 +285,21 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
  */
 void emberAfTickCallback(void)
 {
+  static uint32_t last_heartbeat_tick = 0;
+  uint32_t now = sl_sleeptimer_get_tick_count();
+
+  if (last_heartbeat_tick == 0 ||
+      sl_sleeptimer_tick_to_ms(now - last_heartbeat_tick) >= 5000) {
+    last_heartbeat_tick = now;
+    APP_DEBUG_PRINTF("Heartbeat: net=%d join_in_progress=%d\n",
+                     emberAfNetworkState(),
+                     network_join_in_progress);
+  }
+
   // Check for short press
   if (button_short_press_pending) {
     button_short_press_pending = false;  // Clear flag
+    APP_DEBUG_PRINTF("Button short press\n");
     emberAfCorePrintln("Button: Short press detected (tick callback)");
     handle_short_press();
   }
@@ -285,6 +307,7 @@ void emberAfTickCallback(void)
   // Check for long press
   if (button_long_press_pending) {
     button_long_press_pending = false;  // Clear flag
+    APP_DEBUG_PRINTF("Button long press\n");
     emberAfCorePrintln("Button: Long press detected (tick callback)");
     handle_long_press();
   }
