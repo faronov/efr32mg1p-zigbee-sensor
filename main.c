@@ -6,6 +6,7 @@
 #include "sl_component_catalog.h"
 #include "sl_system_init.h"
 #include "sl_event_handler.h"
+#include <stdio.h>
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
 #include "sl_power_manager.h"
@@ -21,6 +22,9 @@ int main(void)
 {
   // Initialize Silicon Labs system
   sl_system_init();
+
+  // Early SWO sanity print (debug builds should show this).
+  printf("SWO OK: main start\n");
 
 #if defined(SL_CATALOG_KERNEL_PRESENT)
   // Start kernel

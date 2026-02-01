@@ -66,7 +66,7 @@ configuration:
   - name: SL_IOSTREAM_SWO_BAUDRATE
     value: 115200
   - name: SL_IOSTREAM_SWO_RESTRICT_ENERGY_MODE_TO_ALLOW_RECEPTION
-    value: 0
+    value: 1
 
   # Enable Zigbee debug printing
   - name: EMBER_AF_PRINT_ENABLE
