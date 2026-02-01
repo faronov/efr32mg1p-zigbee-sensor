@@ -8,6 +8,7 @@
 #include "sl_event_handler.h"
 #include "sl_sleeptimer.h"
 #include <stdio.h>
+#include "app/framework/include/af.h"
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
 #include "sl_power_manager.h"
@@ -34,6 +35,9 @@ void app_debug_trigger_short_press(void);
 #ifndef APP_DEBUG_POLL_BUTTON
 #define APP_DEBUG_POLL_BUTTON 0
 #endif
+#ifndef APP_DEBUG_FORCE_AF_INIT
+#define APP_DEBUG_FORCE_AF_INIT 0
+#endif
 
 #if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) && defined(APP_DEBUG_POLL_BUTTON) && (APP_DEBUG_POLL_BUTTON != 0)
 #include "sl_simple_button_instances.h"
@@ -43,6 +47,12 @@ int main(void)
 {
   // Initialize Silicon Labs system
   sl_system_init();
+
+#if APP_DEBUG_FORCE_AF_INIT
+  // Force AF init in debug builds in case the framework init isn't wired.
+  emberAfMainInit();
+  printf("Debug: forced emberAfMainInit\n");
+#endif
 
   // Early SWO sanity print (debug builds should show this).
   printf("SWO OK: main start\n");
@@ -83,6 +93,11 @@ int main(void)
   while (1) {
     // Run event handlers
     sl_system_process_action();
+
+#if APP_DEBUG_FORCE_AF_INIT
+    // Ensure AF tick runs even if not wired through sl_system_process_action.
+    emberAfMainTick();
+#endif
 
 #if defined(APP_DEBUG_MAIN_HEARTBEAT) && (APP_DEBUG_MAIN_HEARTBEAT != 0)
     // Throttled main-loop heartbeat for SWO debugging.

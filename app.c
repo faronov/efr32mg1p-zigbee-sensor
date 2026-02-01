@@ -100,6 +100,7 @@ static bool join_network_found = false;
 static EmberZigbeeNetwork join_candidate;
 static bool af_init_seen = false;
 static bool af_init_reported = false;
+static bool join_pending = false;
 
 // Forward declarations
 static void led_blink_event_handler(sl_zigbee_event_t *event);
@@ -302,6 +303,12 @@ void emberAfTickCallback(void)
   if (!af_init_reported && af_init_seen) {
     af_init_reported = true;
     APP_DEBUG_PRINTF("AF init seen (tick)\n");
+  }
+
+  if (join_pending && af_init_seen && !network_join_in_progress) {
+    join_pending = false;
+    APP_DEBUG_PRINTF("Join: deferred request starting\n");
+    handle_short_press();
   }
 
   if (last_heartbeat_tick == 0 ||
@@ -550,7 +557,9 @@ static void handle_short_press(void)
 
   } else {
     if (!af_init_seen) {
-      APP_DEBUG_PRINTF("Join: AF init not ready - proceeding anyway\n");
+      APP_DEBUG_PRINTF("Join: AF init not ready - deferring\n");
+      join_pending = true;
+      return;
     }
     if (network_join_in_progress) {
       emberAfCorePrintln("Join already in progress - ignoring button press");
