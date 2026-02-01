@@ -3,6 +3,7 @@
 # This script generates the project using SLC CLI and builds with GNU Arm GCC
 
 set -e  # Exit on error
+set -o pipefail  # Preserve failures in pipelines
 
 # Default values for TRÅDFRI module
 BOARD="${BOARD:-custom}"
@@ -136,7 +137,17 @@ SLC_CMD="$SLC_CMD --with EFR32MG1P132F256GM32"
 echo "Using TRÅDFRI device OPN: EFR32MG1P132F256GM32"
 
 echo "Running: $SLC_CMD"
-eval $SLC_CMD
+SLC_LOG="$(mktemp)"
+if ! eval $SLC_CMD 2>&1 | tee "$SLC_LOG"; then
+  if grep -q "Follow-up generation did not complete within" "$SLC_LOG"; then
+    echo -e "${YELLOW}SLC follow-up generation timed out; retrying once...${NC}"
+    eval $SLC_CMD
+  else
+    rm -f "$SLC_LOG"
+    exit 1
+  fi
+fi
+rm -f "$SLC_LOG"
 
 # Find the generated Makefile (SLC may use sample name instead of our project name)
 MAKEFILE=$(find "$FIRMWARE_DIR" -maxdepth 1 -name "*.Makefile" 2>/dev/null | head -1)
