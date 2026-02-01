@@ -23,6 +23,7 @@ void sl_system_process_action(void);
 
 void app_debug_sanity(void);
 void app_debug_trigger_short_press(void);
+void app_debug_force_af_init(void);
 
 #ifndef APP_DEBUG_DIAG_ALWAYS
 #define APP_DEBUG_DIAG_ALWAYS 0
@@ -58,6 +59,7 @@ int main(void)
   uint8_t init_level = (uint8_t)EMBER_AF_INIT_LEVEL_DONE;
   emberAfInit(init_level);
   printf("Debug: forced emberAfInit level=%u\n", (unsigned)init_level);
+  app_debug_force_af_init();
 #endif
 
   // Early SWO sanity print (debug builds should show this).

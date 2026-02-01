@@ -120,6 +120,10 @@ static void try_next_channel(void);
  */
 void emberAfInitCallback(void)
 {
+  if (af_init_seen) {
+    APP_DEBUG_PRINTF("AF init callback (duplicate)\n");
+    return;
+  }
   APP_DEBUG_PRINTF("AF init callback\n");
   af_init_seen = true;
   emberAfCorePrintln("Zigbee BME280 Sensor Application");
@@ -151,6 +155,16 @@ void emberAfInitCallback(void)
   // #endif
   // }
   emberAfCorePrintln("Sensor DISABLED for testing - event queue issue");
+}
+
+void app_debug_force_af_init(void)
+{
+#if defined(APP_DEBUG_FORCE_AF_INIT) && (APP_DEBUG_FORCE_AF_INIT != 0)
+  if (!af_init_seen) {
+    APP_DEBUG_PRINTF("AF init forced (debug)\n");
+    emberAfInitCallback();
+  }
+#endif
 }
 
 /**
