@@ -51,9 +51,11 @@ int main(void)
 
 #if APP_DEBUG_FORCE_AF_INIT
   // Force AF init in debug builds in case the framework init isn't wired.
-  // EmberAfInitLevel values are enum constants (not preprocessor macros),
-  // so choose a concrete init level directly.
-  EmberAfInitLevel init_level = EMBER_AF_INIT_LEVEL_DONE;
+  // Some SDK variants don't expose init level enums/macros; default to "DONE".
+#ifndef EMBER_AF_INIT_LEVEL_DONE
+#define EMBER_AF_INIT_LEVEL_DONE 0xFFu
+#endif
+  uint8_t init_level = (uint8_t)EMBER_AF_INIT_LEVEL_DONE;
   emberAfInit(init_level);
   printf("Debug: forced emberAfInit level=%u\n", (unsigned)init_level);
 #endif
