@@ -71,11 +71,7 @@ static bool button_pressed = false;
 #define APP_UNUSED
 #endif
 
-#ifdef SL_CATALOG_IOSTREAM_SWO_PRESENT
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
-#else
-#define APP_DEBUG_PRINTF(...)
-#endif
 
 // Zigbee 3.0 channels (11-26)
 #define ZIGBEE_CHANNELS_MASK 0x07FFF800
