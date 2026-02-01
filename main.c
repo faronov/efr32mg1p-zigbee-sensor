@@ -19,6 +19,19 @@
 void sl_system_process_action(void);
 #endif
 
+#ifndef APP_DEBUG_DIAG_ALWAYS
+#define APP_DEBUG_DIAG_ALWAYS 0
+#endif
+#ifndef APP_DEBUG_NO_SLEEP
+#define APP_DEBUG_NO_SLEEP 0
+#endif
+#ifndef APP_DEBUG_MAIN_HEARTBEAT
+#define APP_DEBUG_MAIN_HEARTBEAT 0
+#endif
+#ifndef APP_DEBUG_POLL_BUTTON
+#define APP_DEBUG_POLL_BUTTON 0
+#endif
+
 #if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) && defined(APP_DEBUG_POLL_BUTTON) && (APP_DEBUG_POLL_BUTTON != 0)
 #include "sl_simple_button_instances.h"
 #endif
@@ -31,6 +44,18 @@ int main(void)
   // Early SWO sanity print (debug builds should show this).
   printf("SWO OK: main start\n");
 
+#if APP_DEBUG_DIAG_ALWAYS
+  printf("Debug flags: NO_SLEEP=%d HEARTBEAT=%d POLL_BUTTON=%d\n",
+         APP_DEBUG_NO_SLEEP,
+         APP_DEBUG_MAIN_HEARTBEAT,
+         APP_DEBUG_POLL_BUTTON);
+#if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
+  printf("Power manager: present\n");
+#else
+  printf("Power manager: absent\n");
+#endif
+#endif
+
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && defined(APP_DEBUG_NO_SLEEP) && (APP_DEBUG_NO_SLEEP != 0)
   // Keep the CPU in EM0 for debug so SWO and logs are reliable.
   sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM0);
@@ -38,9 +63,15 @@ int main(void)
 #endif
 
 #if defined(SL_CATALOG_KERNEL_PRESENT)
+#if APP_DEBUG_DIAG_ALWAYS
+  printf("Kernel present; starting kernel\n");
+#endif
   // Start kernel
   sl_system_kernel_start();
 #else
+#if APP_DEBUG_DIAG_ALWAYS
+  printf("Bare metal loop start\n");
+#endif
   // Bare metal main loop
   while (1) {
     // Run event handlers
