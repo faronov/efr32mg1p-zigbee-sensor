@@ -124,10 +124,12 @@ static EmberStatus start_join_scan(void);
 static void try_next_channel(void);
 static void configure_join_security(void);
 static void log_basic_identity(void);
-bool emberAfExternalAttributeReadCallback(uint8_t endpoint,
-                                          EmberAfClusterId clusterId,
-                                          EmberAfAttributeMetadata *attributeMetadata,
-                                          uint8_t *buffer);
+EmberAfStatus emberAfExternalAttributeReadCallback(int8u endpoint,
+                                                   EmberAfClusterId clusterId,
+                                                   EmberAfAttributeMetadata *attributeMetadata,
+                                                   int16u manufacturerCode,
+                                                   int8u *buffer,
+                                                   int16u maxReadLength);
 
 /**
  * @brief Zigbee application init callback
@@ -240,16 +242,19 @@ static void log_basic_identity(void)
 #endif
 }
 
-bool emberAfExternalAttributeReadCallback(uint8_t endpoint,
-                                          EmberAfClusterId clusterId,
-                                          EmberAfAttributeMetadata *attributeMetadata,
-                                          uint8_t *buffer)
+EmberAfStatus emberAfExternalAttributeReadCallback(int8u endpoint,
+                                                   EmberAfClusterId clusterId,
+                                                   EmberAfAttributeMetadata *attributeMetadata,
+                                                   int16u manufacturerCode,
+                                                   int8u *buffer,
+                                                   int16u maxReadLength)
 {
+  (void)manufacturerCode;
   if (attributeMetadata == NULL || buffer == NULL) {
-    return false;
+    return EMBER_ZCL_STATUS_UNSUPPORTED_ATTRIBUTE;
   }
   if (endpoint != 1 || clusterId != ZCL_BASIC_CLUSTER_ID) {
-    return false;
+    return EMBER_ZCL_STATUS_UNSUPPORTED_ATTRIBUTE;
   }
 
   const char *value = NULL;
@@ -264,16 +269,19 @@ bool emberAfExternalAttributeReadCallback(uint8_t endpoint,
       value = "debug";
       break;
     default:
-      return false;
+      return EMBER_ZCL_STATUS_UNSUPPORTED_ATTRIBUTE;
   }
 
   size_t len = strlen(value);
   if (len > 32) {
     len = 32;
   }
-  buffer[0] = (uint8_t)len;
+  if (maxReadLength < (len + 1)) {
+    return EMBER_ZCL_STATUS_INSUFFICIENT_SPACE;
+  }
+  buffer[0] = (int8u)len;
   memcpy(&buffer[1], value, len);
-  return true;
+  return EMBER_ZCL_STATUS_SUCCESS;
 }
 
 /**
