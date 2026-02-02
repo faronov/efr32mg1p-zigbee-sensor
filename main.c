@@ -24,6 +24,7 @@ void sl_system_process_action(void);
 void app_debug_sanity(void);
 void app_debug_trigger_short_press(void);
 void app_debug_force_af_init(void);
+void app_debug_poll(void);
 
 #ifndef APP_DEBUG_DIAG_ALWAYS
 #define APP_DEBUG_DIAG_ALWAYS 0
@@ -125,6 +126,11 @@ int main(void)
         app_debug_trigger_short_press();
       }
     }
+#endif
+
+#if APP_DEBUG_DIAG_ALWAYS || APP_DEBUG_FORCE_AF_INIT
+    // Ensure debug AF init and identity checks run even if AF tick isn't wired.
+    app_debug_poll();
 #endif
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
