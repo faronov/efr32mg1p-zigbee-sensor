@@ -172,15 +172,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          FILE="$(find firmware -path "*autogen/attribute-storage.c" | head -1 || true)"
-          if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
-            echo "ERROR: attribute-storage.c not found in firmware autogen output"
+          mapfile -t SEARCH_DIRS < <(find firmware -type d -name autogen 2>/dev/null)
+          if [ ${#SEARCH_DIRS[@]} -eq 0 ]; then
+            echo "ERROR: no autogen directories found under firmware/"
+            find firmware -maxdepth 4 -type d 2>/dev/null || true
             exit 1
           fi
-          echo "Checking Basic attributes in: $FILE"
-          rg -q "0x0004" "$FILE" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
-          rg -q "0x0005" "$FILE" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
-          rg -q "0x4000" "$FILE" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
+          echo "Searching Basic attributes in:"
+          printf '  - %s\n' "${SEARCH_DIRS[@]}"
+          rg -q -g "zap-*" "0x0004" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
+          rg -q -g "zap-*" "0x0005" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
+          rg -q -g "zap-*" "0x4000" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
           echo "OK: Basic identity attributes present"
 
       - name: List build outputs
@@ -308,15 +310,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          FILE="$(find firmware -path "*autogen/attribute-storage.c" | head -1 || true)"
-          if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
-            echo "ERROR: attribute-storage.c not found in firmware autogen output"
+          mapfile -t SEARCH_DIRS < <(find firmware -type d -name autogen 2>/dev/null)
+          if [ ${#SEARCH_DIRS[@]} -eq 0 ]; then
+            echo "ERROR: no autogen directories found under firmware/"
+            find firmware -maxdepth 4 -type d 2>/dev/null || true
             exit 1
           fi
-          echo "Checking Basic attributes in: $FILE"
-          rg -q "0x0004" "$FILE" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
-          rg -q "0x0005" "$FILE" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
-          rg -q "0x4000" "$FILE" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
+          echo "Searching Basic attributes in:"
+          printf '  - %s\n' "${SEARCH_DIRS[@]}"
+          rg -q -g "zap-*" "0x0004" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
+          rg -q -g "zap-*" "0x0005" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
+          rg -q -g "zap-*" "0x4000" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
           echo "OK: Basic identity attributes present"
 
       - name: Build summary (Debug)
