@@ -123,9 +123,7 @@ static void handle_long_press(void);
 static EmberStatus start_join_scan(void);
 static void try_next_channel(void);
 static void configure_join_security(void);
-static void set_basic_identity(void);
-static EmberAfStatus write_basic_string_attribute(EmberAfAttributeId attribute_id,
-                                                  const char *value);
+static void log_basic_identity(void);
 
 /**
  * @brief Zigbee application init callback
@@ -156,7 +154,7 @@ void emberAfInitCallback(void)
 
   // Initialize configuration from NVM
   app_config_init();
-  set_basic_identity();
+  log_basic_identity();
 
   // TEMPORARILY DISABLE sensor to reduce event usage (event queue issue)
   // Initialize BME280 sensor
@@ -183,48 +181,58 @@ void app_debug_force_af_init(void)
 #endif
 }
 
-static EmberAfStatus write_basic_string_attribute(EmberAfAttributeId attribute_id,
-                                                  const char *value)
+static void log_basic_identity(void)
 {
-  if (value == NULL) {
-    return EMBER_ZCL_STATUS_INVALID_VALUE;
-  }
-
   uint8_t buf[1 + 32];
-  size_t len = strlen(value);
-  if (len > 32) {
-    len = 32;
-  }
-  buf[0] = (uint8_t)len;
-  memcpy(&buf[1], value, len);
-
-  return emberAfWriteServerAttribute(1,
-                                     ZCL_BASIC_CLUSTER_ID,
-                                     attribute_id,
-                                     buf,
-                                     ZCL_CHAR_STRING_ATTRIBUTE_TYPE);
-}
-
-static void set_basic_identity(void)
-{
+  char str[33];
   EmberAfStatus st;
 
 #ifdef ZCL_MANUFACTURER_NAME_ATTRIBUTE_ID
-  st = write_basic_string_attribute(ZCL_MANUFACTURER_NAME_ATTRIBUTE_ID,
-                                    "OpenBME280");
-  APP_DEBUG_PRINTF("Basic: set manufacturer -> 0x%02x\n", st);
+  st = emberAfReadServerAttribute(1,
+                                  ZCL_BASIC_CLUSTER_ID,
+                                  ZCL_MANUFACTURER_NAME_ATTRIBUTE_ID,
+                                  buf,
+                                  sizeof(buf));
+  if (st == EMBER_ZCL_STATUS_SUCCESS) {
+    uint8_t len = buf[0] > 32 ? 32 : buf[0];
+    memcpy(str, &buf[1], len);
+    str[len] = '\0';
+    APP_DEBUG_PRINTF("Basic: manufacturer=\"%s\"\n", str);
+  } else {
+    APP_DEBUG_PRINTF("Basic: manufacturer read -> 0x%02x\n", st);
+  }
 #endif
 
 #ifdef ZCL_MODEL_IDENTIFIER_ATTRIBUTE_ID
-  st = write_basic_string_attribute(ZCL_MODEL_IDENTIFIER_ATTRIBUTE_ID,
-                                    "TRADFRI-BME280");
-  APP_DEBUG_PRINTF("Basic: set model -> 0x%02x\n", st);
+  st = emberAfReadServerAttribute(1,
+                                  ZCL_BASIC_CLUSTER_ID,
+                                  ZCL_MODEL_IDENTIFIER_ATTRIBUTE_ID,
+                                  buf,
+                                  sizeof(buf));
+  if (st == EMBER_ZCL_STATUS_SUCCESS) {
+    uint8_t len = buf[0] > 32 ? 32 : buf[0];
+    memcpy(str, &buf[1], len);
+    str[len] = '\0';
+    APP_DEBUG_PRINTF("Basic: model=\"%s\"\n", str);
+  } else {
+    APP_DEBUG_PRINTF("Basic: model read -> 0x%02x\n", st);
+  }
 #endif
 
 #ifdef ZCL_SW_BUILD_ID_ATTRIBUTE_ID
-  st = write_basic_string_attribute(ZCL_SW_BUILD_ID_ATTRIBUTE_ID,
-                                    "debug");
-  APP_DEBUG_PRINTF("Basic: set sw build -> 0x%02x\n", st);
+  st = emberAfReadServerAttribute(1,
+                                  ZCL_BASIC_CLUSTER_ID,
+                                  ZCL_SW_BUILD_ID_ATTRIBUTE_ID,
+                                  buf,
+                                  sizeof(buf));
+  if (st == EMBER_ZCL_STATUS_SUCCESS) {
+    uint8_t len = buf[0] > 32 ? 32 : buf[0];
+    memcpy(str, &buf[1], len);
+    str[len] = '\0';
+    APP_DEBUG_PRINTF("Basic: sw build=\"%s\"\n", str);
+  } else {
+    APP_DEBUG_PRINTF("Basic: sw build read -> 0x%02x\n", st);
+  }
 #endif
 }
 
