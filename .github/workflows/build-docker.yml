@@ -213,6 +213,8 @@ jobs:
             firmware/build/**/*.bin
             firmware/build/**/*.s37
             firmware/build/**/*.map
+            firmware/autogen/**
+            firmware/build/**/project/autogen/**
             build/**/*.gbl
             build/**/*.ota
             build/**/*.zigbee
@@ -313,6 +315,8 @@ jobs:
             firmware/build/**/*.bin
             firmware/build/**/*.s37
             firmware/build/**/*.map
+            firmware/autogen/**
+            firmware/build/**/project/autogen/**
           retention-days: 30
           if-no-files-found: error
 
