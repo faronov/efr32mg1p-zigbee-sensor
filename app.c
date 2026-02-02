@@ -124,12 +124,6 @@ static EmberStatus start_join_scan(void);
 static void try_next_channel(void);
 static void configure_join_security(void);
 static void log_basic_identity(void);
-EmberAfStatus emberAfExternalAttributeReadCallback(int8u endpoint,
-                                                   EmberAfClusterId clusterId,
-                                                   EmberAfAttributeMetadata *attributeMetadata,
-                                                   int16u manufacturerCode,
-                                                   int8u *buffer,
-                                                   int16u maxReadLength);
 
 /**
  * @brief Zigbee application init callback
@@ -242,47 +236,6 @@ static void log_basic_identity(void)
 #endif
 }
 
-EmberAfStatus emberAfExternalAttributeReadCallback(int8u endpoint,
-                                                   EmberAfClusterId clusterId,
-                                                   EmberAfAttributeMetadata *attributeMetadata,
-                                                   int16u manufacturerCode,
-                                                   int8u *buffer,
-                                                   int16u maxReadLength)
-{
-  (void)manufacturerCode;
-  if (attributeMetadata == NULL || buffer == NULL) {
-    return EMBER_ZCL_STATUS_UNSUPPORTED_ATTRIBUTE;
-  }
-  if (endpoint != 1 || clusterId != ZCL_BASIC_CLUSTER_ID) {
-    return EMBER_ZCL_STATUS_UNSUPPORTED_ATTRIBUTE;
-  }
-
-  const char *value = NULL;
-  switch (attributeMetadata->attributeId) {
-    case ZCL_MANUFACTURER_NAME_ATTRIBUTE_ID:
-      value = "OpenBME280";
-      break;
-    case ZCL_MODEL_IDENTIFIER_ATTRIBUTE_ID:
-      value = "TRADFRI-BME280";
-      break;
-    case ZCL_SW_BUILD_ID_ATTRIBUTE_ID:
-      value = "debug";
-      break;
-    default:
-      return EMBER_ZCL_STATUS_UNSUPPORTED_ATTRIBUTE;
-  }
-
-  size_t len = strlen(value);
-  if (len > 32) {
-    len = 32;
-  }
-  if (maxReadLength < (len + 1)) {
-    return EMBER_ZCL_STATUS_INSUFFICIENT_SPACE;
-  }
-  buffer[0] = (int8u)len;
-  memcpy(&buffer[1], value, len);
-  return EMBER_ZCL_STATUS_SUCCESS;
-}
 
 /**
  * @brief Network join success callback
