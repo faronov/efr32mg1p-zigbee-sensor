@@ -180,9 +180,20 @@ jobs:
           fi
           echo "Searching Basic attributes in:"
           printf '  - %s\n' "${SEARCH_DIRS[@]}"
-          rg -q -g "zap-*" "0x0004" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
-          rg -q -g "zap-*" "0x0005" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
-          rg -q -g "zap-*" "0x4000" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
+          mapfile -d '' ZAP_FILES < <(find "${SEARCH_DIRS[@]}" -type f -name "zap-*" -print0)
+          if [ ${#ZAP_FILES[@]} -eq 0 ]; then
+            echo "ERROR: no zap-* files found under autogen directories"
+            exit 1
+          fi
+          if command -v rg >/dev/null 2>&1; then
+            rg -q -g "zap-*" "0x0004" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
+            rg -q -g "zap-*" "0x0005" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
+            rg -q -g "zap-*" "0x4000" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
+          else
+            printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x0004" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
+            printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x0005" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
+            printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x4000" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
+          fi
           echo "OK: Basic identity attributes present"
 
       - name: List build outputs
@@ -318,9 +329,20 @@ jobs:
           fi
           echo "Searching Basic attributes in:"
           printf '  - %s\n' "${SEARCH_DIRS[@]}"
-          rg -q -g "zap-*" "0x0004" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
-          rg -q -g "zap-*" "0x0005" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
-          rg -q -g "zap-*" "0x4000" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
+          mapfile -d '' ZAP_FILES < <(find "${SEARCH_DIRS[@]}" -type f -name "zap-*" -print0)
+          if [ ${#ZAP_FILES[@]} -eq 0 ]; then
+            echo "ERROR: no zap-* files found under autogen directories"
+            exit 1
+          fi
+          if command -v rg >/dev/null 2>&1; then
+            rg -q -g "zap-*" "0x0004" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
+            rg -q -g "zap-*" "0x0005" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
+            rg -q -g "zap-*" "0x4000" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
+          else
+            printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x0004" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
+            printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x0005" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
+            printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x4000" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
+          fi
           echo "OK: Basic identity attributes present"
 
       - name: Build summary (Debug)
