@@ -101,6 +101,7 @@ static bool join_network_found = false;
 static EmberZigbeeNetwork join_candidate;
 static bool af_init_seen = false;
 static bool af_init_reported = false;
+static bool basic_identity_pending = false;
 static bool join_pending = false;
 static bool join_security_configured = false;
 
@@ -123,7 +124,7 @@ static void handle_long_press(void);
 static EmberStatus start_join_scan(void);
 static void try_next_channel(void);
 static void configure_join_security(void);
-static void log_basic_identity(void);
+static bool log_basic_identity(void);
 
 /**
  * @brief Zigbee application init callback
@@ -154,7 +155,9 @@ void emberAfInitCallback(void)
 
   // Initialize configuration from NVM
   app_config_init();
-  log_basic_identity();
+  if (!log_basic_identity()) {
+    basic_identity_pending = true;
+  }
 
   // TEMPORARILY DISABLE sensor to reduce event usage (event queue issue)
   // Initialize BME280 sensor
@@ -181,14 +184,23 @@ void app_debug_force_af_init(void)
 #endif
 }
 
-static void log_basic_identity(void)
+static bool log_basic_identity(void)
 {
   uint8_t buf[1 + 32];
   char str[33];
   EmberAfStatus st;
+  uint8_t endpoint_count = emberAfEndpointCount();
+  if (endpoint_count == 0) {
+    APP_DEBUG_PRINTF("Basic: endpoints not ready (count=0)\n");
+    return false;
+  }
+  uint8_t endpoint = emberAfEndpointFromIndex(0);
+  APP_DEBUG_PRINTF("Basic: using endpoint %u (count=%u)\n",
+                   endpoint,
+                   endpoint_count);
 
 #ifdef ZCL_MANUFACTURER_NAME_ATTRIBUTE_ID
-  st = emberAfReadServerAttribute(1,
+  st = emberAfReadServerAttribute(endpoint,
                                   ZCL_BASIC_CLUSTER_ID,
                                   ZCL_MANUFACTURER_NAME_ATTRIBUTE_ID,
                                   buf,
@@ -204,7 +216,7 @@ static void log_basic_identity(void)
 #endif
 
 #ifdef ZCL_MODEL_IDENTIFIER_ATTRIBUTE_ID
-  st = emberAfReadServerAttribute(1,
+  st = emberAfReadServerAttribute(endpoint,
                                   ZCL_BASIC_CLUSTER_ID,
                                   ZCL_MODEL_IDENTIFIER_ATTRIBUTE_ID,
                                   buf,
@@ -220,7 +232,7 @@ static void log_basic_identity(void)
 #endif
 
 #ifdef ZCL_SW_BUILD_ID_ATTRIBUTE_ID
-  st = emberAfReadServerAttribute(1,
+  st = emberAfReadServerAttribute(endpoint,
                                   ZCL_BASIC_CLUSTER_ID,
                                   ZCL_SW_BUILD_ID_ATTRIBUTE_ID,
                                   buf,
@@ -234,6 +246,7 @@ static void log_basic_identity(void)
     APP_DEBUG_PRINTF("Basic: sw build read -> 0x%02x\n", st);
   }
 #endif
+  return true;
 }
 
 
@@ -382,11 +395,22 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
 void emberAfTickCallback(void)
 {
   static uint32_t last_heartbeat_tick = 0;
+  static uint32_t last_basic_identity_tick = 0;
   uint32_t now = sl_sleeptimer_get_tick_count();
 
   if (!af_init_reported && af_init_seen) {
     af_init_reported = true;
     APP_DEBUG_PRINTF("AF init seen (tick)\n");
+  }
+
+  if (basic_identity_pending && af_init_seen) {
+    if (last_basic_identity_tick == 0 ||
+        sl_sleeptimer_tick_to_ms(now - last_basic_identity_tick) >= 2000) {
+      last_basic_identity_tick = now;
+      if (log_basic_identity()) {
+        basic_identity_pending = false;
+      }
+    }
   }
 
   if (join_pending && af_init_seen && !network_join_in_progress) {

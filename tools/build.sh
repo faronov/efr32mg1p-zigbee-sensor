@@ -232,7 +232,6 @@ if [[ "$PROJECT_NAME" == *debug* ]] || [[ "$SAMPLE_SLCP" == *debug* ]]; then
     "-DAPP_DEBUG_NO_SLEEP=1"
     "-DAPP_DEBUG_MAIN_HEARTBEAT=1"
     "-DAPP_DEBUG_POLL_BUTTON=1"
-    "-DAPP_DEBUG_FORCE_AF_INIT=1"
   )
 fi
 EXTRA_CPPFLAGS_STR="${EXTRA_CPPFLAGS[*]} ${DEBUG_CPPFLAGS[*]}"
