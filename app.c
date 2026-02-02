@@ -692,7 +692,6 @@ static void configure_join_security(void)
     return;
   }
 
-#if defined(EMBER_HAVE_PRECONFIGURED_KEY) && defined(EMBER_TRUST_CENTER_GLOBAL_LINK_KEY)
   EmberInitialSecurityState state;
   memset(&state, 0, sizeof(state));
   memcpy(state.preconfiguredKey.contents, zigbee_alliance_key, EMBER_ENCRYPTION_KEY_SIZE);
@@ -705,9 +704,6 @@ static void configure_join_security(void)
   if (st == EMBER_SUCCESS) {
     join_security_configured = true;
   }
-#else
-  APP_DEBUG_PRINTF("Join: security macros missing - skipping key setup\n");
-#endif
 }
 
 /**
