@@ -202,6 +202,8 @@ define:
     value: 1
   - name: APP_DEBUG_POLL_BUTTON
     value: 1
+  - name: APP_DEBUG_FORCE_AF_INIT
+    value: 1
 
   # Increase event queue capacity for Series 1 (fixes event-queue.c:294 crash)
   # Series 1 has limited RAM (32KB) and smaller default event queue

@@ -102,6 +102,8 @@ static EmberZigbeeNetwork join_candidate;
 static bool af_init_seen = false;
 static bool af_init_reported = false;
 static bool basic_identity_pending = false;
+static bool af_init_force_pending = false;
+static uint32_t af_init_force_tick = 0;
 static bool join_pending = false;
 static bool join_security_configured = false;
 
@@ -140,6 +142,8 @@ void emberAfInitCallback(void)
   }
   APP_DEBUG_PRINTF("AF init callback\n");
   af_init_seen = true;
+  af_init_force_pending = false;
+  af_init_force_tick = 0;
   emberAfCorePrintln("Zigbee BME280 Sensor Application");
   emberAfCorePrintln("Silicon Labs EFR32MG1P + Bosch BME280");
   emberAfCorePrintln("Press BTN0 to join network or trigger sensor reading");
@@ -178,8 +182,8 @@ void app_debug_force_af_init(void)
 {
 #if defined(APP_DEBUG_FORCE_AF_INIT) && (APP_DEBUG_FORCE_AF_INIT != 0)
   if (!af_init_seen) {
-    APP_DEBUG_PRINTF("AF init forced (debug)\n");
-    emberAfInitCallback();
+    APP_DEBUG_PRINTF("AF init requested (debug)\n");
+    af_init_force_pending = true;
   }
 #endif
 }
@@ -401,6 +405,16 @@ void emberAfTickCallback(void)
   if (!af_init_reported && af_init_seen) {
     af_init_reported = true;
     APP_DEBUG_PRINTF("AF init seen (tick)\n");
+  }
+
+  if (af_init_force_pending && !af_init_seen) {
+    if (af_init_force_tick == 0) {
+      af_init_force_tick = now;
+    } else if (sl_sleeptimer_tick_to_ms(now - af_init_force_tick) >= 2000) {
+      APP_DEBUG_PRINTF("AF init forced (timeout)\n");
+      emberAfInitCallback();
+      af_init_force_pending = false;
+    }
   }
 
   if (basic_identity_pending && af_init_seen) {
