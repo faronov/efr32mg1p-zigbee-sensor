@@ -167,6 +167,22 @@ jobs:
           echo "Creating OTA files for TRÅDFRI v${VERSION}..."
           bash tools/create_ota_file.sh "$VERSION" || echo "⚠️ OTA file creation failed (non-blocking)"
 
+      - name: Verify Basic identity attributes
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="$(find firmware -path "*autogen/attribute-storage.c" | head -1 || true)"
+          if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
+            echo "ERROR: attribute-storage.c not found in firmware autogen output"
+            exit 1
+          fi
+          echo "Checking Basic attributes in: $FILE"
+          rg -q "0x0004" "$FILE" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
+          rg -q "0x0005" "$FILE" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
+          rg -q "0x4000" "$FILE" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
+          echo "OK: Basic identity attributes present"
+
       - name: List build outputs
         if: always()
         run: |
@@ -286,6 +302,22 @@ jobs:
             firmware/build/**/*.map
           retention-days: 30
           if-no-files-found: error
+
+      - name: Verify Basic identity attributes (Debug)
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="$(find firmware -path "*autogen/attribute-storage.c" | head -1 || true)"
+          if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
+            echo "ERROR: attribute-storage.c not found in firmware autogen output"
+            exit 1
+          fi
+          echo "Checking Basic attributes in: $FILE"
+          rg -q "0x0004" "$FILE" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
+          rg -q "0x0005" "$FILE" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
+          rg -q "0x4000" "$FILE" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
+          echo "OK: Basic identity attributes present"
 
       - name: Build summary (Debug)
         if: success()
