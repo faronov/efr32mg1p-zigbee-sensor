@@ -180,6 +180,14 @@ cp "$PROJECT_ROOT/include/"*.h "$FIRMWARE_DIR/include/" 2>/dev/null || true
 
 echo -e "${GREEN}✓${NC} Custom source files copied"
 
+# Copy custom config files (e.g., ZCL config) to ensure ZAP uses our settings
+if [ -d "$PROJECT_ROOT/config" ]; then
+  echo -e "${GREEN}Copying custom config files...${NC}"
+  mkdir -p "$FIRMWARE_DIR/config"
+  cp -R "$PROJECT_ROOT/config/"* "$FIRMWARE_DIR/config/" 2>/dev/null || true
+  echo -e "${GREEN}✓${NC} Custom config files copied"
+fi
+
 # Suppress noisy config #warning lines in generated headers.
 CONFIG_DIR="$FIRMWARE_DIR/config"
 if [ -d "$CONFIG_DIR" ]; then
