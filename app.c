@@ -110,10 +110,9 @@ static uint32_t basic_identity_tick = 0;
 static uint8_t generatedDefaults[] = GENERATED_DEFAULTS;
 static EmberAfAttributeMetadata generatedAttributes[] = GENERATED_ATTRIBUTES;
 static EmberAfCluster generatedClusters[] = GENERATED_CLUSTERS;
-static EmberAfEndpointType generatedEndpointTypes[] = {
-  { generatedClusters, GENERATED_CLUSTER_COUNT, ATTRIBUTE_MAX_SIZE }
-};
+static EmberAfEndpointType generatedEndpointType;
 
+static uint16_t app_dynamic_endpoint_size(void);
 static void app_register_dynamic_endpoint(void);
 void app_debug_poll(void);
 static bool join_pending = false;
@@ -194,13 +193,26 @@ void emberAfInitCallback(void)
 
 static void app_register_dynamic_endpoint(void)
 {
+  generatedEndpointType.cluster = generatedClusters;
+  generatedEndpointType.clusterCount = GENERATED_CLUSTER_COUNT;
+  generatedEndpointType.endpointSize = app_dynamic_endpoint_size();
+
   EmberAfStatus status = emberAfSetDynamicEndpoint(0,
                                                    1,
                                                    0x0104,
                                                    0x0302,
                                                    1,
-                                                   &generatedEndpointTypes[0]);
+                                                   &generatedEndpointType);
   APP_DEBUG_PRINTF("Dynamic endpoint set -> 0x%02x\n", status);
+}
+
+static uint16_t app_dynamic_endpoint_size(void)
+{
+  uint16_t total = 0;
+  for (uint16_t i = 0; i < GENERATED_CLUSTER_COUNT; i++) {
+    total += generatedClusters[i].clusterSize;
+  }
+  return total;
 }
 
 void app_debug_force_af_init(void)
