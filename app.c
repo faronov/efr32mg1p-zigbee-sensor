@@ -106,7 +106,7 @@ static bool af_init_force_pending = false;
 static uint32_t af_init_force_tick = 0;
 static uint32_t basic_identity_tick = 0;
 
-static void app_debug_poll(void);
+void app_debug_poll(void);
 static bool join_pending = false;
 static bool join_security_configured = false;
 
