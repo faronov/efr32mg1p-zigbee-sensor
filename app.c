@@ -166,19 +166,17 @@ void emberAfInitCallback(void)
     basic_identity_pending = true;
   }
 
-  // TEMPORARILY DISABLE sensor to reduce event usage (event queue issue)
   // Initialize BME280 sensor
-  // if (!app_sensor_init()) {
-  //   emberAfCorePrintln("ERROR: Sensor initialization failed!");
-  // #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-  //   // Rapid blink on error
-  //   for (int i = 0; i < 10; i++) {
-  //     sl_led_toggle(&sl_led_led0);
-  //     sl_sleeptimer_delay_millisecond(100);
-  //   }
-  // #endif
-  // }
-  emberAfCorePrintln("Sensor DISABLED for testing - event queue issue");
+  if (!app_sensor_init()) {
+    emberAfCorePrintln("ERROR: Sensor initialization failed!");
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+    // Rapid blink on error
+    for (int i = 0; i < 10; i++) {
+      sl_led_toggle(&sl_led_led0);
+      sl_sleeptimer_delay_millisecond(100);
+    }
+#endif
+  }
 }
 
 void app_debug_force_af_init(void)
@@ -321,12 +319,11 @@ void emberAfStackStatusCallback(EmberStatus status)
     sl_zigbee_event_set_delay_ms(&led_off_event, 3000);
 #endif
 
-    // Sensor DISABLED for testing (event queue issue)
     // Perform initial sensor reading after joining
-    // app_sensor_update();
+    app_sensor_update();
 
     // Restart periodic sensor updates
-    // app_sensor_start_periodic_updates();
+    app_sensor_start_periodic_updates();
 
     // Note: Binding is handled by coordinator (Zigbee2MQTT/ZHA/deCONZ)
     // No device-side binding code needed - see BINDING_GUIDE.md
