@@ -6,6 +6,7 @@
 #include "sl_component_catalog.h"
 #include "zigbee_app_framework_event.h"
 #include "app/framework/include/af.h"
+#include "zap-config.h"
 // #include "app/framework/plugin/network-steering/network-steering.h" // REMOVED - causes event queue crash
 #include "app_sensor.h"
 #include "app_config.h"
@@ -106,6 +107,14 @@ static bool af_init_force_pending = false;
 static uint32_t af_init_force_tick = 0;
 static uint32_t basic_identity_tick = 0;
 
+static uint8_t generatedDefaults[] = GENERATED_DEFAULTS;
+static EmberAfAttributeMetadata generatedAttributes[] = GENERATED_ATTRIBUTES;
+static EmberAfCluster generatedClusters[] = GENERATED_CLUSTERS;
+static EmberAfEndpointType generatedEndpointTypes[] = {
+  { generatedClusters, GENERATED_CLUSTER_COUNT, ATTRIBUTE_MAX_SIZE }
+};
+
+static void app_register_dynamic_endpoint(void);
 void app_debug_poll(void);
 static bool join_pending = false;
 static bool join_security_configured = false;
@@ -155,6 +164,8 @@ void emberAfInitCallback(void)
   sl_zigbee_event_init(&led_blink_event, led_blink_event_handler);
   sl_zigbee_event_init(&led_off_event, led_off_event_handler);
 
+  app_register_dynamic_endpoint();
+
   // Button handling uses emberAfTickCallback() to check flags - no events needed
 
   // Initialize optimized rejoin event (TEMPORARILY DISABLED - event queue issue)
@@ -179,6 +190,17 @@ void emberAfInitCallback(void)
   // #endif
   // }
   emberAfCorePrintln("Sensor DISABLED for testing - event queue issue");
+}
+
+static void app_register_dynamic_endpoint(void)
+{
+  EmberAfStatus status = emberAfSetDynamicEndpoint(0,
+                                                   1,
+                                                   0x0104,
+                                                   0x0302,
+                                                   1,
+                                                   &generatedEndpointTypes[0]);
+  APP_DEBUG_PRINTF("Dynamic endpoint set -> 0x%02x\n", status);
 }
 
 void app_debug_force_af_init(void)
