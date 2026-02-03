@@ -189,20 +189,26 @@ jobs:
             rg -q -g "zap-*" "0x0004" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
             rg -q -g "zap-*" "0x0005" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
             rg -q -g "zap-*" "0x4000" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
-            endpoint_line=$(rg -g "zap-config.h" "MAX_ENDPOINT_COUNT" "${SEARCH_DIRS[@]}" | head -n1 || true)
+            endpoint_line=$(rg -g "zap-config.h" "FIXED_ENDPOINT_COUNT" "${SEARCH_DIRS[@]}" | head -n1 || true)
+            if [ -z "$endpoint_line" ]; then
+              endpoint_line=$(rg -g "zap-config.h" "MAX_ENDPOINT_COUNT" "${SEARCH_DIRS[@]}" | head -n1 || true)
+            fi
           else
             printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x0004" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
             printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x0005" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
             printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x4000" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
-            endpoint_line=$(printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -m 1 -- "MAX_ENDPOINT_COUNT" || true)
+            endpoint_line=$(printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -m 1 -- "FIXED_ENDPOINT_COUNT" || true)
+            if [ -z "$endpoint_line" ]; then
+              endpoint_line=$(printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -m 1 -- "MAX_ENDPOINT_COUNT" || true)
+            fi
           fi
-          endpoint_count=$(printf '%s' "$endpoint_line" | sed -E 's/.*MAX_ENDPOINT_COUNT[^0-9]*([0-9]+).*/\\1/')
+          endpoint_count=$(printf '%s' "$endpoint_line" | sed -E 's/.*(FIXED_ENDPOINT_COUNT|MAX_ENDPOINT_COUNT)[^0-9]*([0-9]+).*/\\2/')
           if [ -z "$endpoint_count" ]; then
-            echo "ERROR: Could not locate MAX_ENDPOINT_COUNT in zap-config.h"
+            echo "ERROR: Could not locate endpoint count in zap-config.h"
             exit 1
           fi
           if [ "$endpoint_count" -eq 0 ]; then
-            echo "ERROR: MAX_ENDPOINT_COUNT is 0 (no endpoints generated)"
+            echo "ERROR: Endpoint count is 0 (no endpoints generated)"
             exit 1
           fi
           echo "OK: Basic identity attributes present"
@@ -353,20 +359,26 @@ jobs:
             rg -q -g "zap-*" "0x0004" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
             rg -q -g "zap-*" "0x0005" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
             rg -q -g "zap-*" "0x4000" "${SEARCH_DIRS[@]}" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
-            endpoint_line=$(rg -g "zap-config.h" "MAX_ENDPOINT_COUNT" "${SEARCH_DIRS[@]}" | head -n1 || true)
+            endpoint_line=$(rg -g "zap-config.h" "FIXED_ENDPOINT_COUNT" "${SEARCH_DIRS[@]}" | head -n1 || true)
+            if [ -z "$endpoint_line" ]; then
+              endpoint_line=$(rg -g "zap-config.h" "MAX_ENDPOINT_COUNT" "${SEARCH_DIRS[@]}" | head -n1 || true)
+            fi
           else
             printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x0004" || { echo "ERROR: Missing Manufacturer Name (0x0004)"; exit 1; }
             printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x0005" || { echo "ERROR: Missing Model Identifier (0x0005)"; exit 1; }
             printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -q -- "0x4000" || { echo "ERROR: Missing SW Build ID (0x4000)"; exit 1; }
-            endpoint_line=$(printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -m 1 -- "MAX_ENDPOINT_COUNT" || true)
+            endpoint_line=$(printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -m 1 -- "FIXED_ENDPOINT_COUNT" || true)
+            if [ -z "$endpoint_line" ]; then
+              endpoint_line=$(printf '%s\0' "${ZAP_FILES[@]}" | xargs -0 grep -m 1 -- "MAX_ENDPOINT_COUNT" || true)
+            fi
           fi
-          endpoint_count=$(printf '%s' "$endpoint_line" | sed -E 's/.*MAX_ENDPOINT_COUNT[^0-9]*([0-9]+).*/\\1/')
+          endpoint_count=$(printf '%s' "$endpoint_line" | sed -E 's/.*(FIXED_ENDPOINT_COUNT|MAX_ENDPOINT_COUNT)[^0-9]*([0-9]+).*/\\2/')
           if [ -z "$endpoint_count" ]; then
-            echo "ERROR: Could not locate MAX_ENDPOINT_COUNT in zap-config.h"
+            echo "ERROR: Could not locate endpoint count in zap-config.h"
             exit 1
           fi
           if [ "$endpoint_count" -eq 0 ]; then
-            echo "ERROR: MAX_ENDPOINT_COUNT is 0 (no endpoints generated)"
+            echo "ERROR: Endpoint count is 0 (no endpoints generated)"
             exit 1
           fi
           echo "OK: Basic identity attributes present"
