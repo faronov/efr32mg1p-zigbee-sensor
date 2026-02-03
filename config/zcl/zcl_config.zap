@@ -521,6 +521,7 @@
     {
       "endpointTypeName": "Sensor",
       "endpointTypeIndex": 0,
+      "endpointTypeId": 1,
       "profileId": 260,
       "endpointId": 1,
       "networkId": 0
