@@ -33,15 +33,15 @@
       "deviceTypeRef": {
         "code": 770,
         "profileId": 260,
-        "label": "HA-temperaturesensor",
-        "name": "HA-temperaturesensor"
+        "label": "HA-tempsensor",
+        "name": "HA-tempsensor"
       },
       "deviceTypes": [
         {
           "code": 770,
           "profileId": 260,
-          "label": "HA-temperaturesensor",
-          "name": "HA-temperaturesensor"
+          "label": "HA-tempsensor",
+          "name": "HA-tempsensor"
         }
       ],
       "deviceVersions": [
@@ -50,7 +50,7 @@
       "deviceIdentifiers": [
         770
       ],
-      "deviceTypeName": "HA-temperaturesensor",
+      "deviceTypeName": "HA-tempsensor",
       "deviceTypeCode": 770,
       "deviceTypeProfileId": 260,
       "clusters": [
