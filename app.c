@@ -74,6 +74,9 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_DIAG_ALWAYS
 #define APP_DEBUG_DIAG_ALWAYS 0
 #endif
+#ifndef APP_DEBUG_SPI_ONLY
+#define APP_DEBUG_SPI_ONLY 0
+#endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
 static void handle_short_press(void);
@@ -141,6 +144,11 @@ static void app_flash_probe(void);
  */
 void emberAfInitCallback(void)
 {
+#if APP_DEBUG_SPI_ONLY
+  APP_DEBUG_PRINTF("SPI-only debug mode\n");
+  app_flash_probe();
+  return;
+#endif
   if (af_init_seen) {
     APP_DEBUG_PRINTF("AF init callback (duplicate)\n");
     return;
@@ -330,6 +338,10 @@ static void app_flash_probe(void)
  */
 void emberAfStackStatusCallback(EmberStatus status)
 {
+#if APP_DEBUG_SPI_ONLY
+  (void)status;
+  return;
+#endif
   APP_DEBUG_PRINTF("Stack status: 0x%02x\n", status);
   if (status == EMBER_NETWORK_UP) {
     emberAfCorePrintln("Network joined successfully");
@@ -469,6 +481,21 @@ void emberAfTickCallback(void)
   static uint32_t last_heartbeat_tick = 0;
   uint32_t now = sl_sleeptimer_get_tick_count();
   app_debug_poll();
+
+#if APP_DEBUG_SPI_ONLY
+  if (button_short_press_pending) {
+    button_short_press_pending = false;
+    APP_DEBUG_PRINTF("Button short press\n");
+    app_flash_probe();
+  }
+
+  if (button_long_press_pending) {
+    button_long_press_pending = false;
+    APP_DEBUG_PRINTF("Button long press\n");
+    app_flash_probe();
+  }
+  return;
+#endif
 
   if (join_pending && af_init_seen && !network_join_in_progress) {
     join_pending = false;
@@ -706,6 +733,10 @@ void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
  */
 static void handle_short_press(void)
 {
+#if APP_DEBUG_SPI_ONLY
+  app_flash_probe();
+  return;
+#endif
   EmberNetworkStatus network_state = emberAfNetworkState();
 
   if (network_state == EMBER_JOINED_NETWORK) {
