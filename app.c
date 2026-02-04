@@ -143,6 +143,11 @@ static void app_flash_send_cmd(GPIO_Port_TypeDef port,
 static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
                                     unsigned int pin,
                                     const char *label);
+static void app_flash_bb_init(void);
+static uint8_t app_flash_bb_transfer(uint8_t out);
+static void app_flash_probe_bitbang(GPIO_Port_TypeDef port,
+                                    unsigned int pin,
+                                    const char *label);
 
 /**
  * @brief Zigbee application init callback
@@ -313,6 +318,10 @@ static void app_flash_probe(void)
   if (!app_flash_probe_with_cs(gpioPortB, 11, "PB11")) {
     (void)app_flash_probe_with_cs(gpioPortF, 3, "PF3");
   }
+
+  // Bit-bang fallback to validate pin routing independent of USART LOCs.
+  app_flash_probe_bitbang(gpioPortB, 11, "PB11");
+  app_flash_probe_bitbang(gpioPortF, 3, "PF3");
 }
 
 static void app_flash_enable_init(void)
@@ -390,6 +399,64 @@ static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
 
   return !((rx[1] == 0x00 && rx[2] == 0x00 && rx[3] == 0x00)
            || (rx[1] == 0xFF && rx[2] == 0xFF && rx[3] == 0xFF));
+}
+
+static void app_flash_bb_init(void)
+{
+  GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0); // CLK
+  GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, 0); // MOSI
+  GPIO_PinModeSet(gpioPortD, 14, gpioModeInput, 0);    // MISO
+}
+
+static uint8_t app_flash_bb_transfer(uint8_t out)
+{
+  uint8_t in = 0;
+  for (int bit = 7; bit >= 0; bit--) {
+    if (out & (1u << bit)) {
+      GPIO_PinOutSet(gpioPortD, 15);
+    } else {
+      GPIO_PinOutClear(gpioPortD, 15);
+    }
+
+    // Small delay to meet setup time.
+    for (volatile int d = 0; d < 20; d++) {
+      __NOP();
+    }
+
+    GPIO_PinOutSet(gpioPortD, 13);
+    if (GPIO_PinInGet(gpioPortD, 14)) {
+      in |= (1u << bit);
+    }
+
+    for (volatile int d = 0; d < 20; d++) {
+      __NOP();
+    }
+
+    GPIO_PinOutClear(gpioPortD, 13);
+  }
+  return in;
+}
+
+static void app_flash_probe_bitbang(GPIO_Port_TypeDef port,
+                                    unsigned int pin,
+                                    const char *label)
+{
+  app_flash_enable_init();
+  app_flash_bb_init();
+  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
+
+  GPIO_PinOutClear(port, pin);
+  (void)app_flash_bb_transfer(0x9F);
+  uint8_t b0 = app_flash_bb_transfer(0x00);
+  uint8_t b1 = app_flash_bb_transfer(0x00);
+  uint8_t b2 = app_flash_bb_transfer(0x00);
+  GPIO_PinOutSet(port, pin);
+
+  APP_DEBUG_PRINTF("SPI flash (bitbang): JEDEC ID %02X %02X %02X (%s)\n",
+                   b0,
+                   b1,
+                   b2,
+                   label);
 }
 
 
