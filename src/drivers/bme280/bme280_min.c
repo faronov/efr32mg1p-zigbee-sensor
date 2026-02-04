@@ -12,6 +12,8 @@
 
 static bme280_calib_data_t calib_data;
 static bool sensor_initialized = false;
+static bool sensor_has_humidity = false;
+static uint8_t sensor_chip_id = 0;
 
 // Helper function to read register
 static bool read_register(uint8_t reg, uint8_t *data, uint16_t len)
@@ -27,7 +29,7 @@ static bool write_register(uint8_t reg, uint8_t value)
 }
 
 // Read calibration data from sensor
-static bool read_calibration_data(void)
+static bool read_calibration_data(bool include_humidity)
 {
   uint8_t calib[32];
 
@@ -50,18 +52,27 @@ static bool read_calibration_data(void)
   calib_data.dig_P8 = (int16_t)(calib[21] << 8) | calib[20];
   calib_data.dig_P9 = (int16_t)(calib[23] << 8) | calib[22];
 
-  calib_data.dig_H1 = calib[25];
+  if (include_humidity) {
+    calib_data.dig_H1 = calib[25];
 
-  // Read calibration data 0xE1-0xE7 (7 bytes)
-  if (!read_register(BME280_REG_CALIB_26, calib, 7)) {
-    return false;
+    // Read calibration data 0xE1-0xE7 (7 bytes)
+    if (!read_register(BME280_REG_CALIB_26, calib, 7)) {
+      return false;
+    }
+
+    calib_data.dig_H2 = (int16_t)(calib[1] << 8) | calib[0];
+    calib_data.dig_H3 = calib[2];
+    calib_data.dig_H4 = (int16_t)(calib[3] << 4) | (calib[4] & 0x0F);
+    calib_data.dig_H5 = (int16_t)(calib[5] << 4) | (calib[4] >> 4);
+    calib_data.dig_H6 = (int8_t)calib[6];
+  } else {
+    calib_data.dig_H1 = 0;
+    calib_data.dig_H2 = 0;
+    calib_data.dig_H3 = 0;
+    calib_data.dig_H4 = 0;
+    calib_data.dig_H5 = 0;
+    calib_data.dig_H6 = 0;
   }
-
-  calib_data.dig_H2 = (int16_t)(calib[1] << 8) | calib[0];
-  calib_data.dig_H3 = calib[2];
-  calib_data.dig_H4 = (int16_t)(calib[3] << 4) | (calib[4] & 0x0F);
-  calib_data.dig_H5 = (int16_t)(calib[5] << 4) | (calib[4] >> 4);
-  calib_data.dig_H6 = (int8_t)calib[6];
 
   return true;
 }
@@ -153,8 +164,13 @@ bool bme280_init(void)
     return false;
   }
 
-  if (chip_id != BME280_CHIP_ID) {
-    return false;  // Wrong chip ID
+  sensor_chip_id = chip_id;
+  if (chip_id == BME280_CHIP_ID) {
+    sensor_has_humidity = true;
+  } else if (chip_id == BMP280_CHIP_ID) {
+    sensor_has_humidity = false;
+  } else {
+    return false;  // Unknown chip ID
   }
 
   // Soft reset
@@ -166,14 +182,16 @@ bool bme280_init(void)
   for (volatile int i = 0; i < 100000; i++);
 
   // Read calibration data
-  if (!read_calibration_data()) {
+  if (!read_calibration_data(sensor_has_humidity)) {
     return false;
   }
 
   // Configure sensor
-  // Humidity oversampling x1
-  if (!write_register(BME280_REG_CTRL_HUM, 0x01)) {
-    return false;
+  // Humidity oversampling x1 (BME280 only)
+  if (sensor_has_humidity) {
+    if (!write_register(BME280_REG_CTRL_HUM, 0x01)) {
+      return false;
+    }
   }
 
   // Temperature oversampling x1, Pressure oversampling x1, Normal mode
@@ -199,8 +217,9 @@ bool bme280_read_data(bme280_data_t *data)
     return false;
   }
 
-  // Read all data registers (0xF7-0xFE)
-  if (!read_register(BME280_REG_PRESS_MSB, raw_data, 8)) {
+  // Read data registers (BMP280 = 6 bytes, BME280 = 8 bytes)
+  uint16_t read_len = sensor_has_humidity ? 8 : 6;
+  if (!read_register(BME280_REG_PRESS_MSB, raw_data, read_len)) {
     return false;
   }
 
@@ -213,13 +232,26 @@ bool bme280_read_data(bme280_data_t *data)
                     (((uint32_t)raw_data[4]) << 4) |
                     (((uint32_t)raw_data[5]) >> 4));
 
-  adc_H = (int32_t)((((uint32_t)raw_data[6]) << 8) |
-                    ((uint32_t)raw_data[7]));
+  adc_H = 0;
+  if (sensor_has_humidity) {
+    adc_H = (int32_t)((((uint32_t)raw_data[6]) << 8) |
+                      ((uint32_t)raw_data[7]));
+  }
 
   // Compensate values
   data->temperature = compensate_temperature(adc_T);
   data->pressure = compensate_pressure(adc_P);
-  data->humidity = compensate_humidity(adc_H);
+  data->humidity = sensor_has_humidity ? compensate_humidity(adc_H) : 0xFFFF;
 
   return true;
+}
+
+bool bme280_has_humidity(void)
+{
+  return sensor_has_humidity;
+}
+
+uint8_t bme280_get_chip_id(void)
+{
+  return sensor_chip_id;
 }

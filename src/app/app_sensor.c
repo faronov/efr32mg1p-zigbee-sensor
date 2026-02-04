@@ -36,6 +36,9 @@ bool app_sensor_init(void)
     return false;
   }
 
+  emberAfCorePrintln("Detected sensor chip ID: 0x%02X (%s)",
+                     bme280_get_chip_id(),
+                     bme280_has_humidity() ? "BME280" : "BMP280");
   emberAfCorePrintln("BME280 sensor initialized successfully");
 
   // Initialize battery monitoring
@@ -101,6 +104,7 @@ void app_sensor_update(void)
 {
   bme280_data_t sensor_data;
   EmberAfStatus status;
+  bool has_humidity = bme280_has_humidity();
 
   // Read sensor data
   if (!bme280_read_data(&sensor_data)) {
@@ -108,27 +112,44 @@ void app_sensor_update(void)
     return;
   }
 
-  emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=%d.%02d %%, P=%d Pa",
-                     sensor_data.temperature / 100,
-                     sensor_data.temperature % 100,
-                     sensor_data.humidity / 100,
-                     sensor_data.humidity % 100,
-                     sensor_data.pressure);
+  if (has_humidity) {
+    emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=%d.%02d %%, P=%d Pa",
+                       sensor_data.temperature / 100,
+                       sensor_data.temperature % 100,
+                       sensor_data.humidity / 100,
+                       sensor_data.humidity % 100,
+                       sensor_data.pressure);
+  } else {
+    emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=--, P=%d Pa",
+                       sensor_data.temperature / 100,
+                       sensor_data.temperature % 100,
+                       sensor_data.pressure);
+  }
 
   // Get configuration and apply calibration offsets
   const app_config_t* config = app_config_get();
 
   // Apply calibration offsets
   int32_t temp_calibrated = sensor_data.temperature + config->temperature_offset_centidegrees;
-  int32_t humidity_calibrated = sensor_data.humidity + config->humidity_offset_centipercent;
+  int32_t humidity_calibrated = 0;
+  if (has_humidity) {
+    humidity_calibrated = sensor_data.humidity + config->humidity_offset_centipercent;
+  }
   int32_t pressure_calibrated = sensor_data.pressure + (config->pressure_offset_centikilopascals * 10); // Convert 0.01 kPa to Pa
 
-  emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=%d.%02d %%, P=%d Pa",
-                     (int)(temp_calibrated / 100),
-                     (int)(temp_calibrated % 100),
-                     (int)(humidity_calibrated / 100),
-                     (int)(humidity_calibrated % 100),
-                     (int)pressure_calibrated);
+  if (has_humidity) {
+    emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=%d.%02d %%, P=%d Pa",
+                       (int)(temp_calibrated / 100),
+                       (int)(temp_calibrated % 100),
+                       (int)(humidity_calibrated / 100),
+                       (int)(humidity_calibrated % 100),
+                       (int)pressure_calibrated);
+  } else {
+    emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=--, P=%d Pa",
+                       (int)(temp_calibrated / 100),
+                       (int)(temp_calibrated % 100),
+                       (int)pressure_calibrated);
+  }
 
   // Update Temperature Measurement cluster (0x0402)
   // MeasuredValue is int16, in 0.01°C units
@@ -142,16 +163,20 @@ void app_sensor_update(void)
     emberAfCorePrintln("Error: Failed to update temperature attribute (0x%x)", status);
   }
 
-  // Update Relative Humidity Measurement cluster (0x0405)
-  // MeasuredValue is uint16, in 0.01%RH units
-  uint16_t humidity_value = (uint16_t)humidity_calibrated;
-  status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                       ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
-                                       ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
-                                       (uint8_t *)&humidity_value,
-                                       ZCL_INT16U_ATTRIBUTE_TYPE);
-  if (status != EMBER_ZCL_STATUS_SUCCESS) {
-    emberAfCorePrintln("Error: Failed to update humidity attribute (0x%x)", status);
+  if (has_humidity) {
+    // Update Relative Humidity Measurement cluster (0x0405)
+    // MeasuredValue is uint16, in 0.01%RH units
+    uint16_t humidity_value = (uint16_t)humidity_calibrated;
+    status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                         ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
+                                         ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
+                                         (uint8_t *)&humidity_value,
+                                         ZCL_INT16U_ATTRIBUTE_TYPE);
+    if (status != EMBER_ZCL_STATUS_SUCCESS) {
+      emberAfCorePrintln("Error: Failed to update humidity attribute (0x%x)", status);
+    }
+  } else {
+    emberAfCorePrintln("Humidity not supported by sensor (BMP280)");
   }
 
   // Update Pressure Measurement cluster (0x0403)

@@ -23,8 +23,9 @@
 #define BME280_REG_CALIB_00     0x88
 #define BME280_REG_CALIB_26     0xE1
 
-// BME280 chip ID
+// BME280 / BMP280 chip IDs
 #define BME280_CHIP_ID          0x60
+#define BMP280_CHIP_ID          0x58
 
 // Compensation parameters structure
 typedef struct {
@@ -68,6 +69,16 @@ bool bme280_init(void);
  * @return true if successful, false otherwise
  */
 bool bme280_read_data(bme280_data_t *data);
+
+/**
+ * @brief Returns true if the detected sensor provides humidity.
+ */
+bool bme280_has_humidity(void);
+
+/**
+ * @brief Return detected chip ID (0 if not initialized).
+ */
+uint8_t bme280_get_chip_id(void);
 
 /**
  * @brief Perform soft reset of the sensor
