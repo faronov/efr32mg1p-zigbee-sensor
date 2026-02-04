@@ -20,7 +20,7 @@ This document describes the hardware connections for the IKEA TRÅDFRI module (E
 
 **Right Side (Top to Bottom):**
 - RESET - Hardware reset
-- PF3 - GPIO
+- PF3 - SPI flash enable (not exposed on ICC-A-1)
 - PF2 - SWO (Serial Wire Output for debugging)
 - PF1 - SWDIO (Serial Wire Debug I/O)
 - PF0 - SWCLK (Serial Wire Clock)
@@ -142,6 +142,7 @@ The TRÅDFRI board includes **ISSI IS25LQ020B** 256KB (2Mbit) SPI flash for OTA:
 - **PD14**: SPI MISO
 - **PD15**: SPI MOSI
 - **PB11**: SPI CS (Chip Select)
+- **PF3**: Flash enable (drive high to activate; on ICC-A-1 this pin is not exposed but still connected internally)
 
 OTA functionality is fully supported. See [OTA_FILE_CREATION.md](OTA_FILE_CREATION.md) for creating update files.
 

@@ -137,6 +137,7 @@ static void configure_join_security(void);
 static bool log_basic_identity(void);
 static void app_flash_probe(void);
 static void app_flash_send_cmd(uint8_t cmd);
+static void app_flash_enable_init(void);
 static void app_flash_cs_init(void);
 static void app_flash_cs_assert(void);
 static void app_flash_cs_deassert(void);
@@ -305,6 +306,7 @@ static bool log_basic_identity(void)
 
 static void app_flash_probe(void)
 {
+  app_flash_enable_init();
   app_flash_cs_init();
   app_flash_send_cmd(0xFF); // Release from continuous read (safe no-op)
   app_flash_send_cmd(0xAB); // Release from deep power-down
@@ -350,11 +352,24 @@ static void app_flash_probe(void)
 
 static void app_flash_send_cmd(uint8_t cmd)
 {
+  app_flash_enable_init();
   app_flash_cs_init();
   uint8_t tx[1] = {cmd};
   app_flash_cs_assert();
   (void)SPIDRV_MTransmitB(sl_spidrv_exp_handle, tx, sizeof(tx));
   app_flash_cs_deassert();
+}
+
+static void app_flash_enable_init(void)
+{
+  static bool configured = false;
+  if (configured) {
+    return;
+  }
+  // ICC-1 exposes PF3; ICC-A-1 uses PF3 internally to enable the SPI flash.
+  GPIO_PinModeSet(gpioPortF, 3, gpioModePushPull, 1);
+  APP_DEBUG_PRINTF("SPI flash: enable PF3=1\n");
+  configured = true;
 }
 
 static void app_flash_cs_init(void)
