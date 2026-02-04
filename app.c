@@ -12,6 +12,7 @@
 #include "stack/include/network-formation.h"  // For manual network join
 #include "stack/include/security.h"
 #include "sl_sleeptimer.h"
+#include "sl_spidrv_instances.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -130,6 +131,7 @@ static EmberStatus start_join_scan(void);
 static void try_next_channel(void);
 static void configure_join_security(void);
 static bool log_basic_identity(void);
+static void app_flash_probe(void);
 
 /**
  * @brief Zigbee application init callback
@@ -165,6 +167,10 @@ void emberAfInitCallback(void)
   if (!log_basic_identity()) {
     basic_identity_pending = true;
   }
+
+#if APP_DEBUG_DIAG_ALWAYS
+  app_flash_probe();
+#endif
 
   // Initialize BME280 sensor
   if (!app_sensor_init()) {
@@ -282,6 +288,38 @@ static bool log_basic_identity(void)
   }
 #endif
   return true;
+}
+
+static void app_flash_probe(void)
+{
+  uint8_t tx[4] = {0x9F, 0x00, 0x00, 0x00};
+  uint8_t rx[4] = {0};
+
+  Ecode_t status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, sizeof(tx));
+  if (status != ECODE_OK) {
+    APP_DEBUG_PRINTF("SPI flash: JEDEC read failed (0x%lx)\n",
+                     (unsigned long)status);
+    return;
+  }
+
+  APP_DEBUG_PRINTF("SPI flash: JEDEC ID %02X %02X %02X\n",
+                   rx[1],
+                   rx[2],
+                   rx[3]);
+
+  tx[0] = 0x05; // Read Status Register-1
+  memset(rx, 0, sizeof(rx));
+  status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, 2);
+  if (status == ECODE_OK) {
+    APP_DEBUG_PRINTF("SPI flash: SR1=0x%02X\n", rx[1]);
+  }
+
+  tx[0] = 0x35; // Read Status Register-2
+  memset(rx, 0, sizeof(rx));
+  status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, 2);
+  if (status == ECODE_OK) {
+    APP_DEBUG_PRINTF("SPI flash: SR2=0x%02X\n", rx[1]);
+  }
 }
 
 
