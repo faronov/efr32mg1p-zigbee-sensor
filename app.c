@@ -13,6 +13,7 @@
 #include "stack/include/security.h"
 #include "sl_sleeptimer.h"
 #include "sl_spidrv_instances.h"
+#include "em_gpio.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -136,6 +137,9 @@ static void configure_join_security(void);
 static bool log_basic_identity(void);
 static void app_flash_probe(void);
 static void app_flash_send_cmd(uint8_t cmd);
+static void app_flash_cs_init(void);
+static void app_flash_cs_assert(void);
+static void app_flash_cs_deassert(void);
 
 /**
  * @brief Zigbee application init callback
@@ -301,6 +305,7 @@ static bool log_basic_identity(void)
 
 static void app_flash_probe(void)
 {
+  app_flash_cs_init();
   app_flash_send_cmd(0xFF); // Release from continuous read (safe no-op)
   app_flash_send_cmd(0xAB); // Release from deep power-down
   app_flash_send_cmd(0x66); // Reset enable
@@ -310,7 +315,9 @@ static void app_flash_probe(void)
   uint8_t tx[4] = {0x9F, 0x00, 0x00, 0x00};
   uint8_t rx[4] = {0};
 
+  app_flash_cs_assert();
   Ecode_t status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, sizeof(tx));
+  app_flash_cs_deassert();
   if (status != ECODE_OK) {
     APP_DEBUG_PRINTF("SPI flash: JEDEC read failed (0x%lx)\n",
                      (unsigned long)status);
@@ -324,14 +331,18 @@ static void app_flash_probe(void)
 
   tx[0] = 0x05; // Read Status Register-1
   memset(rx, 0, sizeof(rx));
+  app_flash_cs_assert();
   status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, 2);
+  app_flash_cs_deassert();
   if (status == ECODE_OK) {
     APP_DEBUG_PRINTF("SPI flash: SR1=0x%02X\n", rx[1]);
   }
 
   tx[0] = 0x35; // Read Status Register-2
   memset(rx, 0, sizeof(rx));
+  app_flash_cs_assert();
   status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, 2);
+  app_flash_cs_deassert();
   if (status == ECODE_OK) {
     APP_DEBUG_PRINTF("SPI flash: SR2=0x%02X\n", rx[1]);
   }
@@ -339,8 +350,31 @@ static void app_flash_probe(void)
 
 static void app_flash_send_cmd(uint8_t cmd)
 {
+  app_flash_cs_init();
   uint8_t tx[1] = {cmd};
+  app_flash_cs_assert();
   (void)SPIDRV_MTransmitB(sl_spidrv_exp_handle, tx, sizeof(tx));
+  app_flash_cs_deassert();
+}
+
+static void app_flash_cs_init(void)
+{
+  static bool configured = false;
+  if (configured) {
+    return;
+  }
+  GPIO_PinModeSet(gpioPortB, 11, gpioModePushPull, 1);
+  configured = true;
+}
+
+static void app_flash_cs_assert(void)
+{
+  GPIO_PinOutClear(gpioPortB, 11);
+}
+
+static void app_flash_cs_deassert(void)
+{
+  GPIO_PinOutSet(gpioPortB, 11);
 }
 
 
