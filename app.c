@@ -135,6 +135,7 @@ static void try_next_channel(void);
 static void configure_join_security(void);
 static bool log_basic_identity(void);
 static void app_flash_probe(void);
+static void app_flash_send_cmd(uint8_t cmd);
 
 /**
  * @brief Zigbee application init callback
@@ -300,6 +301,12 @@ static bool log_basic_identity(void)
 
 static void app_flash_probe(void)
 {
+  app_flash_send_cmd(0xFF); // Release from continuous read (safe no-op)
+  app_flash_send_cmd(0xAB); // Release from deep power-down
+  app_flash_send_cmd(0x66); // Reset enable
+  app_flash_send_cmd(0x99); // Reset memory
+  sl_sleeptimer_delay_millisecond(1);
+
   uint8_t tx[4] = {0x9F, 0x00, 0x00, 0x00};
   uint8_t rx[4] = {0};
 
@@ -328,6 +335,12 @@ static void app_flash_probe(void)
   if (status == ECODE_OK) {
     APP_DEBUG_PRINTF("SPI flash: SR2=0x%02X\n", rx[1]);
   }
+}
+
+static void app_flash_send_cmd(uint8_t cmd)
+{
+  uint8_t tx[1] = {cmd};
+  (void)SPIDRV_MTransmitB(sl_spidrv_exp_handle, tx, sizeof(tx));
 }
 
 
