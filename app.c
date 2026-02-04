@@ -136,11 +136,13 @@ static void try_next_channel(void);
 static void configure_join_security(void);
 static bool log_basic_identity(void);
 static void app_flash_probe(void);
-static void app_flash_send_cmd(uint8_t cmd);
 static void app_flash_enable_init(void);
-static void app_flash_cs_init(void);
-static void app_flash_cs_assert(void);
-static void app_flash_cs_deassert(void);
+static void app_flash_send_cmd(GPIO_Port_TypeDef port,
+                               unsigned int pin,
+                               uint8_t cmd);
+static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
+                                    unsigned int pin,
+                                    const char *label);
 
 /**
  * @brief Zigbee application init callback
@@ -307,57 +309,10 @@ static bool log_basic_identity(void)
 static void app_flash_probe(void)
 {
   app_flash_enable_init();
-  app_flash_cs_init();
-  app_flash_send_cmd(0xFF); // Release from continuous read (safe no-op)
-  app_flash_send_cmd(0xAB); // Release from deep power-down
-  app_flash_send_cmd(0x66); // Reset enable
-  app_flash_send_cmd(0x99); // Reset memory
-  sl_sleeptimer_delay_millisecond(1);
-
-  uint8_t tx[4] = {0x9F, 0x00, 0x00, 0x00};
-  uint8_t rx[4] = {0};
-
-  app_flash_cs_assert();
-  Ecode_t status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, sizeof(tx));
-  app_flash_cs_deassert();
-  if (status != ECODE_OK) {
-    APP_DEBUG_PRINTF("SPI flash: JEDEC read failed (0x%lx)\n",
-                     (unsigned long)status);
-    return;
+  // Try the standard ICC-1 CS first, then alternate PF3 (some modules)
+  if (!app_flash_probe_with_cs(gpioPortB, 11, "PB11")) {
+    (void)app_flash_probe_with_cs(gpioPortF, 3, "PF3");
   }
-
-  APP_DEBUG_PRINTF("SPI flash: JEDEC ID %02X %02X %02X\n",
-                   rx[1],
-                   rx[2],
-                   rx[3]);
-
-  tx[0] = 0x05; // Read Status Register-1
-  memset(rx, 0, sizeof(rx));
-  app_flash_cs_assert();
-  status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, 2);
-  app_flash_cs_deassert();
-  if (status == ECODE_OK) {
-    APP_DEBUG_PRINTF("SPI flash: SR1=0x%02X\n", rx[1]);
-  }
-
-  tx[0] = 0x35; // Read Status Register-2
-  memset(rx, 0, sizeof(rx));
-  app_flash_cs_assert();
-  status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, 2);
-  app_flash_cs_deassert();
-  if (status == ECODE_OK) {
-    APP_DEBUG_PRINTF("SPI flash: SR2=0x%02X\n", rx[1]);
-  }
-}
-
-static void app_flash_send_cmd(uint8_t cmd)
-{
-  app_flash_enable_init();
-  app_flash_cs_init();
-  uint8_t tx[1] = {cmd};
-  app_flash_cs_assert();
-  (void)SPIDRV_MTransmitB(sl_spidrv_exp_handle, tx, sizeof(tx));
-  app_flash_cs_deassert();
 }
 
 static void app_flash_enable_init(void)
@@ -372,24 +327,69 @@ static void app_flash_enable_init(void)
   configured = true;
 }
 
-static void app_flash_cs_init(void)
+static void app_flash_send_cmd(GPIO_Port_TypeDef port,
+                               unsigned int pin,
+                               uint8_t cmd)
 {
-  static bool configured = false;
-  if (configured) {
-    return;
+  app_flash_enable_init();
+  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
+  uint8_t tx[1] = {cmd};
+  GPIO_PinOutClear(port, pin);
+  (void)SPIDRV_MTransmitB(sl_spidrv_exp_handle, tx, sizeof(tx));
+  GPIO_PinOutSet(port, pin);
+}
+
+static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
+                                    unsigned int pin,
+                                    const char *label)
+{
+  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
+
+  app_flash_send_cmd(port, pin, 0xFF); // Release from continuous read (safe no-op)
+  app_flash_send_cmd(port, pin, 0xAB); // Release from deep power-down
+  app_flash_send_cmd(port, pin, 0x66); // Reset enable
+  app_flash_send_cmd(port, pin, 0x99); // Reset memory
+  sl_sleeptimer_delay_millisecond(1);
+
+  uint8_t tx[4] = {0x9F, 0x00, 0x00, 0x00};
+  uint8_t rx[4] = {0};
+
+  GPIO_PinOutClear(port, pin);
+  Ecode_t status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, sizeof(tx));
+  GPIO_PinOutSet(port, pin);
+  if (status != ECODE_OK) {
+    APP_DEBUG_PRINTF("SPI flash: JEDEC read failed (%s, 0x%lx)\n",
+                     label,
+                     (unsigned long)status);
+    return false;
   }
-  GPIO_PinModeSet(gpioPortB, 11, gpioModePushPull, 1);
-  configured = true;
-}
 
-static void app_flash_cs_assert(void)
-{
-  GPIO_PinOutClear(gpioPortB, 11);
-}
+  APP_DEBUG_PRINTF("SPI flash: JEDEC ID %02X %02X %02X (%s)\n",
+                   rx[1],
+                   rx[2],
+                   rx[3],
+                   label);
 
-static void app_flash_cs_deassert(void)
-{
-  GPIO_PinOutSet(gpioPortB, 11);
+  tx[0] = 0x05; // Read Status Register-1
+  memset(rx, 0, sizeof(rx));
+  GPIO_PinOutClear(port, pin);
+  status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, 2);
+  GPIO_PinOutSet(port, pin);
+  if (status == ECODE_OK) {
+    APP_DEBUG_PRINTF("SPI flash: SR1=0x%02X (%s)\n", rx[1], label);
+  }
+
+  tx[0] = 0x35; // Read Status Register-2
+  memset(rx, 0, sizeof(rx));
+  GPIO_PinOutClear(port, pin);
+  status = SPIDRV_MTransferB(sl_spidrv_exp_handle, tx, rx, 2);
+  GPIO_PinOutSet(port, pin);
+  if (status == ECODE_OK) {
+    APP_DEBUG_PRINTF("SPI flash: SR2=0x%02X (%s)\n", rx[1], label);
+  }
+
+  return !((rx[1] == 0x00 && rx[2] == 0x00 && rx[3] == 0x00)
+           || (rx[1] == 0xFF && rx[2] == 0xFF && rx[3] == 0xFF));
 }
 
 
