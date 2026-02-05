@@ -78,7 +78,8 @@
 
 // Bitrate: 4 MHz (conservative for reliable operation)
 // IS25LQ020B supports up to 104 MHz, but 4 MHz is sufficient and more reliable
-#define SL_USART_EXTFLASH_BITRATE             4000000
+#define SL_USART_EXTFLASH_FREQUENCY           4000000
+#define SL_USART_EXTFLASH_BITRATE             SL_USART_EXTFLASH_FREQUENCY
 
 // SPI Mode: Mode 0 (CPOL=0, CPHA=0)
 // Clock polarity: idle low
