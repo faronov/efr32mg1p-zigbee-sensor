@@ -321,12 +321,15 @@ static void app_flash_probe(void)
 {
   app_flash_enable_init();
 
-#if defined(SL_CATALOG_SPIDRV_EXP_PRESENT)
   static bool spidrv_inited = false;
   if (!spidrv_inited) {
     sl_spidrv_exp_init();
     spidrv_inited = true;
-    APP_DEBUG_PRINTF("SPI flash: SPIDRV exp init\n");
+    APP_DEBUG_PRINTF("SPI flash: SPIDRV exp init (handle=%p)\n",
+                     (void *)sl_spidrv_exp_handle);
+    APP_DEBUG_PRINTF("SPI flash: USART0 ROUTELOC0=0x%08lX ROUTEPEN=0x%08lX\n",
+                     (unsigned long)USART0->ROUTELOC0,
+                     (unsigned long)USART0->ROUTEPEN);
 #ifdef SL_SPIDRV_EXP_TX_LOC
     APP_DEBUG_PRINTF("SPI flash: SPIDRV loc tx=%u rx=%u clk=%u\n",
                      (unsigned)SL_SPIDRV_EXP_TX_LOC,
@@ -334,9 +337,6 @@ static void app_flash_probe(void)
                      (unsigned)SL_SPIDRV_EXP_CLK_LOC);
 #endif
   }
-#else
-  APP_DEBUG_PRINTF("SPI flash: SPIDRV exp not present\n");
-#endif
 
   // Try the standard ICC-1 CS first, then alternate PF3 (some modules)
   if (!app_flash_probe_with_cs(gpioPortB, 11, "PB11")) {
@@ -446,6 +446,7 @@ static void app_flash_force_usart_route(void)
   init.master = true;
   init.autoCsEnable = false;
   USART_InitSync(USART0, &init);
+  USART_Enable(USART0, usartEnable);
 
   USART0->ROUTELOC0 = (USART0->ROUTELOC0
                        & ~(_USART_ROUTELOC0_TXLOC_MASK
@@ -457,6 +458,10 @@ static void app_flash_force_usart_route(void)
   USART0->ROUTEPEN = USART_ROUTEPEN_TXPEN
                      | USART_ROUTEPEN_RXPEN
                      | USART_ROUTEPEN_CLKPEN;
+
+  GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0);
+  GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, 0);
+  GPIO_PinModeSet(gpioPortD, 14, gpioModeInput, 0);
 
   configured = true;
 }
