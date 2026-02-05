@@ -118,7 +118,7 @@ echo -e "${GREEN}✓${NC} Project generated successfully: $MAKEFILE_NAME"
 # Replace the USART SPI controller driver with our bit-bang implementation.
 SPI_DRIVER_REPL="$BOOTLOADER_DIR/src/spi_bitbang.c"
 if [ -f "$SPI_DRIVER_REPL" ]; then
-  for mk in "$BUILD_DIR"/*.mak "$BUILD_DIR"/*.Makefile; do
+  for mk in "$BUILD_DIR"/*.mak "$BUILD_DIR"/*.Makefile "$BUILD_DIR"/project/*.mak "$BUILD_DIR"/project/*.Makefile; do
     if [ -f "$mk" ] && grep -q "btl_driver_spi_controller_usart.c" "$mk"; then
       sed -i.bak "s|[^[:space:]]*btl_driver_spi_controller_usart.c|$SPI_DRIVER_REPL|g" "$mk"
     fi
