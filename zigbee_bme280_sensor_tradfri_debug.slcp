@@ -157,6 +157,7 @@ source:
   - path: src/app/app_sensor.c
   - path: src/app/app_config.c
   - path: src/drivers/hal_i2c.c
+  - path: src/drivers/hal_eeprom.c
   - path: src/drivers/bme280/bme280_min.c
   - path: src/drivers/battery.c
 
