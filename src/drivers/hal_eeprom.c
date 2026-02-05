@@ -4,16 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#ifndef EEPROM_SUCCESS
-#define EEPROM_SUCCESS 0
-#endif
-#ifndef EEPROM_ERR
-#define EEPROM_ERR 1
-#endif
-#ifndef EEPROM_ERR_INVALID_ADDR
-#define EEPROM_ERR_INVALID_ADDR 2
-#endif
-
 #define SPI_FLASH_SIZE_BYTES (256u * 1024u)
 #define SPI_FLASH_PAGE_SIZE 256u
 #define SPI_FLASH_SECTOR_SIZE 4096u
@@ -43,6 +33,17 @@ static void flash_gpio_init(void)
   GPIO_PinModeSet(FLASH_PORT_MISO, FLASH_PIN_MISO, gpioModeInput, 0);
   configured = true;
 }
+
+static const HalEepromInformationType halEepromInfoData = {
+  .version = 1,
+  .partSize = SPI_FLASH_SIZE_BYTES,
+  .pageSize = SPI_FLASH_PAGE_SIZE,
+  .erasedMemValue = 0xFF,
+  .capabilitiesMask = EEPROM_CAPABILITIES_ERASE_SUPPORTED
+                      | EEPROM_CAPABILITIES_PAGE_ERASE,
+  .pageEraseMs = 50,
+  .partEraseMs = 2000,
+};
 
 static inline void flash_cs_low(void)
 {
@@ -219,6 +220,5 @@ uint8_t halEepromShutdown(void)
 
 const HalEepromInformationType *halEepromInfo(void)
 {
-  return NULL;
+  return &halEepromInfoData;
 }
-
