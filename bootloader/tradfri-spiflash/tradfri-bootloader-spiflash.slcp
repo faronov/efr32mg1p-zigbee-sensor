@@ -29,7 +29,7 @@ component:
   - id: bootloader_spiflash_storage
 
   # SPI controller driver for flash communication
-  # NOTE: USART SPI routing does not work on TRÅDFRI pins; use custom bit-bang driver.
+  - id: bootloader_spi_controller_usart_driver
 
   # Image parser for application images
   - id: bootloader_image_parser
@@ -88,9 +88,6 @@ define:
 toolchain_settings:
   - option: gcc_linker_option
     value: -Wl,--no-warn-rwx-segments
-
-source:
-  - path: src/spi_bitbang.c
 
 readme:
   - path: README_BOOTLOADER.md

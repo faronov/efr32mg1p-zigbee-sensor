@@ -26,7 +26,7 @@ This bootloader enables Over-The-Air (OTA) firmware updates by:
 | MOSI | PD15 | Port D, Pin 15 | 3 |
 | CS | PB11 | Port B, Pin 11 | 6 |
 
-**SPI Controller**: GPIO bit-bang (USART SPI routing is not available on these pins)
+**SPI Controller**: USART1 hardware SPI (RXLOC21/TXLOC23/CLKLOC19)
 
 ### Optional GPIO
 
@@ -217,7 +217,7 @@ Hold button (PB13) during power-up to enter bootloader mode:
 4. Test with logic analyzer if available
 
 **Solutions**:
-- Check `src/spi_bitbang.c` pin assignments
+- Check `config/btl_spi_peripheral_usart_driver_cfg.h` pin/LOC assignments
 - Ensure PF3 is driven high to enable the flash
 - Ensure no conflicts with application GPIO usage
 
@@ -262,21 +262,21 @@ commander flash known_good_firmware.s37 --device EFR32MG1P132F256GM32
 
 - **tradfri-bootloader-spiflash.slcp** - Project configuration
 - **config/btl_spiflash_storage_cfg.h** - Flash chip configuration
-- **src/spi_bitbang.c** - SPI pin configuration and GPIO bit-bang driver
+- **config/btl_spi_peripheral_usart_driver_cfg.h** - SPI pin and LOC configuration
 
 ### Customization
 
 To modify for different hardware:
 
-1. **Different SPI pins**: Edit `src/spi_bitbang.c`
+1. **Different SPI pins**: Edit `config/btl_spi_peripheral_usart_driver_cfg.h`
 2. **Different flash chip**: Edit `btl_spiflash_storage_cfg.h`
 3. **Different device**: Update `device:` in .slcp file
 
 ## Version History
 
-- **v1.1.0** - Bit-bang SPI bootloader
+- **v1.1.1** - USART1 SPI routing update
   - IS25LQ020B 256KB flash support
-  - GPIO bit-bang SPI controller
+  - Hardware SPI via USART1 LOCs RX=21 / TX=23 / CLK=19
   - Single OTA slot (256KB)
 
 ## References
