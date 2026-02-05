@@ -26,7 +26,7 @@ This bootloader enables Over-The-Air (OTA) firmware updates by:
 | MOSI | PD15 | Port D, Pin 15 | 3 |
 | CS | PB11 | Port B, Pin 11 | 6 |
 
-**USART Configuration**: USART0, Location 4 (LOC4)
+**SPI Controller**: GPIO bit-bang (USART SPI routing is not available on these pins)
 
 ### Optional GPIO
 
@@ -159,7 +159,7 @@ commander bootloader info --device EFR32MG1P132F256GM32
 If flash not detected, check:
 1. SPI pin connections
 2. Flash chip power (3.3V)
-3. USART location configuration (LOC4)
+3. PF3 flash enable pin state (must be high)
 
 ## Using the Bootloader
 
@@ -203,9 +203,6 @@ Hold button (PB13) during power-up to enter bootloader mode:
 
 ### Bootloader Won't Build
 
-**Error**: `USART location not found`
-- **Solution**: Verify LOC4 is correct for PD13/14/15 in datasheet
-
 **Error**: `Flash configuration invalid`
 - **Solution**: Check `btl_spiflash_storage_cfg.h` values match IS25LQ020B specs
 
@@ -220,8 +217,8 @@ Hold button (PB13) during power-up to enter bootloader mode:
 4. Test with logic analyzer if available
 
 **Solutions**:
-- Check `btl_spi_peripheral_usart_driver_cfg.h` pin assignments
-- Verify USART0 LOC4 routing in datasheet
+- Check `src/spi_bitbang.c` pin assignments
+- Ensure PF3 is driven high to enable the flash
 - Ensure no conflicts with application GPIO usage
 
 ### OTA Update Fails
@@ -265,21 +262,21 @@ commander flash known_good_firmware.s37 --device EFR32MG1P132F256GM32
 
 - **tradfri-bootloader-spiflash.slcp** - Project configuration
 - **config/btl_spiflash_storage_cfg.h** - Flash chip configuration
-- **config/btl_spi_peripheral_usart_driver_cfg.h** - SPI pin configuration
+- **src/spi_bitbang.c** - SPI pin configuration and GPIO bit-bang driver
 
 ### Customization
 
 To modify for different hardware:
 
-1. **Different SPI pins**: Edit `btl_spi_peripheral_usart_driver_cfg.h`
+1. **Different SPI pins**: Edit `src/spi_bitbang.c`
 2. **Different flash chip**: Edit `btl_spiflash_storage_cfg.h`
 3. **Different device**: Update `device:` in .slcp file
 
 ## Version History
 
-- **v1.0.0** - Initial release for TRÅDFRI board
+- **v1.1.0** - Bit-bang SPI bootloader
   - IS25LQ020B 256KB flash support
-  - USART0 LOC4 configuration
+  - GPIO bit-bang SPI controller
   - Single OTA slot (256KB)
 
 ## References
