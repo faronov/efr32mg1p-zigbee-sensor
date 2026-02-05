@@ -155,6 +155,10 @@ static void app_flash_usart_set_loc(uint8_t loc);
 static void app_flash_force_usart1_route(void);
 static void app_flash_usart1_set_loc(uint8_t loc);
 #endif
+#if defined(USART2)
+static void app_flash_force_usart2_route(void);
+static void app_flash_usart2_set_loc(uint8_t loc);
+#endif
 static void app_flash_bb_init(void);
 static uint8_t app_flash_bb_transfer(uint8_t out);
 static void app_flash_probe_bitbang(GPIO_Port_TypeDef port,
@@ -168,6 +172,11 @@ static void app_flash_probe_usart_loc_scan(GPIO_Port_TypeDef port,
                                            const char *label);
 #if defined(USART1)
 static void app_flash_probe_usart1_loc_scan(GPIO_Port_TypeDef port,
+                                            unsigned int pin,
+                                            const char *label);
+#endif
+#if defined(USART2)
+static void app_flash_probe_usart2_loc_scan(GPIO_Port_TypeDef port,
                                             unsigned int pin,
                                             const char *label);
 #endif
@@ -381,6 +390,10 @@ static void app_flash_probe(void)
   // Try USART1 as well in case PD13/14/15 are routed there.
   app_flash_probe_usart1_loc_scan(gpioPortB, 11, "PB11");
 #endif
+#if defined(USART2)
+  // Try USART2 as well in case PD13/14/15 are routed there.
+  app_flash_probe_usart2_loc_scan(gpioPortB, 11, "PB11");
+#endif
 }
 
 static void app_flash_enable_init(void)
@@ -541,6 +554,47 @@ static void app_flash_usart1_set_loc(uint8_t loc)
                      | USART_ROUTEPEN_CLKPEN;
 }
 #endif
+
+#if defined(USART2)
+static void app_flash_force_usart2_route(void)
+{
+  static bool configured = false;
+  if (configured) {
+    return;
+  }
+
+  CMU_ClockEnable(cmuClock_USART2, true);
+  USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
+  init.baudrate = 1000000;
+  init.clockMode = usartClockMode0;
+  init.msbf = true;
+  init.master = true;
+  init.autoCsEnable = false;
+  USART_InitSync(USART2, &init);
+  USART_Enable(USART2, usartEnable);
+
+  GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0);
+  GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, 0);
+  GPIO_PinModeSet(gpioPortD, 14, gpioModeInput, 0);
+
+  configured = true;
+}
+
+static void app_flash_usart2_set_loc(uint8_t loc)
+{
+  uint32_t loc_val = ((uint32_t)loc << _USART_ROUTELOC0_TXLOC_SHIFT)
+                     | ((uint32_t)loc << _USART_ROUTELOC0_RXLOC_SHIFT)
+                     | ((uint32_t)loc << _USART_ROUTELOC0_CLKLOC_SHIFT);
+  USART2->ROUTELOC0 = (USART2->ROUTELOC0
+                       & ~(_USART_ROUTELOC0_TXLOC_MASK
+                           | _USART_ROUTELOC0_RXLOC_MASK
+                           | _USART_ROUTELOC0_CLKLOC_MASK))
+                      | loc_val;
+  USART2->ROUTEPEN = USART_ROUTEPEN_TXPEN
+                     | USART_ROUTEPEN_RXPEN
+                     | USART_ROUTEPEN_CLKPEN;
+}
+#endif
 static void app_flash_bb_init(void)
 {
   GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0); // CLK
@@ -665,6 +719,33 @@ static void app_flash_probe_usart1_loc_scan(GPIO_Port_TypeDef port,
     uint8_t b2 = USART_SpiTransfer(USART1, 0x00);
     GPIO_PinOutSet(port, pin);
     APP_DEBUG_PRINTF("SPI flash (usart1 loc%u): JEDEC ID %02X %02X %02X (%s)\n",
+                     (unsigned)loc,
+                     b0,
+                     b1,
+                     b2,
+                     label);
+  }
+}
+#endif
+
+#if defined(USART2)
+static void app_flash_probe_usart2_loc_scan(GPIO_Port_TypeDef port,
+                                            unsigned int pin,
+                                            const char *label)
+{
+  app_flash_enable_init();
+  app_flash_force_usart2_route();
+  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
+
+  for (uint8_t loc = 0; loc <= 7; loc++) {
+    app_flash_usart2_set_loc(loc);
+    GPIO_PinOutClear(port, pin);
+    (void)USART_SpiTransfer(USART2, 0x9F);
+    uint8_t b0 = USART_SpiTransfer(USART2, 0x00);
+    uint8_t b1 = USART_SpiTransfer(USART2, 0x00);
+    uint8_t b2 = USART_SpiTransfer(USART2, 0x00);
+    GPIO_PinOutSet(port, pin);
+    APP_DEBUG_PRINTF("SPI flash (usart2 loc%u): JEDEC ID %02X %02X %02X (%s)\n",
                      (unsigned)loc,
                      b0,
                      b1,
