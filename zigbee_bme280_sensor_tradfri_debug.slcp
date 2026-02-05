@@ -22,12 +22,11 @@ component:
   # Identify cluster support (LED blink when identified)
   - id: zigbee_identify
 
-  # OTA bootloader support (DISABLED for testing - SPI flash not responding)
-  # - id: zigbee_ota_client_policy
-  # - id: zigbee_ota_storage_simple
-  # - id: zigbee_ota_storage_simple_eeprom
+  # OTA bootloader support
+  - id: zigbee_ota_client_policy
+  - id: zigbee_ota_storage_simple
+  - id: zigbee_ota_storage_simple_eeprom
   - id: bootloader_interface
-  # Note: SPIDRV kept for stack compatibility, but OTA storage disabled
   # Flash power management handled by SPIDRV component
   - id: spidrv
     instance:
@@ -121,8 +120,8 @@ configuration:
 
   # SPI Flash configuration for IS25LQ020B (256KB) on TRÅDFRI
   # SPI pins: PB11 (CS), PD15 (MOSI), PD14 (MISO), PD13 (CLK)
-  # CRITICAL: USART1 LOCs RX=21 / TX=23 / CLK=19 required for PD13/14/15
-  # NOTE: SPIDRV initialized but OTA storage disabled (flash not responding)
+  # CRITICAL: USART0 LOCs RX=21 / TX=23 / CLK=19 required for PD13/14/15
+  # NOTE: SPIDRV initialized for OTA storage support
   - name: SL_SPIDRV_EXP_BITRATE
     value: 1000000
   - name: SL_SPIDRV_EXP_CS_PORT
@@ -143,13 +142,13 @@ configuration:
     value: 14
   # CS control mode (0 = spidrvCsControlAuto - driver controls CS)
   - name: SL_SPIDRV_EXP_CS_CONTROL
-    value: 1
+    value: 0
 
-  # OTA storage configuration DISABLED - SPI flash not responding
-  # - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_START
-  #   value: 0
-  # - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_END
-  #   value: 262144  # 256KB (2Mbit flash)
+  # OTA storage configuration for IS25LQ020B (256KB external flash)
+  - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_START
+    value: 0
+  - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_END
+    value: 262144  # 256KB (2Mbit flash)
 
 source:
   - path: main.c
@@ -206,7 +205,7 @@ define:
   - name: APP_DEBUG_FORCE_AF_INIT
     value: 1
   - name: APP_DEBUG_SPI_ONLY
-    value: 1
+    value: 0
 
   # Increase event queue capacity for Series 1 (fixes event-queue.c:294 crash)
   # Series 1 has limited RAM (32KB) and smaller default event queue

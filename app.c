@@ -14,7 +14,6 @@
 #include "sl_sleeptimer.h"
 #include "em_cmu.h"
 #include "em_gpio.h"
-#include "em_usart.h"
 #include "sl_spidrv_instances.h"
 #include <stdio.h>
 #include <string.h>
@@ -149,32 +148,6 @@ static void app_flash_send_cmd(GPIO_Port_TypeDef port,
 static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
                                     unsigned int pin,
                                     const char *label);
-static void app_flash_config_usart(USART_ClockMode_TypeDef mode,
-                                   uint32_t baudrate,
-                                   uint32_t tx_loc,
-                                   uint32_t rx_loc,
-                                   uint32_t clk_loc);
-static void app_flash_config_usart0(USART_ClockMode_TypeDef mode,
-                                    uint32_t baudrate,
-                                    uint32_t tx_loc,
-                                    uint32_t rx_loc,
-                                    uint32_t clk_loc);
-static void app_flash_read_jedec_usart(GPIO_Port_TypeDef port,
-                                       unsigned int pin,
-                                       const char *label,
-                                       const char *route_tag);
-static void app_flash_read_jedec_usart0(GPIO_Port_TypeDef port,
-                                        unsigned int pin,
-                                        const char *label,
-                                        const char *route_tag);
-static void app_flash_bb_init(void);
-static uint8_t app_flash_bb_transfer(uint8_t out);
-static void app_flash_probe_bitbang(GPIO_Port_TypeDef port,
-                                    unsigned int pin,
-                                    const char *label);
-static void app_flash_probe_usart(GPIO_Port_TypeDef port,
-                                  unsigned int pin,
-                                  const char *label);
 
 /**
  * @brief Zigbee application init callback
@@ -375,18 +348,9 @@ static void app_flash_probe(void)
 #endif
   }
 
-  // Try the standard ICC-1 CS first, then alternate PF3 (some modules)
   if (!app_flash_probe_with_cs(gpioPortB, 11, "PB11")) {
-    (void)app_flash_probe_with_cs(gpioPortF, 3, "PF3");
+    APP_DEBUG_PRINTF("SPI flash: no response on PB11\n");
   }
-
-  // Bit-bang fallback to validate pin routing independent of USART LOCs.
-  app_flash_probe_bitbang(gpioPortB, 11, "PB11");
-  app_flash_probe_bitbang(gpioPortF, 3, "PF3");
-
-  // Direct USART probe to confirm HW SPI without SPIDRV.
-  app_flash_probe_usart(gpioPortB, 11, "PB11");
-  app_flash_probe_usart(gpioPortF, 3, "PF3");
 }
 
 static void app_flash_enable_init(void)
@@ -417,11 +381,6 @@ static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
                                     unsigned int pin,
                                     const char *label)
 {
-  app_flash_config_usart(usartClockMode0,
-                         500000,
-                         USART_ROUTELOC0_TXLOC_LOC23,
-                         USART_ROUTELOC0_RXLOC_LOC21,
-                         USART_ROUTELOC0_CLKLOC_LOC19);
   GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
 
   app_flash_send_cmd(port, pin, 0xFF); // Release from continuous read (safe no-op)
@@ -469,214 +428,6 @@ static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
 
   return !((rx[1] == 0x00 && rx[2] == 0x00 && rx[3] == 0x00)
            || (rx[1] == 0xFF && rx[2] == 0xFF && rx[3] == 0xFF));
-}
-
-static void app_flash_config_usart(USART_ClockMode_TypeDef mode,
-                                   uint32_t baudrate,
-                                   uint32_t tx_loc,
-                                   uint32_t rx_loc,
-                                   uint32_t clk_loc)
-{
-  static bool clocked = false;
-  if (!clocked) {
-    CMU_ClockEnable(cmuClock_HFPER, true);
-    CMU_ClockEnable(cmuClock_USART1, true);
-    GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0);
-    GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, 0);
-    GPIO_PinModeSet(gpioPortD, 14, gpioModeInputPull, 0);
-    clocked = true;
-  }
-
-  USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
-  init.baudrate = baudrate;
-  init.clockMode = mode;
-  init.msbf = true;
-  init.master = true;
-  init.autoCsEnable = false;
-  USART_InitSync(USART1, &init);
-  USART1->ROUTELOC0 = (USART1->ROUTELOC0
-                       & ~(_USART_ROUTELOC0_TXLOC_MASK
-                           | _USART_ROUTELOC0_RXLOC_MASK
-                           | _USART_ROUTELOC0_CLKLOC_MASK))
-                      | tx_loc
-                      | rx_loc
-                      | clk_loc;
-  USART1->ROUTEPEN = USART_ROUTEPEN_TXPEN
-                     | USART_ROUTEPEN_RXPEN
-                     | USART_ROUTEPEN_CLKPEN;
-  USART_Enable(USART1, usartEnable);
-}
-static void app_flash_bb_init(void)
-{
-  GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0); // CLK
-  GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, 0); // MOSI
-  GPIO_PinModeSet(gpioPortD, 14, gpioModeInput, 0);    // MISO
-}
-
-static uint8_t app_flash_bb_transfer(uint8_t out)
-{
-  uint8_t in = 0;
-  for (int bit = 7; bit >= 0; bit--) {
-    if (out & (1u << bit)) {
-      GPIO_PinOutSet(gpioPortD, 15);
-    } else {
-      GPIO_PinOutClear(gpioPortD, 15);
-    }
-
-    // Small delay to meet setup time.
-    for (volatile int d = 0; d < 20; d++) {
-      __NOP();
-    }
-
-    GPIO_PinOutSet(gpioPortD, 13);
-    if (GPIO_PinInGet(gpioPortD, 14)) {
-      in |= (1u << bit);
-    }
-
-    for (volatile int d = 0; d < 20; d++) {
-      __NOP();
-    }
-
-    GPIO_PinOutClear(gpioPortD, 13);
-  }
-  return in;
-}
-
-static void app_flash_probe_bitbang(GPIO_Port_TypeDef port,
-                                    unsigned int pin,
-                                    const char *label)
-{
-  app_flash_enable_init();
-  app_flash_bb_init();
-  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
-
-  GPIO_PinOutClear(port, pin);
-  (void)app_flash_bb_transfer(0x9F);
-  uint8_t b0 = app_flash_bb_transfer(0x00);
-  uint8_t b1 = app_flash_bb_transfer(0x00);
-  uint8_t b2 = app_flash_bb_transfer(0x00);
-  GPIO_PinOutSet(port, pin);
-
-  APP_DEBUG_PRINTF("SPI flash (bitbang): JEDEC ID %02X %02X %02X (%s)\n",
-                   b0,
-                   b1,
-                   b2,
-                   label);
-}
-
-static void app_flash_probe_usart(GPIO_Port_TypeDef port,
-                                  unsigned int pin,
-                                  const char *label)
-{
-  app_flash_config_usart(usartClockMode0,
-                         500000,
-                         USART_ROUTELOC0_TXLOC_LOC23,
-                         USART_ROUTELOC0_RXLOC_LOC21,
-                         USART_ROUTELOC0_CLKLOC_LOC19);
-  app_flash_read_jedec_usart(port, pin, label, "tx23/rx21");
-
-  app_flash_config_usart(usartClockMode0,
-                         500000,
-                         USART_ROUTELOC0_TXLOC_LOC21,
-                         USART_ROUTELOC0_RXLOC_LOC23,
-                         USART_ROUTELOC0_CLKLOC_LOC19);
-  app_flash_read_jedec_usart(port, pin, label, "tx21/rx23");
-
-  app_flash_config_usart0(usartClockMode0,
-                          500000,
-                          USART_ROUTELOC0_TXLOC_LOC23,
-                          USART_ROUTELOC0_RXLOC_LOC21,
-                          USART_ROUTELOC0_CLKLOC_LOC19);
-  app_flash_read_jedec_usart0(port, pin, label, "u0 tx23/rx21");
-
-  app_flash_config_usart0(usartClockMode0,
-                          500000,
-                          USART_ROUTELOC0_TXLOC_LOC21,
-                          USART_ROUTELOC0_RXLOC_LOC23,
-                          USART_ROUTELOC0_CLKLOC_LOC19);
-  app_flash_read_jedec_usart0(port, pin, label, "u0 tx21/rx23");
-}
-
-static void app_flash_read_jedec_usart(GPIO_Port_TypeDef port,
-                                       unsigned int pin,
-                                       const char *label,
-                                       const char *route_tag)
-{
-  app_flash_enable_init();
-  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
-
-  GPIO_PinOutClear(port, pin);
-  (void)USART_SpiTransfer(USART1, 0x9F);
-  uint8_t b0 = USART_SpiTransfer(USART1, 0x00);
-  uint8_t b1 = USART_SpiTransfer(USART1, 0x00);
-  uint8_t b2 = USART_SpiTransfer(USART1, 0x00);
-  GPIO_PinOutSet(port, pin);
-
-  APP_DEBUG_PRINTF("SPI flash (usart1 %s): JEDEC ID %02X %02X %02X (%s)\n",
-                   route_tag,
-                   b0,
-                   b1,
-                   b2,
-                   label);
-}
-
-static void app_flash_read_jedec_usart0(GPIO_Port_TypeDef port,
-                                        unsigned int pin,
-                                        const char *label,
-                                        const char *route_tag)
-{
-  app_flash_enable_init();
-  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
-
-  GPIO_PinOutClear(port, pin);
-  (void)USART_SpiTransfer(USART0, 0x9F);
-  uint8_t b0 = USART_SpiTransfer(USART0, 0x00);
-  uint8_t b1 = USART_SpiTransfer(USART0, 0x00);
-  uint8_t b2 = USART_SpiTransfer(USART0, 0x00);
-  GPIO_PinOutSet(port, pin);
-
-  APP_DEBUG_PRINTF("SPI flash (usart0 %s): JEDEC ID %02X %02X %02X (%s)\n",
-                   route_tag,
-                   b0,
-                   b1,
-                   b2,
-                   label);
-}
-
-static void app_flash_config_usart0(USART_ClockMode_TypeDef mode,
-                                    uint32_t baudrate,
-                                    uint32_t tx_loc,
-                                    uint32_t rx_loc,
-                                    uint32_t clk_loc)
-{
-  static bool clocked = false;
-  if (!clocked) {
-    CMU_ClockEnable(cmuClock_HFPER, true);
-    CMU_ClockEnable(cmuClock_USART0, true);
-    GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0);
-    GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, 0);
-    GPIO_PinModeSet(gpioPortD, 14, gpioModeInputPull, 0);
-    clocked = true;
-  }
-
-  USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
-  init.baudrate = baudrate;
-  init.clockMode = mode;
-  init.msbf = true;
-  init.master = true;
-  init.autoCsEnable = false;
-  USART_InitSync(USART0, &init);
-  USART0->ROUTELOC0 = (USART0->ROUTELOC0
-                       & ~(_USART_ROUTELOC0_TXLOC_MASK
-                           | _USART_ROUTELOC0_RXLOC_MASK
-                           | _USART_ROUTELOC0_CLKLOC_MASK))
-                      | tx_loc
-                      | rx_loc
-                      | clk_loc;
-  USART0->ROUTEPEN = USART_ROUTEPEN_TXPEN
-                     | USART_ROUTEPEN_RXPEN
-                     | USART_ROUTEPEN_CLKPEN;
-  USART_Enable(USART0, usartEnable);
 }
 
 
