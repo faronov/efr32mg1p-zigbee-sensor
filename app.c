@@ -19,6 +19,10 @@
 #include <stdio.h>
 #include <string.h>
 
+// Optional SPIDRV init symbols (generated when SPIDRV component is present).
+__attribute__((weak)) void sl_spidrv_exp_init(void);
+__attribute__((weak)) void sl_spidrv_init_instances(void);
+
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
 #include "sl_simple_button_instances.h"
 #endif
@@ -323,7 +327,13 @@ static void app_flash_probe(void)
 
   static bool spidrv_inited = false;
   if (!spidrv_inited) {
-    sl_spidrv_exp_init();
+    if (sl_spidrv_exp_init != NULL) {
+      sl_spidrv_exp_init();
+    } else if (sl_spidrv_init_instances != NULL) {
+      sl_spidrv_init_instances();
+    } else {
+      APP_DEBUG_PRINTF("SPI flash: SPIDRV init symbol missing\n");
+    }
     spidrv_inited = true;
     APP_DEBUG_PRINTF("SPI flash: SPIDRV exp init (handle=%p)\n",
                      (void *)sl_spidrv_exp_handle);
