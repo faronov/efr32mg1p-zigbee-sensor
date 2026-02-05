@@ -116,12 +116,11 @@ MAKEFILE_NAME=$(basename "$MAKEFILE")
 echo -e "${GREEN}✓${NC} Project generated successfully: $MAKEFILE_NAME"
 
 # Replace the USART SPI controller driver with our bit-bang implementation.
-SPI_DRIVER_SRC="$GSDK_DIR/platform/bootloader/driver/btl_driver_spi_controller_usart.c"
 SPI_DRIVER_REPL="$BOOTLOADER_DIR/src/spi_bitbang.c"
 if [ -f "$SPI_DRIVER_REPL" ]; then
   for mk in "$BUILD_DIR"/*.mak "$BUILD_DIR"/*.Makefile; do
-    if [ -f "$mk" ] && grep -q "$SPI_DRIVER_SRC" "$mk"; then
-      sed -i.bak "s|$SPI_DRIVER_SRC|$SPI_DRIVER_REPL|g" "$mk"
+    if [ -f "$mk" ] && grep -q "btl_driver_spi_controller_usart.c" "$mk"; then
+      sed -i.bak "s|[^[:space:]]*btl_driver_spi_controller_usart.c|$SPI_DRIVER_REPL|g" "$mk"
     fi
   done
 fi

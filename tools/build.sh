@@ -176,7 +176,7 @@ cp "$PROJECT_ROOT/src/drivers/"*.c "$FIRMWARE_DIR/src/drivers/" 2>/dev/null || t
 cp "$PROJECT_ROOT/src/drivers/"*.h "$FIRMWARE_DIR/src/drivers/" 2>/dev/null || true
 cp "$PROJECT_ROOT/src/drivers/bme280/"*.c "$FIRMWARE_DIR/src/drivers/bme280/" 2>/dev/null || true
 cp "$PROJECT_ROOT/src/drivers/bme280/"*.h "$FIRMWARE_DIR/src/drivers/bme280/" 2>/dev/null || true
-cp "$PROJECT_ROOT/include/"*.h "$FIRMWARE_DIR/include/" 2>/dev/null || true
+cp -R "$PROJECT_ROOT/include/"* "$FIRMWARE_DIR/include/" 2>/dev/null || true
 
 echo -e "${GREEN}✓${NC} Custom source files copied"
 
