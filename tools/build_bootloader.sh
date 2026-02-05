@@ -115,9 +115,16 @@ fi
 MAKEFILE_NAME=$(basename "$MAKEFILE")
 echo -e "${GREEN}✓${NC} Project generated successfully: $MAKEFILE_NAME"
 
-# Suppress noisy config #warning lines in generated headers.
+# Replace generated config headers with project overrides.
 CONFIG_DIR="$BUILD_DIR/config"
 if [ -d "$CONFIG_DIR" ]; then
+  for cfg in btl_spi_controller_usart_driver_cfg.h btl_spiflash_storage_cfg.h; do
+    if [ -f "$BOOTLOADER_DIR/config/$cfg" ]; then
+      cp "$BOOTLOADER_DIR/config/$cfg" "$CONFIG_DIR/$cfg"
+    fi
+  done
+
+  # Suppress noisy config #warning lines in generated headers.
   for cfg in btl_spi_controller_usart_driver_cfg.h; do
     if [ -f "$CONFIG_DIR/$cfg" ]; then
       sed -i.bak 's/^#warning /\/\/ #warning /' "$CONFIG_DIR/$cfg"
