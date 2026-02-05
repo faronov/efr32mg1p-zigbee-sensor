@@ -151,6 +151,9 @@ static uint8_t app_flash_bb_transfer(uint8_t out);
 static void app_flash_probe_bitbang(GPIO_Port_TypeDef port,
                                     unsigned int pin,
                                     const char *label);
+static void app_flash_probe_usart(GPIO_Port_TypeDef port,
+                                  unsigned int pin,
+                                  const char *label);
 
 /**
  * @brief Zigbee application init callback
@@ -331,6 +334,8 @@ static void app_flash_probe(void)
                      (unsigned)SL_SPIDRV_EXP_CLK_LOC);
 #endif
   }
+#else
+  APP_DEBUG_PRINTF("SPI flash: SPIDRV exp not present\n");
 #endif
 
   // Try the standard ICC-1 CS first, then alternate PF3 (some modules)
@@ -341,6 +346,10 @@ static void app_flash_probe(void)
   // Bit-bang fallback to validate pin routing independent of USART LOCs.
   app_flash_probe_bitbang(gpioPortB, 11, "PB11");
   app_flash_probe_bitbang(gpioPortF, 3, "PF3");
+
+  // Direct USART probe to confirm HW SPI without SPIDRV.
+  app_flash_probe_usart(gpioPortB, 11, "PB11");
+  app_flash_probe_usart(gpioPortF, 3, "PF3");
 }
 
 static void app_flash_enable_init(void)
@@ -504,6 +513,28 @@ static void app_flash_probe_bitbang(GPIO_Port_TypeDef port,
   GPIO_PinOutSet(port, pin);
 
   APP_DEBUG_PRINTF("SPI flash (bitbang): JEDEC ID %02X %02X %02X (%s)\n",
+                   b0,
+                   b1,
+                   b2,
+                   label);
+}
+
+static void app_flash_probe_usart(GPIO_Port_TypeDef port,
+                                  unsigned int pin,
+                                  const char *label)
+{
+  app_flash_enable_init();
+  app_flash_force_usart_route();
+  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
+
+  GPIO_PinOutClear(port, pin);
+  (void)USART_SpiTransfer(USART0, 0x9F);
+  uint8_t b0 = USART_SpiTransfer(USART0, 0x00);
+  uint8_t b1 = USART_SpiTransfer(USART0, 0x00);
+  uint8_t b2 = USART_SpiTransfer(USART0, 0x00);
+  GPIO_PinOutSet(port, pin);
+
+  APP_DEBUG_PRINTF("SPI flash (usart): JEDEC ID %02X %02X %02X (%s)\n",
                    b0,
                    b1,
                    b2,
