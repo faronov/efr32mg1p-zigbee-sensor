@@ -13,7 +13,9 @@
 #include "stack/include/security.h"
 #include "sl_sleeptimer.h"
 #include "sl_spidrv_instances.h"
+#include "em_cmu.h"
 #include "em_gpio.h"
+#include "em_usart.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -143,6 +145,7 @@ static void app_flash_send_cmd(GPIO_Port_TypeDef port,
 static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
                                     unsigned int pin,
                                     const char *label);
+static void app_flash_force_usart_route(void);
 static void app_flash_bb_init(void);
 static uint8_t app_flash_bb_transfer(uint8_t out);
 static void app_flash_probe_bitbang(GPIO_Port_TypeDef port,
@@ -352,6 +355,7 @@ static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
                                     unsigned int pin,
                                     const char *label)
 {
+  app_flash_force_usart_route();
   GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
 
   app_flash_send_cmd(port, pin, 0xFF); // Release from continuous read (safe no-op)
@@ -399,6 +403,37 @@ static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
 
   return !((rx[1] == 0x00 && rx[2] == 0x00 && rx[3] == 0x00)
            || (rx[1] == 0xFF && rx[2] == 0xFF && rx[3] == 0xFF));
+}
+
+static void app_flash_force_usart_route(void)
+{
+  static bool configured = false;
+  if (configured) {
+    return;
+  }
+
+  // Ensure USART0 is routed to PD13/PD14/PD15 (LOC4) for SPI flash.
+  CMU_ClockEnable(cmuClock_USART0, true);
+  USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
+  init.baudrate = 1000000;
+  init.clockMode = usartClockMode0;
+  init.msbf = true;
+  init.master = true;
+  init.autoCsEnable = false;
+  USART_InitSync(USART0, &init);
+
+  USART0->ROUTELOC0 = (USART0->ROUTELOC0
+                       & ~(_USART_ROUTELOC0_TXLOC_MASK
+                           | _USART_ROUTELOC0_RXLOC_MASK
+                           | _USART_ROUTELOC0_CLKLOC_MASK))
+                      | (USART_ROUTELOC0_TXLOC_LOC4
+                         | USART_ROUTELOC0_RXLOC_LOC4
+                         | USART_ROUTELOC0_CLKLOC_LOC4);
+  USART0->ROUTEPEN = USART_ROUTEPEN_TXPEN
+                     | USART_ROUTEPEN_RXPEN
+                     | USART_ROUTEPEN_CLKPEN;
+
+  configured = true;
 }
 
 static void app_flash_bb_init(void)
