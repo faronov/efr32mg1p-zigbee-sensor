@@ -1,5 +1,5 @@
 /**
- * @file btl_spi_peripheral_usart_driver_cfg.h
+ * @file btl_spi_controller_usart_driver_cfg.h
  * @brief SPI Peripheral Driver Configuration for TRÅDFRI Board
  *
  * CRITICAL CONFIGURATION for IKEA TRÅDFRI board SPI flash communication.
@@ -14,8 +14,8 @@
  * USART Location: RXLOC21/TXLOC23/CLKLOC19 (for PD13/14/15 routing)
  */
 
-#ifndef BTL_SPI_PERIPHERAL_USART_DRIVER_CFG_H
-#define BTL_SPI_PERIPHERAL_USART_DRIVER_CFG_H
+#ifndef BTL_SPI_CONTROLLER_USART_DRIVER_CFG_H
+#define BTL_SPI_CONTROLLER_USART_DRIVER_CFG_H
 
 #include "em_device.h"
 #include "em_gpio.h"
@@ -170,4 +170,4 @@
   #error "TRÅDFRI CS must be on PB11"
 #endif
 
-#endif // BTL_SPI_PERIPHERAL_USART_DRIVER_CFG_H
+#endif // BTL_SPI_CONTROLLER_USART_DRIVER_CFG_H

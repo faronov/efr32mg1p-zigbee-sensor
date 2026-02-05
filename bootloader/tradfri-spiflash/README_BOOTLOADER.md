@@ -217,7 +217,7 @@ Hold button (PB13) during power-up to enter bootloader mode:
 4. Test with logic analyzer if available
 
 **Solutions**:
-- Check `config/btl_spi_peripheral_usart_driver_cfg.h` pin/LOC assignments
+- Check `config/btl_spi_controller_usart_driver_cfg.h` pin/LOC assignments
 - Ensure PF3 is driven high to enable the flash
 - Ensure no conflicts with application GPIO usage
 
@@ -262,13 +262,13 @@ commander flash known_good_firmware.s37 --device EFR32MG1P132F256GM32
 
 - **tradfri-bootloader-spiflash.slcp** - Project configuration
 - **config/btl_spiflash_storage_cfg.h** - Flash chip configuration
-- **config/btl_spi_peripheral_usart_driver_cfg.h** - SPI pin and LOC configuration
+- **config/btl_spi_controller_usart_driver_cfg.h** - SPI pin and LOC configuration
 
 ### Customization
 
 To modify for different hardware:
 
-1. **Different SPI pins**: Edit `config/btl_spi_peripheral_usart_driver_cfg.h`
+1. **Different SPI pins**: Edit `config/btl_spi_controller_usart_driver_cfg.h`
 2. **Different flash chip**: Edit `btl_spiflash_storage_cfg.h`
 3. **Different device**: Update `device:` in .slcp file
 
