@@ -11,7 +11,7 @@
  *   PD15 (Pin 3)  - SPI MOSI (TX)
  *   PB11 (Pin 6)  - SPI CS
  *
- * USART Location: LOC4 (for PD13/14/15 routing)
+ * USART Location: RXLOC21/TXLOC23/CLKLOC19 (for PD13/14/15 routing)
  */
 
 #ifndef BTL_SPI_PERIPHERAL_USART_DRIVER_CFG_H
@@ -21,12 +21,12 @@
 #include "em_gpio.h"
 
 // USART peripheral selection
-// TRÅDFRI uses USART0 for SPI flash communication
-#define SL_USART_EXTFLASH_PERIPHERAL          USART0
-#define SL_USART_EXTFLASH_PERIPHERAL_NO       0
+// TRÅDFRI uses USART1 for SPI flash communication
+#define SL_USART_EXTFLASH_PERIPHERAL          USART1
+#define SL_USART_EXTFLASH_PERIPHERAL_NO       1
 
 // Clock source configuration
-#define SL_USART_EXTFLASH_CLOCK               cmuClock_USART0
+#define SL_USART_EXTFLASH_CLOCK               cmuClock_USART1
 
 // ============================================================================
 // PIN CONFIGURATION - TRÅDFRI SPECIFIC
@@ -53,19 +53,15 @@
 // ============================================================================
 
 // For EFR32MG1 Series 1, USART routing uses location values
-// PD13/PD14/PD15 pins map to USART0 Location 4
-
-// USART0 LOC4 configuration for EFR32MG1P132:
-//   LOC4: TX=PD15, RX=PD14, CLK=PD13
+// PD13/PD14/PD15 pins map to USART1 with mixed LOC values:
+//   TX=PD15 (LOC23), RX=PD14 (LOC21), CLK=PD13 (LOC19)
 
 #if defined(_SILICON_LABS_32B_SERIES_1)
   // Series 1 uses ROUTELOC registers
-  #define SL_USART_EXTFLASH_ROUTE_LOC         4  // LOC4 for PD13/14/15
-
   // Build route location value
-  #define SL_USART_EXTFLASH_TX_LOC            _USART_ROUTELOC0_TXLOC_LOC4
-  #define SL_USART_EXTFLASH_RX_LOC            _USART_ROUTELOC0_RXLOC_LOC4
-  #define SL_USART_EXTFLASH_CLK_LOC           _USART_ROUTELOC0_CLKLOC_LOC4
+  #define SL_USART_EXTFLASH_TX_LOC            _USART_ROUTELOC0_TXLOC_LOC23
+  #define SL_USART_EXTFLASH_RX_LOC            _USART_ROUTELOC0_RXLOC_LOC21
+  #define SL_USART_EXTFLASH_CLK_LOC           _USART_ROUTELOC0_CLKLOC_LOC19
 
   // Combined location register value
   #define SL_USART_EXTFLASH_ROUTELOC          (SL_USART_EXTFLASH_TX_LOC  | \
@@ -155,9 +151,9 @@
 // VERIFICATION
 // ============================================================================
 
-// Compile-time verification that USART0 is selected
-#if (SL_USART_EXTFLASH_PERIPHERAL_NO != 0)
-  #error "TRÅDFRI bootloader requires USART0 for SPI flash"
+// Compile-time verification that USART1 is selected
+#if (SL_USART_EXTFLASH_PERIPHERAL_NO != 1)
+  #error "TRÅDFRI bootloader requires USART1 for SPI flash"
 #endif
 
 // Verify pin assignments match TRÅDFRI hardware

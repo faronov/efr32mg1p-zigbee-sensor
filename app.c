@@ -150,15 +150,6 @@ static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
                                     unsigned int pin,
                                     const char *label);
 static void app_flash_force_usart_route(void);
-static void app_flash_usart_set_loc(uint8_t loc);
-#if defined(USART1)
-static void app_flash_force_usart1_route(void);
-static void app_flash_usart1_set_loc(uint8_t loc);
-#endif
-#if defined(USART2)
-static void app_flash_force_usart2_route(void);
-static void app_flash_usart2_set_loc(uint8_t loc);
-#endif
 static void app_flash_bb_init(void);
 static uint8_t app_flash_bb_transfer(uint8_t out);
 static void app_flash_probe_bitbang(GPIO_Port_TypeDef port,
@@ -167,19 +158,6 @@ static void app_flash_probe_bitbang(GPIO_Port_TypeDef port,
 static void app_flash_probe_usart(GPIO_Port_TypeDef port,
                                   unsigned int pin,
                                   const char *label);
-static void app_flash_probe_usart_loc_scan(GPIO_Port_TypeDef port,
-                                           unsigned int pin,
-                                           const char *label);
-#if defined(USART1)
-static void app_flash_probe_usart1_loc_scan(GPIO_Port_TypeDef port,
-                                            unsigned int pin,
-                                            const char *label);
-#endif
-#if defined(USART2)
-static void app_flash_probe_usart2_loc_scan(GPIO_Port_TypeDef port,
-                                            unsigned int pin,
-                                            const char *label);
-#endif
 
 /**
  * @brief Zigbee application init callback
@@ -359,9 +337,11 @@ static void app_flash_probe(void)
     spidrv_inited = true;
     APP_DEBUG_PRINTF("SPI flash: SPIDRV exp init (handle=%p)\n",
                      (void *)sl_spidrv_exp_handle);
-    APP_DEBUG_PRINTF("SPI flash: USART0 ROUTELOC0=0x%08lX ROUTEPEN=0x%08lX\n",
-                     (unsigned long)USART0->ROUTELOC0,
-                     (unsigned long)USART0->ROUTEPEN);
+#if defined(USART1)
+    APP_DEBUG_PRINTF("SPI flash: USART1 ROUTELOC0=0x%08lX ROUTEPEN=0x%08lX\n",
+                     (unsigned long)USART1->ROUTELOC0,
+                     (unsigned long)USART1->ROUTEPEN);
+#endif
 #ifdef SL_SPIDRV_EXP_TX_LOC
     APP_DEBUG_PRINTF("SPI flash: SPIDRV loc tx=%u rx=%u clk=%u\n",
                      (unsigned)SL_SPIDRV_EXP_TX_LOC,
@@ -382,18 +362,6 @@ static void app_flash_probe(void)
   // Direct USART probe to confirm HW SPI without SPIDRV.
   app_flash_probe_usart(gpioPortB, 11, "PB11");
   app_flash_probe_usart(gpioPortF, 3, "PF3");
-
-  // Scan USART LOC values to find working route (debug).
-  app_flash_probe_usart_loc_scan(gpioPortB, 11, "PB11");
-
-#if defined(USART1)
-  // Try USART1 as well in case PD13/14/15 are routed there.
-  app_flash_probe_usart1_loc_scan(gpioPortB, 11, "PB11");
-#endif
-#if defined(USART2)
-  // Try USART2 as well in case PD13/14/15 are routed there.
-  app_flash_probe_usart2_loc_scan(gpioPortB, 11, "PB11");
-#endif
 }
 
 static void app_flash_enable_init(void)
@@ -481,47 +449,7 @@ static void app_flash_force_usart_route(void)
     return;
   }
 
-  // Ensure USART0 is routed to PD13/PD14/PD15 (LOC4) for SPI flash.
-  CMU_ClockEnable(cmuClock_USART0, true);
-  USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
-  init.baudrate = 1000000;
-  init.clockMode = usartClockMode0;
-  init.msbf = true;
-  init.master = true;
-  init.autoCsEnable = false;
-  USART_InitSync(USART0, &init);
-  USART_Enable(USART0, usartEnable);
-
-  GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0);
-  GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, 0);
-  GPIO_PinModeSet(gpioPortD, 14, gpioModeInput, 0);
-
-  configured = true;
-}
-
-static void app_flash_usart_set_loc(uint8_t loc)
-{
-  uint32_t loc_val = ((uint32_t)loc << _USART_ROUTELOC0_TXLOC_SHIFT)
-                     | ((uint32_t)loc << _USART_ROUTELOC0_RXLOC_SHIFT)
-                     | ((uint32_t)loc << _USART_ROUTELOC0_CLKLOC_SHIFT);
-  USART0->ROUTELOC0 = (USART0->ROUTELOC0
-                       & ~(_USART_ROUTELOC0_TXLOC_MASK
-                           | _USART_ROUTELOC0_RXLOC_MASK
-                           | _USART_ROUTELOC0_CLKLOC_MASK))
-                      | loc_val;
-  USART0->ROUTEPEN = USART_ROUTEPEN_TXPEN
-                     | USART_ROUTEPEN_RXPEN
-                     | USART_ROUTEPEN_CLKPEN;
-}
-
-#if defined(USART1)
-static void app_flash_force_usart1_route(void)
-{
-  static bool configured = false;
-  if (configured) {
-    return;
-  }
-
+  // Route USART1 to PD13/PD14/PD15 using the correct LOC values.
   CMU_ClockEnable(cmuClock_USART1, true);
   USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
   init.baudrate = 1000000;
@@ -536,65 +464,19 @@ static void app_flash_force_usart1_route(void)
   GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, 0);
   GPIO_PinModeSet(gpioPortD, 14, gpioModeInput, 0);
 
-  configured = true;
-}
-
-static void app_flash_usart1_set_loc(uint8_t loc)
-{
-  uint32_t loc_val = ((uint32_t)loc << _USART_ROUTELOC0_TXLOC_SHIFT)
-                     | ((uint32_t)loc << _USART_ROUTELOC0_RXLOC_SHIFT)
-                     | ((uint32_t)loc << _USART_ROUTELOC0_CLKLOC_SHIFT);
   USART1->ROUTELOC0 = (USART1->ROUTELOC0
                        & ~(_USART_ROUTELOC0_TXLOC_MASK
                            | _USART_ROUTELOC0_RXLOC_MASK
                            | _USART_ROUTELOC0_CLKLOC_MASK))
-                      | loc_val;
+                      | _USART_ROUTELOC0_TXLOC_LOC23
+                      | _USART_ROUTELOC0_RXLOC_LOC21
+                      | _USART_ROUTELOC0_CLKLOC_LOC19;
   USART1->ROUTEPEN = USART_ROUTEPEN_TXPEN
                      | USART_ROUTEPEN_RXPEN
                      | USART_ROUTEPEN_CLKPEN;
-}
-#endif
-
-#if defined(USART2)
-static void app_flash_force_usart2_route(void)
-{
-  static bool configured = false;
-  if (configured) {
-    return;
-  }
-
-  CMU_ClockEnable(cmuClock_USART2, true);
-  USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
-  init.baudrate = 1000000;
-  init.clockMode = usartClockMode0;
-  init.msbf = true;
-  init.master = true;
-  init.autoCsEnable = false;
-  USART_InitSync(USART2, &init);
-  USART_Enable(USART2, usartEnable);
-
-  GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0);
-  GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, 0);
-  GPIO_PinModeSet(gpioPortD, 14, gpioModeInput, 0);
 
   configured = true;
 }
-
-static void app_flash_usart2_set_loc(uint8_t loc)
-{
-  uint32_t loc_val = ((uint32_t)loc << _USART_ROUTELOC0_TXLOC_SHIFT)
-                     | ((uint32_t)loc << _USART_ROUTELOC0_RXLOC_SHIFT)
-                     | ((uint32_t)loc << _USART_ROUTELOC0_CLKLOC_SHIFT);
-  USART2->ROUTELOC0 = (USART2->ROUTELOC0
-                       & ~(_USART_ROUTELOC0_TXLOC_MASK
-                           | _USART_ROUTELOC0_RXLOC_MASK
-                           | _USART_ROUTELOC0_CLKLOC_MASK))
-                      | loc_val;
-  USART2->ROUTEPEN = USART_ROUTEPEN_TXPEN
-                     | USART_ROUTEPEN_RXPEN
-                     | USART_ROUTEPEN_CLKPEN;
-}
-#endif
 static void app_flash_bb_init(void)
 {
   GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0); // CLK
@@ -659,101 +541,21 @@ static void app_flash_probe_usart(GPIO_Port_TypeDef port,
 {
   app_flash_enable_init();
   app_flash_force_usart_route();
-  app_flash_usart_set_loc(4);
   GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
 
   GPIO_PinOutClear(port, pin);
-  (void)USART_SpiTransfer(USART0, 0x9F);
-  uint8_t b0 = USART_SpiTransfer(USART0, 0x00);
-  uint8_t b1 = USART_SpiTransfer(USART0, 0x00);
-  uint8_t b2 = USART_SpiTransfer(USART0, 0x00);
+  (void)USART_SpiTransfer(USART1, 0x9F);
+  uint8_t b0 = USART_SpiTransfer(USART1, 0x00);
+  uint8_t b1 = USART_SpiTransfer(USART1, 0x00);
+  uint8_t b2 = USART_SpiTransfer(USART1, 0x00);
   GPIO_PinOutSet(port, pin);
 
-  APP_DEBUG_PRINTF("SPI flash (usart): JEDEC ID %02X %02X %02X (%s)\n",
+  APP_DEBUG_PRINTF("SPI flash (usart1): JEDEC ID %02X %02X %02X (%s)\n",
                    b0,
                    b1,
                    b2,
                    label);
 }
-
-static void app_flash_probe_usart_loc_scan(GPIO_Port_TypeDef port,
-                                           unsigned int pin,
-                                           const char *label)
-{
-  app_flash_enable_init();
-  app_flash_force_usart_route();
-  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
-
-  for (uint8_t loc = 0; loc <= 7; loc++) {
-    app_flash_usart_set_loc(loc);
-    GPIO_PinOutClear(port, pin);
-    (void)USART_SpiTransfer(USART0, 0x9F);
-    uint8_t b0 = USART_SpiTransfer(USART0, 0x00);
-    uint8_t b1 = USART_SpiTransfer(USART0, 0x00);
-    uint8_t b2 = USART_SpiTransfer(USART0, 0x00);
-    GPIO_PinOutSet(port, pin);
-    APP_DEBUG_PRINTF("SPI flash (usart loc%u): JEDEC ID %02X %02X %02X (%s)\n",
-                     (unsigned)loc,
-                     b0,
-                     b1,
-                     b2,
-                     label);
-  }
-}
-
-#if defined(USART1)
-static void app_flash_probe_usart1_loc_scan(GPIO_Port_TypeDef port,
-                                            unsigned int pin,
-                                            const char *label)
-{
-  app_flash_enable_init();
-  app_flash_force_usart1_route();
-  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
-
-  for (uint8_t loc = 0; loc <= 7; loc++) {
-    app_flash_usart1_set_loc(loc);
-    GPIO_PinOutClear(port, pin);
-    (void)USART_SpiTransfer(USART1, 0x9F);
-    uint8_t b0 = USART_SpiTransfer(USART1, 0x00);
-    uint8_t b1 = USART_SpiTransfer(USART1, 0x00);
-    uint8_t b2 = USART_SpiTransfer(USART1, 0x00);
-    GPIO_PinOutSet(port, pin);
-    APP_DEBUG_PRINTF("SPI flash (usart1 loc%u): JEDEC ID %02X %02X %02X (%s)\n",
-                     (unsigned)loc,
-                     b0,
-                     b1,
-                     b2,
-                     label);
-  }
-}
-#endif
-
-#if defined(USART2)
-static void app_flash_probe_usart2_loc_scan(GPIO_Port_TypeDef port,
-                                            unsigned int pin,
-                                            const char *label)
-{
-  app_flash_enable_init();
-  app_flash_force_usart2_route();
-  GPIO_PinModeSet(port, pin, gpioModePushPull, 1);
-
-  for (uint8_t loc = 0; loc <= 7; loc++) {
-    app_flash_usart2_set_loc(loc);
-    GPIO_PinOutClear(port, pin);
-    (void)USART_SpiTransfer(USART2, 0x9F);
-    uint8_t b0 = USART_SpiTransfer(USART2, 0x00);
-    uint8_t b1 = USART_SpiTransfer(USART2, 0x00);
-    uint8_t b2 = USART_SpiTransfer(USART2, 0x00);
-    GPIO_PinOutSet(port, pin);
-    APP_DEBUG_PRINTF("SPI flash (usart2 loc%u): JEDEC ID %02X %02X %02X (%s)\n",
-                     (unsigned)loc,
-                     b0,
-                     b1,
-                     b2,
-                     label);
-  }
-}
-#endif
 
 
 /**

@@ -150,7 +150,7 @@ commander bootloader info --device EFR32MG1P132F256GM32
 
 If flash is **not detected**:
 1. Check SPI pin configuration in `config/btl_spi_peripheral_usart_driver_cfg.h`
-2. Verify USART location (LOC4 for TRÅDFRI)
+2. Verify USART routing (RXLOC21/TXLOC23/CLKLOC19 for TRÅDFRI)
 3. Check flash chip power (3.3V)
 4. Verify physical connections
 
