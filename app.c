@@ -450,9 +450,10 @@ static void app_flash_force_usart_route(void)
   }
 
   // Route USART1 to PD13/PD14/PD15 using the correct LOC values.
+  CMU_ClockEnable(cmuClock_HFPER, true);
   CMU_ClockEnable(cmuClock_USART1, true);
   USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
-  init.baudrate = 1000000;
+  init.baudrate = 500000;
   init.clockMode = usartClockMode0;
   init.msbf = true;
   init.master = true;
@@ -462,7 +463,7 @@ static void app_flash_force_usart_route(void)
 
   GPIO_PinModeSet(gpioPortD, 13, gpioModePushPull, 0);
   GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, 0);
-  GPIO_PinModeSet(gpioPortD, 14, gpioModeInput, 0);
+  GPIO_PinModeSet(gpioPortD, 14, gpioModeInputPull, 0);
 
   USART1->ROUTELOC0 = (USART1->ROUTELOC0
                        & ~(_USART_ROUTELOC0_TXLOC_MASK
