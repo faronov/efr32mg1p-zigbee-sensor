@@ -213,18 +213,7 @@ else
 fi
 
 echo "Building with $JOBS parallel jobs..."
-# Build release configuration which has size optimizations
-# Ensure GPIO/SPIDRV macros are visible during compilation to avoid config warnings.
-EXTRA_CPPFLAGS=(
-  "-DSL_SIMPLE_BUTTON_BTN0_PORT=gpioPortB"
-  "-DSL_SIMPLE_BUTTON_BTN0_PIN=13"
-  "-DSL_SIMPLE_LED_LED0_PORT=gpioPortA"
-  "-DSL_SIMPLE_LED_LED0_PIN=0"
-  "-DSL_SPIDRV_EXP_PERIPHERAL=USART1"
-  "-DSL_SPIDRV_EXP_TX_LOC=23"
-  "-DSL_SPIDRV_EXP_RX_LOC=21"
-  "-DSL_SPIDRV_EXP_CLK_LOC=19"
-)
+# Build release configuration which has size optimizations.
 DEBUG_CPPFLAGS=()
 if [[ "$PROJECT_NAME" == *debug* ]] || [[ "$SAMPLE_SLCP" == *debug* ]]; then
   DEBUG_CPPFLAGS+=(
@@ -234,7 +223,7 @@ if [[ "$PROJECT_NAME" == *debug* ]] || [[ "$SAMPLE_SLCP" == *debug* ]]; then
     "-DAPP_DEBUG_POLL_BUTTON=1"
   )
 fi
-EXTRA_CPPFLAGS_STR="${EXTRA_CPPFLAGS[*]} ${DEBUG_CPPFLAGS[*]}"
+EXTRA_CPPFLAGS_STR="${DEBUG_CPPFLAGS[*]}"
 
 make -f "$MAKEFILE_NAME" -j"$JOBS" CONF=release CPPFLAGS="$CPPFLAGS $EXTRA_CPPFLAGS_STR"
 
