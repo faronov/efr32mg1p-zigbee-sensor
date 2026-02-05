@@ -12,10 +12,10 @@
 #include "stack/include/network-formation.h"  // For manual network join
 #include "stack/include/security.h"
 #include "sl_sleeptimer.h"
-#include "sl_spidrv_instances.h"
 #include "em_cmu.h"
 #include "em_gpio.h"
 #include "em_usart.h"
+#include "sl_spidrv_instances.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -317,6 +317,22 @@ static bool log_basic_identity(void)
 static void app_flash_probe(void)
 {
   app_flash_enable_init();
+
+#if defined(SL_CATALOG_SPIDRV_EXP_PRESENT)
+  static bool spidrv_inited = false;
+  if (!spidrv_inited) {
+    sl_spidrv_exp_init();
+    spidrv_inited = true;
+    APP_DEBUG_PRINTF("SPI flash: SPIDRV exp init\n");
+#ifdef SL_SPIDRV_EXP_TX_LOC
+    APP_DEBUG_PRINTF("SPI flash: SPIDRV loc tx=%u rx=%u clk=%u\n",
+                     (unsigned)SL_SPIDRV_EXP_TX_LOC,
+                     (unsigned)SL_SPIDRV_EXP_RX_LOC,
+                     (unsigned)SL_SPIDRV_EXP_CLK_LOC);
+#endif
+  }
+#endif
+
   // Try the standard ICC-1 CS first, then alternate PF3 (some modules)
   if (!app_flash_probe_with_cs(gpioPortB, 11, "PB11")) {
     (void)app_flash_probe_with_cs(gpioPortF, 3, "PF3");
