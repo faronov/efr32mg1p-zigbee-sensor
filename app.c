@@ -479,6 +479,13 @@ static void app_flash_config_usart(USART_ClockMode_TypeDef mode,
     clocked = true;
   }
 
+  USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
+  init.baudrate = baudrate;
+  init.clockMode = mode;
+  init.msbf = true;
+  init.master = true;
+  init.autoCsEnable = false;
+  USART_InitSync(USART1, &init);
   USART1->ROUTELOC0 = (USART1->ROUTELOC0
                        & ~(_USART_ROUTELOC0_TXLOC_MASK
                            | _USART_ROUTELOC0_RXLOC_MASK
@@ -489,14 +496,6 @@ static void app_flash_config_usart(USART_ClockMode_TypeDef mode,
   USART1->ROUTEPEN = USART_ROUTEPEN_TXPEN
                      | USART_ROUTEPEN_RXPEN
                      | USART_ROUTEPEN_CLKPEN;
-
-  USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
-  init.baudrate = baudrate;
-  init.clockMode = mode;
-  init.msbf = true;
-  init.master = true;
-  init.autoCsEnable = false;
-  USART_InitSync(USART1, &init);
   USART_Enable(USART1, usartEnable);
 }
 static void app_flash_bb_init(void)
@@ -652,6 +651,13 @@ static void app_flash_config_usart0(USART_ClockMode_TypeDef mode,
     clocked = true;
   }
 
+  USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
+  init.baudrate = baudrate;
+  init.clockMode = mode;
+  init.msbf = true;
+  init.master = true;
+  init.autoCsEnable = false;
+  USART_InitSync(USART0, &init);
   USART0->ROUTELOC0 = (USART0->ROUTELOC0
                        & ~(_USART_ROUTELOC0_TXLOC_MASK
                            | _USART_ROUTELOC0_RXLOC_MASK
@@ -662,14 +668,6 @@ static void app_flash_config_usart0(USART_ClockMode_TypeDef mode,
   USART0->ROUTEPEN = USART_ROUTEPEN_TXPEN
                      | USART_ROUTEPEN_RXPEN
                      | USART_ROUTEPEN_CLKPEN;
-
-  USART_InitSync_TypeDef init = USART_INITSYNC_DEFAULT;
-  init.baudrate = baudrate;
-  init.clockMode = mode;
-  init.msbf = true;
-  init.master = true;
-  init.autoCsEnable = false;
-  USART_InitSync(USART0, &init);
   USART_Enable(USART0, usartEnable);
 }
 
