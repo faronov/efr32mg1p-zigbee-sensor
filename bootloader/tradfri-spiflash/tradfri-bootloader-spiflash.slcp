@@ -8,7 +8,7 @@ description: >
 
   This bootloader is specifically configured for TRÅDFRI hardware:
   - SPI pins: PD13 (CLK), PD14 (MISO), PD15 (MOSI), PB11 (CS)
-  - USART1 LOCs: RX=21 / TX=23 / CLK=19
+  - USART0 LOCs: RX=21 / TX=23 / CLK=19
   - Flash: IS25LQ020B 256KB (2Mbit)
 
 category: Bootloader|Core

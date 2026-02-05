@@ -21,12 +21,12 @@
 #include "em_gpio.h"
 
 // USART peripheral selection
-// TRÅDFRI uses USART1 for SPI flash communication
-#define SL_USART_EXTFLASH_PERIPHERAL          USART1
-#define SL_USART_EXTFLASH_PERIPHERAL_NO       1
+// TRÅDFRI uses USART0 for SPI flash communication
+#define SL_USART_EXTFLASH_PERIPHERAL          USART0
+#define SL_USART_EXTFLASH_PERIPHERAL_NO       0
 
 // Clock source configuration
-#define SL_USART_EXTFLASH_CLOCK               cmuClock_USART1
+#define SL_USART_EXTFLASH_CLOCK               cmuClock_USART0
 
 // ============================================================================
 // PIN CONFIGURATION - TRÅDFRI SPECIFIC
@@ -53,7 +53,7 @@
 // ============================================================================
 
 // For EFR32MG1 Series 1, USART routing uses location values
-// PD13/PD14/PD15 pins map to USART1 with mixed LOC values:
+// PD13/PD14/PD15 pins map to USART0 with mixed LOC values:
 //   TX=PD15 (LOC23), RX=PD14 (LOC21), CLK=PD13 (LOC19)
 
 #if defined(_SILICON_LABS_32B_SERIES_1)
@@ -152,9 +152,9 @@
 // VERIFICATION
 // ============================================================================
 
-// Compile-time verification that USART1 is selected
-#if (SL_USART_EXTFLASH_PERIPHERAL_NO != 1)
-  #error "TRÅDFRI bootloader requires USART1 for SPI flash"
+// Compile-time verification that USART0 is selected
+#if (SL_USART_EXTFLASH_PERIPHERAL_NO != 0)
+  #error "TRÅDFRI bootloader requires USART0 for SPI flash"
 #endif
 
 // Verify pin assignments match TRÅDFRI hardware

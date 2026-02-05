@@ -26,7 +26,7 @@ This bootloader enables Over-The-Air (OTA) firmware updates by:
 | MOSI | PD15 | Port D, Pin 15 | 3 |
 | CS | PB11 | Port B, Pin 11 | 6 |
 
-**SPI Controller**: USART1 hardware SPI (RXLOC21/TXLOC23/CLKLOC19)
+**SPI Controller**: USART0 hardware SPI (RXLOC21/TXLOC23/CLKLOC19)
 
 ### Optional GPIO
 
@@ -274,9 +274,9 @@ To modify for different hardware:
 
 ## Version History
 
-- **v1.1.1** - USART1 SPI routing update
+- **v1.1.2** - Switch SPI flash to USART0
   - IS25LQ020B 256KB flash support
-  - Hardware SPI via USART1 LOCs RX=21 / TX=23 / CLK=19
+  - Hardware SPI via USART0 LOCs RX=21 / TX=23 / CLK=19
   - Single OTA slot (256KB)
 
 ## References

@@ -354,10 +354,18 @@ static void app_flash_probe(void)
     spidrv_inited = true;
     APP_DEBUG_PRINTF("SPI flash: SPIDRV exp init (handle=%p)\n",
                      (void *)sl_spidrv_exp_handle);
-#if defined(USART1)
-    APP_DEBUG_PRINTF("SPI flash: USART1 ROUTELOC0=0x%08lX ROUTEPEN=0x%08lX\n",
-                     (unsigned long)USART1->ROUTELOC0,
-                     (unsigned long)USART1->ROUTEPEN);
+#ifdef SL_SPIDRV_EXP_PERIPHERAL
+    USART_TypeDef *periph = SL_SPIDRV_EXP_PERIPHERAL;
+    const char *periph_name = "USART?";
+    if (periph == USART0) {
+      periph_name = "USART0";
+    } else if (periph == USART1) {
+      periph_name = "USART1";
+    }
+    APP_DEBUG_PRINTF("SPI flash: %s ROUTELOC0=0x%08lX ROUTEPEN=0x%08lX\n",
+                     periph_name,
+                     (unsigned long)periph->ROUTELOC0,
+                     (unsigned long)periph->ROUTEPEN);
 #endif
 #ifdef SL_SPIDRV_EXP_TX_LOC
     APP_DEBUG_PRINTF("SPI flash: SPIDRV loc tx=%u rx=%u clk=%u\n",
