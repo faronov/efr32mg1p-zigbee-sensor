@@ -90,6 +90,24 @@ static void handle_short_press(void);
 void app_debug_sanity(void)
 {
   APP_DEBUG_PRINTF("app_debug_sanity\n");
+#if APP_DEBUG_DIAG_ALWAYS
+  uint8_t endpoint_count = emberAfEndpointCount();
+  APP_DEBUG_PRINTF("Debug: endpoint count=%u primary=%u\n",
+                   endpoint_count,
+                   emberAfPrimaryEndpoint());
+  bool ota_client_present = false;
+  for (uint8_t i = 0; i < endpoint_count; i++) {
+    uint8_t ep = emberAfEndpointFromIndex(i);
+    bool has_ota = emberAfContainsClient(ep, ZCL_OTA_BOOTLOAD_CLUSTER_ID);
+    if (has_ota) {
+      ota_client_present = true;
+    }
+    APP_DEBUG_PRINTF("Debug: ep %u ota_client=%u\n", ep, has_ota ? 1 : 0);
+  }
+  if (!ota_client_present) {
+    APP_DEBUG_PRINTF("Debug: OTA client cluster missing - expect ep FF writes\n");
+  }
+#endif
 }
 
 void app_debug_trigger_short_press(void)
