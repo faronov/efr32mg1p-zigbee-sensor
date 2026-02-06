@@ -221,6 +221,9 @@ define:
     value: 1000
   - name: APP_DEBUG_FAKE_SENSOR_VALUES
     value: 1
+  # Keep device awake right after join so ZHA interview can finish.
+  - name: APP_DEBUG_AWAKE_AFTER_JOIN_MS
+    value: 120000
   - name: APP_BUILD_TAG
     value: '"dbg-netreset-otaoff-bootspam-crashprint"'
 

@@ -218,7 +218,6 @@ DEBUG_CPPFLAGS=()
 if [[ "$PROJECT_NAME" == *debug* ]] || [[ "$SAMPLE_SLCP" == *debug* ]]; then
   DEBUG_CPPFLAGS+=(
     "-DAPP_DEBUG_DIAG_ALWAYS=1"
-    "-DAPP_DEBUG_NO_SLEEP=1"
     "-DAPP_DEBUG_MAIN_HEARTBEAT=1"
     "-DAPP_DEBUG_POLL_BUTTON=1"
   )

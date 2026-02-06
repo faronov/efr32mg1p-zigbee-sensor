@@ -16,6 +16,9 @@
 #include "em_cmu.h"
 #include "em_gpio.h"
 #include "sl_spidrv_instances.h"
+#if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
+#include "sl_power_manager.h"
+#endif
 #include <stdio.h>
 #include <string.h>
 
@@ -87,6 +90,9 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_RESET_NETWORK
 #define APP_DEBUG_RESET_NETWORK 0
 #endif
+#ifndef APP_DEBUG_AWAKE_AFTER_JOIN_MS
+#define APP_DEBUG_AWAKE_AFTER_JOIN_MS 0
+#endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
 static void handle_short_press(void);
@@ -137,6 +143,10 @@ static bool basic_identity_pending = false;
 static bool af_init_force_pending = false;
 static uint32_t af_init_force_tick = 0;
 static uint32_t basic_identity_tick = 0;
+#if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
+static bool app_join_awake_active = false;
+static uint32_t app_join_awake_start_tick = 0;
+#endif
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -305,6 +315,18 @@ void app_debug_poll(void)
       }
     }
   }
+
+#if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
+  if (app_join_awake_active && app_join_awake_start_tick != 0) {
+    uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_join_awake_start_tick);
+    if (elapsed_ms >= APP_DEBUG_AWAKE_AFTER_JOIN_MS) {
+      sl_power_manager_remove_em_requirement(SL_POWER_MANAGER_EM0);
+      app_join_awake_active = false;
+      app_join_awake_start_tick = 0;
+      APP_DEBUG_PRINTF("Debug: post-join awake window ended\n");
+    }
+  }
+#endif
 }
 
 static bool log_basic_identity(void)
@@ -518,6 +540,16 @@ void emberAfStackStatusCallback(EmberStatus status)
   APP_DEBUG_PRINTF("Stack status: 0x%02x\n", status);
   if (status == EMBER_NETWORK_UP) {
     emberAfCorePrintln("Network joined successfully");
+
+#if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
+    if (!app_join_awake_active) {
+      sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM0);
+      app_join_awake_active = true;
+      app_join_awake_start_tick = sl_sleeptimer_get_tick_count();
+      APP_DEBUG_PRINTF("Debug: keeping EM0 for %lu ms after join\n",
+                       (unsigned long)APP_DEBUG_AWAKE_AFTER_JOIN_MS);
+    }
+#endif
 
     // Reset join attempt counter and scan state on success
     join_attempt_count = 0;

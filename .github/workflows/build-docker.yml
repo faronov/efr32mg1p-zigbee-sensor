@@ -337,6 +337,28 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      - name: Verify debug autogen components
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          CATALOG_FILE=$(find firmware -type f -path "*/autogen/sl_component_catalog.h" | head -n1 || true)
+          if [ -z "$CATALOG_FILE" ]; then
+            echo "ERROR: sl_component_catalog.h not found in generated firmware output"
+            find firmware -maxdepth 5 -type f | head -n 200 || true
+            exit 1
+          fi
+          echo "Using catalog: $CATALOG_FILE"
+          if rg -q "SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT" "$CATALOG_FILE"; then
+            echo "ERROR: Debug build unexpectedly includes zigbee_network_steering"
+            exit 1
+          fi
+          if rg -q "SL_CATALOG_ZIGBEE_SCAN_DISPATCH_PRESENT" "$CATALOG_FILE"; then
+            echo "ERROR: Debug build unexpectedly includes zigbee_scan_dispatch"
+            exit 1
+          fi
+          echo "OK: Debug autogen component set matches expected manual-join stack"
+
       - name: Verify Basic identity attributes (Debug)
         if: success()
         shell: bash
