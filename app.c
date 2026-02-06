@@ -884,7 +884,7 @@ void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
     params.nwkUpdateId = join_candidate.nwkUpdateId;
     params.channels = BIT32(join_candidate.channel);
 
-    EmberStatus join_status = emberJoinNetwork(EMBER_END_DEVICE, &params);
+    EmberStatus join_status = emberJoinNetwork(EMBER_SLEEPY_END_DEVICE, &params);
     APP_DEBUG_PRINTF("Join: emberJoinNetwork -> 0x%02x\n", join_status);
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
