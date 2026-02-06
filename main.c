@@ -41,6 +41,12 @@ void app_debug_poll(void);
 #ifndef APP_DEBUG_FORCE_AF_INIT
 #define APP_DEBUG_FORCE_AF_INIT 0
 #endif
+#ifndef APP_DEBUG_BOOT_DELAY_MS
+#define APP_DEBUG_BOOT_DELAY_MS 0
+#endif
+#ifndef APP_BUILD_TAG
+#define APP_BUILD_TAG "unknown"
+#endif
 
 #if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) && defined(APP_DEBUG_POLL_BUTTON) && (APP_DEBUG_POLL_BUTTON != 0)
 #include "sl_simple_button_instances.h"
@@ -50,6 +56,11 @@ int main(void)
 {
   // Initialize Silicon Labs system
   sl_system_init();
+
+#if APP_DEBUG_BOOT_DELAY_MS
+  // Give time to attach SWO before any logs.
+  sl_sleeptimer_delay_millisecond(APP_DEBUG_BOOT_DELAY_MS);
+#endif
 
 #if APP_DEBUG_FORCE_AF_INIT
   // Force AF init in debug builds in case the framework init isn't wired.
@@ -64,13 +75,22 @@ int main(void)
 #endif
 
   // Early SWO sanity print (debug builds should show this).
-  printf("SWO OK: main start\n");
+#if APP_DEBUG_BOOT_DELAY_MS
+  printf("SWO OK: main start (delay=%lu ms, tag=%s)\n",
+         (unsigned long)APP_DEBUG_BOOT_DELAY_MS,
+         APP_BUILD_TAG);
+#else
+  printf("SWO OK: main start (tag=%s)\n", APP_BUILD_TAG);
+#endif
 
 #if APP_DEBUG_DIAG_ALWAYS
   printf("Debug flags: NO_SLEEP=%d HEARTBEAT=%d POLL_BUTTON=%d\n",
          APP_DEBUG_NO_SLEEP,
          APP_DEBUG_MAIN_HEARTBEAT,
          APP_DEBUG_POLL_BUTTON);
+#ifdef EMBER_AF_PLUGIN_OTA_CLIENT_AUTO_START
+  printf("Debug: OTA auto-start=%d\n", EMBER_AF_PLUGIN_OTA_CLIENT_AUTO_START);
+#endif
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
   printf("Power manager: present\n");
 #else

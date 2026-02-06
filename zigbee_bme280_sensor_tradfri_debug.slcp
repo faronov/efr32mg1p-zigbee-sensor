@@ -211,6 +211,10 @@ define:
     value: 1
   - name: APP_DEBUG_SPI_ONLY
     value: 0
+  - name: APP_DEBUG_BOOT_DELAY_MS
+    value: 5000
+  - name: APP_BUILD_TAG
+    value: '"dbg-netreset-otaoff-bootdelay"'
 
   # Increase event queue capacity for Series 1 (fixes event-queue.c:294 crash)
   # Series 1 has limited RAM (32KB) and smaller default event queue
