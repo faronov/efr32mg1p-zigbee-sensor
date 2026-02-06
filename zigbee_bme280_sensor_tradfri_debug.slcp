@@ -73,10 +73,10 @@ configuration:
   - name: EMBER_AF_PRINT_CORE
     value: 1
 
-  # Configure as Zigbee End Device (non-sleepy for testing/debugging)
-  # TODO: Change back to SLEEPY after event queue issue resolved
+  # Configure as Zigbee Sleepy End Device so coordinators classify battery entity correctly.
+  # Debug keeps EM0 via APP_DEBUG_NO_SLEEP, but network role stays sleepy/battery-powered.
   - name: SLI_ZIGBEE_PRIMARY_NETWORK_DEVICE_TYPE
-    value: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_END_DEVICE
+    value: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_SLEEPY_END_DEVICE
 
   # Increase stack sizes and reduce event usage (fix event-queue.c:294 assert)
   - name: EMBER_AF_PLUGIN_IDLE_SLEEP_USE_BUTTONS
