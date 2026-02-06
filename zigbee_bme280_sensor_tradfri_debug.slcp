@@ -149,6 +149,9 @@ configuration:
     value: 0
   - name: EMBER_AF_PLUGIN_OTA_STORAGE_SIMPLE_EEPROM_STORAGE_END
     value: 262144  # 256KB (2Mbit flash)
+  # Debug: disable auto-start OTA client to avoid reset loop during random delay
+  - name: EMBER_AF_PLUGIN_OTA_CLIENT_AUTO_START
+    value: 0
 
 source:
   - path: main.c
