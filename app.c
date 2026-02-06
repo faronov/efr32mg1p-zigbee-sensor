@@ -289,6 +289,13 @@ void app_debug_poll(void)
     }
   }
 
+  // Some debug builds run without AF tick wiring, so process deferred joins here.
+  if (join_pending && af_init_seen && !network_join_in_progress) {
+    join_pending = false;
+    APP_DEBUG_PRINTF("Join: deferred request starting (poll)\n");
+    handle_short_press();
+  }
+
   if (basic_identity_pending && af_init_seen) {
     if (basic_identity_tick == 0 ||
         sl_sleeptimer_tick_to_ms(now - basic_identity_tick) >= 2000) {
