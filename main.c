@@ -7,10 +7,12 @@
 #include "sl_system_init.h"
 #include "sl_event_handler.h"
 #include "sl_sleeptimer.h"
-#include "em_device.h"
 #include <stdio.h>
 #include <stdint.h>
 #include "app/framework/include/af.h"
+#include "hal.h"
+#include "micro.h"
+#include "cortexm3/diagnostic.h"
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
 #include "sl_power_manager.h"
@@ -42,8 +44,8 @@ void app_debug_poll(void);
 #ifndef APP_DEBUG_FORCE_AF_INIT
 #define APP_DEBUG_FORCE_AF_INIT 0
 #endif
-#ifndef APP_DEBUG_FAULT_DUMP
-#define APP_DEBUG_FAULT_DUMP 0
+#ifndef APP_DEBUG_CRASH_PRINT
+#define APP_DEBUG_CRASH_PRINT 0
 #endif
 #ifndef APP_DEBUG_BOOT_DELAY_MS
 #define APP_DEBUG_BOOT_DELAY_MS 0
@@ -56,72 +58,23 @@ void app_debug_poll(void);
 #include "sl_simple_button_instances.h"
 #endif
 
-#if APP_DEBUG_FAULT_DUMP
-static void app_fault_dump(const char *name, uint32_t *stacked)
-{
-  uint32_t r0 = stacked[0];
-  uint32_t r1 = stacked[1];
-  uint32_t r2 = stacked[2];
-  uint32_t r3 = stacked[3];
-  uint32_t r12 = stacked[4];
-  uint32_t lr = stacked[5];
-  uint32_t pc = stacked[6];
-  uint32_t psr = stacked[7];
-
-  printf("FAULT: %s\n", name);
-  printf("R0=0x%08lx R1=0x%08lx R2=0x%08lx R3=0x%08lx\n",
-         (unsigned long)r0, (unsigned long)r1,
-         (unsigned long)r2, (unsigned long)r3);
-  printf("R12=0x%08lx LR=0x%08lx PC=0x%08lx PSR=0x%08lx\n",
-         (unsigned long)r12, (unsigned long)lr,
-         (unsigned long)pc, (unsigned long)psr);
-  printf("CFSR=0x%08lx HFSR=0x%08lx BFAR=0x%08lx MMFAR=0x%08lx\n",
-         (unsigned long)SCB->CFSR,
-         (unsigned long)SCB->HFSR,
-         (unsigned long)SCB->BFAR,
-         (unsigned long)SCB->MMFAR);
-  while (1) {
-    // Halt so the fault stays visible in SWO.
-  }
-}
-
-static void app_hardfault_c(uint32_t *stacked)
-{
-  app_fault_dump("HardFault", stacked);
-}
-
-static void app_busfault_c(uint32_t *stacked)
-{
-  app_fault_dump("BusFault", stacked);
-}
-
-__attribute__((naked)) void HardFault_Handler(void)
-{
-  __asm volatile(
-    "tst lr, #4\n"
-    "ite eq\n"
-    "mrseq r0, msp\n"
-    "mrsne r0, psp\n"
-    "b app_hardfault_c\n"
-  );
-}
-
-__attribute__((naked)) void BusFault_Handler(void)
-{
-  __asm volatile(
-    "tst lr, #4\n"
-    "ite eq\n"
-    "mrseq r0, msp\n"
-    "mrsne r0, psp\n"
-    "b app_busfault_c\n"
-  );
-}
-#endif
-
 int main(void)
 {
   // Initialize Silicon Labs system
   sl_system_init();
+
+#if APP_DEBUG_CRASH_PRINT
+  {
+    uint8_t reset = halGetResetInfo();
+    if ((RESET_CRASH_REASON_MASK & (1u << reset)) != 0u) {
+      printf("Debug: crash reset info=0x%02x (%s)\n",
+             reset,
+             halGetResetString());
+      halPrintCrashSummary(0);
+      halPrintCrashDetails(0);
+    }
+  }
+#endif
 
 #if APP_DEBUG_BOOT_DELAY_MS
   // Give time to attach SWO before any logs.
