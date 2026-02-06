@@ -21,6 +21,7 @@
 
 // Event control for periodic updates
 static sl_zigbee_event_t sensor_update_event;
+static bool sensor_update_event_initialized = false;
 
 // Configurable sensor update interval
 static uint32_t sensor_update_interval_ms = SENSOR_UPDATE_INTERVAL_MS;
@@ -30,6 +31,8 @@ static void sensor_update_event_handler(sl_zigbee_event_t *event);
 
 bool app_sensor_init(void)
 {
+  sensor_update_event_initialized = false;
+
   // Initialize BME280 sensor
   if (!bme280_init()) {
     emberAfCorePrintln("Error: BME280 initialization failed");
@@ -55,6 +58,7 @@ bool app_sensor_init(void)
 
   // Initialize and schedule the event for periodic updates
   sl_zigbee_event_init(&sensor_update_event, sensor_update_event_handler);
+  sensor_update_event_initialized = true;
   sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
 
   emberAfCorePrintln("Sensor update interval: %d seconds", config->sensor_read_interval_seconds);
@@ -64,6 +68,11 @@ bool app_sensor_init(void)
 
 void app_sensor_start_periodic_updates(void)
 {
+  if (!sensor_update_event_initialized) {
+    emberAfCorePrintln("Sensor periodic updates disabled: sensor/event not initialized");
+    return;
+  }
+
   // (Re)start the periodic sensor update event
   emberAfCorePrintln("Starting periodic sensor updates (interval: %d seconds)",
                      sensor_update_interval_ms / 1000);
@@ -95,6 +104,11 @@ void app_sensor_set_interval(uint32_t interval_ms)
 
   sensor_update_interval_ms = interval_ms;
   emberAfCorePrintln("Sensor update interval changed to %d seconds", interval_ms / 1000);
+
+  if (!sensor_update_event_initialized) {
+    emberAfCorePrintln("Sensor interval stored; periodic event will start after sensor init");
+    return;
+  }
 
   // Restart the timer with new interval
   sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
