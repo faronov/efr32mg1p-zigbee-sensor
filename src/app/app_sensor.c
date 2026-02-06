@@ -244,10 +244,14 @@ void app_sensor_update(void)
     // Update Power Configuration cluster (0x0001)
     // Read battery voltage and percentage
     uint16_t battery_voltage_mv = battery_read_voltage_mv();
-    uint8_t battery_voltage_100mv = battery_read_voltage_100mv();
+    uint8_t battery_voltage_100mv = (uint8_t)(battery_voltage_mv / 100);
     uint8_t battery_percentage = battery_calculate_percentage(battery_voltage_mv);
+    uint16_t battery_adc_raw = battery_get_last_raw_adc();
+    bool battery_sample_valid = battery_last_measurement_valid();
 
-    emberAfCorePrintln("Battery: %d mV (%d %%), raw: %d/200",
+    emberAfCorePrintln("Battery: adc=%d %s, %d mV (%d %%), raw: %d/200",
+                       battery_adc_raw,
+                       battery_sample_valid ? "OK" : "FALLBACK",
                        battery_voltage_mv,
                        battery_percentage / 2, // Convert to percentage (200 = 100%)
                        battery_percentage);

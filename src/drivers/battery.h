@@ -41,6 +41,20 @@ uint16_t battery_read_voltage_mv(void);
 uint8_t battery_read_voltage_100mv(void);
 
 /**
+ * @brief Get last averaged raw ADC sample used for battery conversion.
+ *
+ * @return 12-bit ADC code (0-4095)
+ */
+uint16_t battery_get_last_raw_adc(void);
+
+/**
+ * @brief Indicates whether last battery sample was valid.
+ *
+ * @return true when last conversion looked sane; false when fallback was used
+ */
+bool battery_last_measurement_valid(void);
+
+/**
  * @brief Calculate battery percentage remaining
  *
  * Calculates battery percentage based on voltage curve for 2xAAA batteries.

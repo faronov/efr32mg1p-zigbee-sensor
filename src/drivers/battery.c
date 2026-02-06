@@ -21,6 +21,15 @@
 // AVDD gain: EFR32MG1P Series 1 uses 1/4 gain for AVDD measurement
 #define AVDD_SCALE_FACTOR           4
 
+// ADC sanity limits to reject obvious bad reads.
+#define BATTERY_MIN_VALID_MV        1200
+#define BATTERY_MAX_VALID_MV        5000
+
+static bool battery_adc_ready = false;
+static uint16_t battery_last_raw_adc = 0;
+static bool battery_last_valid = false;
+static uint16_t battery_last_good_mv = BATTERY_VOLTAGE_NOMINAL_MV;
+
 /**
  * @brief Initialize battery voltage measurement
  */
@@ -43,6 +52,7 @@ bool battery_init(void)
   initSingle.acqTime = adcAcqTime256;       // Longer acquisition for accuracy
   ADC_InitSingle(ADC0, &initSingle);
 
+  battery_adc_ready = true;
   return true;
 }
 
@@ -51,21 +61,39 @@ bool battery_init(void)
  */
 uint16_t battery_read_voltage_mv(void)
 {
-  // Start ADC conversion
-  ADC_Start(ADC0, adcStartSingle);
+  if (!battery_adc_ready) {
+    battery_last_valid = false;
+    return battery_last_good_mv;
+  }
 
-  // Wait for conversion to complete
-  while (ADC0->STATUS & ADC_STATUS_SINGLEACT);
+  // Average several samples and wait on conversion-complete flag
+  // to avoid stale zero reads on some MG1 boards.
+  uint32_t sum = 0;
+  const uint8_t samples = 4;
+  for (uint8_t i = 0; i < samples; i++) {
+    ADC_IntClear(ADC0, ADC_IF_SINGLE);
+    ADC_Start(ADC0, adcStartSingle);
+    while ((ADC_IntGet(ADC0) & ADC_IF_SINGLE) == 0u) {
+      // wait
+    }
+    sum += ADC_DataSingleGet(ADC0) & 0x0FFFu;
+  }
 
-  // Read ADC result (12-bit)
-  uint32_t adc_value = ADC_DataSingleGet(ADC0);
+  uint32_t adc_value = sum / samples;
+  battery_last_raw_adc = (uint16_t)adc_value;
 
   // Calculate voltage in mV
-  // AVDD = (ADC_value / 4096) * ADC_REF_VOLTAGE * AVDD_SCALE_FACTOR
-  // Scale factor of 4 accounts for the 1/4 gain on AVDD input
-  uint32_t voltage_mv = (adc_value * ADC_REF_VOLTAGE_MV * AVDD_SCALE_FACTOR) / 4096;
+  // AVDD = (ADC_value / 4095) * ADC_REF_VOLTAGE * AVDD_SCALE_FACTOR
+  uint32_t voltage_mv = (adc_value * ADC_REF_VOLTAGE_MV * AVDD_SCALE_FACTOR) / 4095u;
 
-  return (uint16_t)voltage_mv;
+  if (voltage_mv >= BATTERY_MIN_VALID_MV && voltage_mv <= BATTERY_MAX_VALID_MV) {
+    battery_last_valid = true;
+    battery_last_good_mv = (uint16_t)voltage_mv;
+    return (uint16_t)voltage_mv;
+  }
+
+  battery_last_valid = false;
+  return battery_last_good_mv;
 }
 
 /**
@@ -79,6 +107,16 @@ uint8_t battery_read_voltage_100mv(void)
   uint8_t voltage_100mv = (uint8_t)(voltage_mv / 100);
 
   return voltage_100mv;
+}
+
+uint16_t battery_get_last_raw_adc(void)
+{
+  return battery_last_raw_adc;
+}
+
+bool battery_last_measurement_valid(void)
+{
+  return battery_last_valid;
 }
 
 /**
