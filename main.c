@@ -50,6 +50,12 @@ void app_debug_poll(void);
 #ifndef APP_DEBUG_BOOT_DELAY_MS
 #define APP_DEBUG_BOOT_DELAY_MS 0
 #endif
+#ifndef APP_DEBUG_BOOT_SPAM_MS
+#define APP_DEBUG_BOOT_SPAM_MS 0
+#endif
+#ifndef APP_DEBUG_BOOT_SPAM_PERIOD_MS
+#define APP_DEBUG_BOOT_SPAM_PERIOD_MS 1000
+#endif
 #ifndef APP_BUILD_TAG
 #define APP_BUILD_TAG "unknown"
 #endif
@@ -58,22 +64,55 @@ void app_debug_poll(void);
 #include "sl_simple_button_instances.h"
 #endif
 
+static uint8_t app_reset_info = 0;
+static bool app_reset_info_valid = false;
+static bool app_crash_print_pending = false;
+static uint32_t app_boot_tick_start = 0;
+static uint32_t app_boot_tick_last = 0;
+
+static void app_debug_record_reset_info(void)
+{
+  uint8_t reset = halGetResetInfo();
+  app_reset_info = reset;
+  app_reset_info_valid = true;
+  app_crash_print_pending =
+    ((RESET_CRASH_REASON_MASK & (1u << reset)) != 0u);
+}
+
+static void app_debug_boot_tick(void)
+{
+#if APP_DEBUG_BOOT_SPAM_MS
+  uint32_t now = sl_sleeptimer_get_tick_count();
+  if (app_boot_tick_start == 0) {
+    app_boot_tick_start = now;
+  }
+  if (app_crash_print_pending && app_reset_info_valid) {
+    printf("Debug: crash reset info=0x%02x (%s)\n",
+           app_reset_info,
+           halGetResetString());
+    halPrintCrashSummary(0);
+    halPrintCrashDetails(0);
+    app_crash_print_pending = false;
+  }
+  if (sl_sleeptimer_tick_to_ms(now - app_boot_tick_start) < APP_DEBUG_BOOT_SPAM_MS) {
+    if (app_boot_tick_last == 0
+        || sl_sleeptimer_tick_to_ms(now - app_boot_tick_last) >= APP_DEBUG_BOOT_SPAM_PERIOD_MS) {
+      app_boot_tick_last = now;
+      printf("BOOT: tag=%s uptime=%lu ms\n",
+             APP_BUILD_TAG,
+             (unsigned long)sl_sleeptimer_tick_to_ms(now - app_boot_tick_start));
+    }
+  }
+#endif
+}
+
 int main(void)
 {
   // Initialize Silicon Labs system
   sl_system_init();
 
-#if APP_DEBUG_CRASH_PRINT
-  {
-    uint8_t reset = halGetResetInfo();
-    if ((RESET_CRASH_REASON_MASK & (1u << reset)) != 0u) {
-      printf("Debug: crash reset info=0x%02x (%s)\n",
-             reset,
-             halGetResetString());
-      halPrintCrashSummary(0);
-      halPrintCrashDetails(0);
-    }
-  }
+#if APP_DEBUG_CRASH_PRINT || APP_DEBUG_BOOT_SPAM_MS
+  app_debug_record_reset_info();
 #endif
 
 #if APP_DEBUG_BOOT_DELAY_MS
@@ -139,6 +178,9 @@ int main(void)
 #endif
   // Bare metal main loop
   while (1) {
+#if APP_DEBUG_CRASH_PRINT || APP_DEBUG_BOOT_SPAM_MS
+    app_debug_boot_tick();
+#endif
     // Run event handlers
     sl_system_process_action();
 
