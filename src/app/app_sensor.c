@@ -9,6 +9,7 @@
 #include "battery.h"
 #include "af.h"
 #include "app/framework/include/af.h"
+#include "sl_sleeptimer.h"
 #include <stdio.h>
 
 // Endpoint where sensor clusters are located
@@ -31,6 +32,120 @@ static uint32_t sensor_update_interval_ms = SENSOR_UPDATE_INTERVAL_MS;
 #ifndef APP_DEBUG_FAKE_SENSOR_VALUES
 #define APP_DEBUG_FAKE_SENSOR_VALUES 0
 #endif
+#ifndef APP_FORCE_SENSOR_INTERVAL_MS
+#define APP_FORCE_SENSOR_INTERVAL_MS 10000
+#endif
+
+#ifndef APP_REPORT_MIN_INTERVAL_S
+#define APP_REPORT_MIN_INTERVAL_S 10
+#endif
+#ifndef APP_REPORT_MAX_INTERVAL_S
+#define APP_REPORT_MAX_INTERVAL_S 300
+#endif
+#ifndef APP_REPORT_TEMP_CHANGE_CENTI
+#define APP_REPORT_TEMP_CHANGE_CENTI 50
+#endif
+#ifndef APP_REPORT_HUM_CHANGE_CENTI
+#define APP_REPORT_HUM_CHANGE_CENTI 100
+#endif
+#ifndef APP_REPORT_PRESS_CHANGE_KPA
+#define APP_REPORT_PRESS_CHANGE_KPA 1
+#endif
+
+typedef struct {
+  bool initialized;
+  int32_t last_value;
+  uint32_t last_report_ms;
+} app_report_state_t;
+
+static app_report_state_t temp_report_state = { false, 0, 0 };
+static app_report_state_t hum_report_state = { false, 0, 0 };
+static app_report_state_t press_report_state = { false, 0, 0 };
+
+static uint32_t fake_last_change_ms = 0;
+static bme280_data_t fake_sensor_data = {
+  .temperature = 2150, // 21.50 C
+  .humidity = 5000,    // 50.00 %
+  .pressure = 101325,  // Pa
+};
+static uint32_t fake_prng_state = 0x12345678u;
+
+static uint32_t app_get_ms(void)
+{
+  uint32_t ticks = sl_sleeptimer_get_tick_count();
+  return (uint32_t)sl_sleeptimer_tick_to_ms(ticks);
+}
+
+static int32_t app_abs_i32(int32_t value)
+{
+  return (value < 0) ? -value : value;
+}
+
+static bool app_report_gate(app_report_state_t *state,
+                            int32_t value,
+                            int32_t change_threshold,
+                            uint32_t now_ms)
+{
+  uint32_t min_ms = (uint32_t)APP_REPORT_MIN_INTERVAL_S * 1000u;
+  uint32_t max_ms = (uint32_t)APP_REPORT_MAX_INTERVAL_S * 1000u;
+
+  if (!state->initialized) {
+    state->initialized = true;
+    state->last_value = value;
+    state->last_report_ms = now_ms;
+    return true;
+  }
+
+  uint32_t elapsed = now_ms - state->last_report_ms;
+  int32_t delta = app_abs_i32(value - state->last_value);
+
+  if (elapsed >= max_ms || (elapsed >= min_ms && delta >= change_threshold)) {
+    state->last_value = value;
+    state->last_report_ms = now_ms;
+    return true;
+  }
+
+  return false;
+}
+
+static uint32_t app_fake_prng_next(uint32_t salt)
+{
+  fake_prng_state = (fake_prng_state * 1664525u) + 1013904223u + salt;
+  return fake_prng_state;
+}
+
+static int32_t app_fake_apply_delta_percent(int32_t base, int8_t percent)
+{
+  return base + ((base * percent) / 100);
+}
+
+static void app_update_fake_sensor_data(uint32_t now_ms)
+{
+  if (fake_last_change_ms != 0 && (now_ms - fake_last_change_ms) < 60000u) {
+    return;
+  }
+  fake_last_change_ms = now_ms;
+
+  int8_t d_t = (int8_t)((int32_t)(app_fake_prng_next(now_ms) % 21u) - 10);
+  int8_t d_h = (int8_t)((int32_t)(app_fake_prng_next(now_ms + 1u) % 21u) - 10);
+  int8_t d_p = (int8_t)((int32_t)(app_fake_prng_next(now_ms + 2u) % 21u) - 10);
+
+  fake_sensor_data.temperature = app_fake_apply_delta_percent(fake_sensor_data.temperature, d_t);
+  fake_sensor_data.humidity = app_fake_apply_delta_percent(fake_sensor_data.humidity, d_h);
+  fake_sensor_data.pressure = app_fake_apply_delta_percent(fake_sensor_data.pressure, d_p);
+
+  if (fake_sensor_data.humidity < 0) {
+    fake_sensor_data.humidity = 0;
+  } else if (fake_sensor_data.humidity > 10000) {
+    fake_sensor_data.humidity = 10000;
+  }
+
+  if (fake_sensor_data.pressure < 80000) {
+    fake_sensor_data.pressure = 80000;
+  } else if (fake_sensor_data.pressure > 120000) {
+    fake_sensor_data.pressure = 120000;
+  }
+}
 
 // Forward declaration
 static void sensor_update_event_handler(sl_zigbee_event_t *event);
@@ -69,13 +184,22 @@ bool app_sensor_init(void)
   // Load configured interval from NVM
   const app_config_t* config = app_config_get();
   sensor_update_interval_ms = config->sensor_read_interval_seconds * 1000;
+#if APP_FORCE_SENSOR_INTERVAL_MS > 0
+  sensor_update_interval_ms = APP_FORCE_SENSOR_INTERVAL_MS;
+#endif
 
   // Initialize and schedule the event for periodic updates
   sl_zigbee_event_init(&sensor_update_event, sensor_update_event_handler);
   sensor_update_event_initialized = true;
   sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
 
-  emberAfCorePrintln("Sensor update interval: %d seconds", config->sensor_read_interval_seconds);
+  emberAfCorePrintln("Sensor poll interval: %d seconds", sensor_update_interval_ms / 1000);
+  emberAfCorePrintln("Reporting config: min=%ds max=%ds dT=%d dRH=%d dP=%d",
+                     APP_REPORT_MIN_INTERVAL_S,
+                     APP_REPORT_MAX_INTERVAL_S,
+                     APP_REPORT_TEMP_CHANGE_CENTI,
+                     APP_REPORT_HUM_CHANGE_CENTI,
+                     APP_REPORT_PRESS_CHANGE_KPA);
 
   return true;
 }
@@ -134,6 +258,7 @@ void app_sensor_update(void)
   EmberAfStatus status;
   bool has_humidity = sensor_ready ? bme280_has_humidity() : true;
   bool have_sensor_sample = false;
+  uint32_t now_ms = app_get_ms();
 
   // Read sensor data
   if (sensor_ready) {
@@ -145,13 +270,11 @@ void app_sensor_update(void)
   }
 
   if (!have_sensor_sample && APP_DEBUG_FAKE_SENSOR_VALUES) {
-    // Deterministic fallback values for debug when no physical sensor is present.
-    sensor_data.temperature = 2150;  // 21.50 C
-    sensor_data.humidity = 5000;     // 50.00 %
-    sensor_data.pressure = 101325;   // Pa
+    app_update_fake_sensor_data(now_ms);
+    sensor_data = fake_sensor_data;
     has_humidity = true;
     have_sensor_sample = true;
-    emberAfCorePrintln("Sensor: using debug fallback values");
+    emberAfCorePrintln("Sensor: using debug fallback values (minute drift)");
   }
 
   if (have_sensor_sample && has_humidity) {
@@ -201,26 +324,30 @@ void app_sensor_update(void)
     // Update Temperature Measurement cluster (0x0402)
     // MeasuredValue is int16, in 0.01°C units
     int16_t temp_value = (int16_t)temp_calibrated;
-    status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                         ZCL_TEMP_MEASUREMENT_CLUSTER_ID,
-                                         ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID,
-                                         (uint8_t *)&temp_value,
-                                         ZCL_INT16S_ATTRIBUTE_TYPE);
-    if (status != EMBER_ZCL_STATUS_SUCCESS) {
-      emberAfCorePrintln("Error: Failed to update temperature attribute (0x%x)", status);
+    if (app_report_gate(&temp_report_state, temp_calibrated, APP_REPORT_TEMP_CHANGE_CENTI, now_ms)) {
+      status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                           ZCL_TEMP_MEASUREMENT_CLUSTER_ID,
+                                           ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID,
+                                           (uint8_t *)&temp_value,
+                                           ZCL_INT16S_ATTRIBUTE_TYPE);
+      if (status != EMBER_ZCL_STATUS_SUCCESS) {
+        emberAfCorePrintln("Error: Failed to update temperature attribute (0x%x)", status);
+      }
     }
 
     if (has_humidity) {
       // Update Relative Humidity Measurement cluster (0x0405)
       // MeasuredValue is uint16, in 0.01%RH units
       uint16_t humidity_value = (uint16_t)humidity_calibrated;
-      status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                           ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
-                                           ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
-                                           (uint8_t *)&humidity_value,
-                                           ZCL_INT16U_ATTRIBUTE_TYPE);
-      if (status != EMBER_ZCL_STATUS_SUCCESS) {
-        emberAfCorePrintln("Error: Failed to update humidity attribute (0x%x)", status);
+      if (app_report_gate(&hum_report_state, humidity_calibrated, APP_REPORT_HUM_CHANGE_CENTI, now_ms)) {
+        status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                             ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
+                                             ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
+                                             (uint8_t *)&humidity_value,
+                                             ZCL_INT16U_ATTRIBUTE_TYPE);
+        if (status != EMBER_ZCL_STATUS_SUCCESS) {
+          emberAfCorePrintln("Error: Failed to update humidity attribute (0x%x)", status);
+        }
       }
     } else {
       emberAfCorePrintln("Humidity not supported by sensor (BMP280)");
@@ -230,13 +357,15 @@ void app_sensor_update(void)
     // MeasuredValue is int16, in kPa units (divide Pa by 1000)
     // Zigbee spec: signed 16-bit integer in kPa
     int16_t pressure_value = (int16_t)(pressure_calibrated / 1000);
-    status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                         ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID,
-                                         ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID,
-                                         (uint8_t *)&pressure_value,
-                                         ZCL_INT16S_ATTRIBUTE_TYPE);
-    if (status != EMBER_ZCL_STATUS_SUCCESS) {
-      emberAfCorePrintln("Error: Failed to update pressure attribute (0x%x)", status);
+    if (app_report_gate(&press_report_state, pressure_value, APP_REPORT_PRESS_CHANGE_KPA, now_ms)) {
+      status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                           ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID,
+                                           ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID,
+                                           (uint8_t *)&pressure_value,
+                                           ZCL_INT16S_ATTRIBUTE_TYPE);
+      if (status != EMBER_ZCL_STATUS_SUCCESS) {
+        emberAfCorePrintln("Error: Failed to update pressure attribute (0x%x)", status);
+      }
     }
   }
 

@@ -322,6 +322,18 @@ static bool log_basic_identity(void)
                    endpoint,
                    endpoint_count);
 
+#ifdef ZCL_POWER_SOURCE_ATTRIBUTE_ID
+  {
+    uint8_t power_source = 0x03; // Battery
+    EmberAfStatus wr = emberAfWriteServerAttribute(endpoint,
+                                                    ZCL_BASIC_CLUSTER_ID,
+                                                    ZCL_POWER_SOURCE_ATTRIBUTE_ID,
+                                                    &power_source,
+                                                    ZCL_ENUM8_ATTRIBUTE_TYPE);
+    APP_DEBUG_PRINTF("Basic: set power source(battery) -> 0x%02x\n", wr);
+  }
+#endif
+
 #ifdef ZCL_MANUFACTURER_NAME_ATTRIBUTE_ID
   st = emberAfReadServerAttribute(endpoint,
                                   ZCL_BASIC_CLUSTER_ID,

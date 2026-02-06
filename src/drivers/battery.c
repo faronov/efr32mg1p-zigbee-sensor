@@ -15,20 +15,23 @@
 #define BATTERY_VOLTAGE_NOMINAL_MV  3000  // 2x 1.5V nominal
 #define BATTERY_VOLTAGE_EMPTY_MV    1800  // 2x 0.9V depleted
 
-// ADC reference voltage in mV (internal 1.25V reference)
-#define ADC_REF_VOLTAGE_MV          1250
+// ADC reference voltage in mV defaults.
+#define ADC_REF_VOLTAGE_1V25_MV     1250
+#define ADC_REF_VOLTAGE_5V_MV       5000
 
 // AVDD gain: EFR32MG1P Series 1 uses 1/4 gain for AVDD measurement
 #define AVDD_SCALE_FACTOR           4
 
 // ADC sanity limits to reject obvious bad reads.
 #define BATTERY_MIN_VALID_MV        1200
-#define BATTERY_MAX_VALID_MV        5000
+#define BATTERY_MAX_VALID_MV        3600
 
 static bool battery_adc_ready = false;
 static uint16_t battery_last_raw_adc = 0;
 static bool battery_last_valid = false;
 static uint16_t battery_last_good_mv = BATTERY_VOLTAGE_NOMINAL_MV;
+static uint16_t battery_ref_mv = ADC_REF_VOLTAGE_1V25_MV;
+static uint8_t battery_scale_factor = AVDD_SCALE_FACTOR;
 
 /**
  * @brief Initialize battery voltage measurement
@@ -46,7 +49,17 @@ bool battery_init(void)
 
   // Configure for single-ended mode
   ADC_InitSingle_TypeDef initSingle = ADC_INITSINGLE_DEFAULT;
+  // On some MG1 boards AVDD measurement saturates with 1.25V ref.
+  // Prefer 5V ref when available to keep measurement in range.
+#if defined(_ADC_SINGLECTRL_REF_5V)
+  initSingle.reference = adcRef5V;
+  battery_ref_mv = ADC_REF_VOLTAGE_5V_MV;
+  battery_scale_factor = 1;
+#else
   initSingle.reference = adcRef1V25;        // 1.25V internal reference
+  battery_ref_mv = ADC_REF_VOLTAGE_1V25_MV;
+  battery_scale_factor = AVDD_SCALE_FACTOR;
+#endif
   initSingle.posSel = adcPosSelAVDD;        // VDD measurement (AVDD channel)
   initSingle.resolution = adcRes12Bit;      // 12-bit resolution
   initSingle.acqTime = adcAcqTime256;       // Longer acquisition for accuracy
@@ -83,8 +96,8 @@ uint16_t battery_read_voltage_mv(void)
   battery_last_raw_adc = (uint16_t)adc_value;
 
   // Calculate voltage in mV
-  // AVDD = (ADC_value / 4095) * ADC_REF_VOLTAGE * AVDD_SCALE_FACTOR
-  uint32_t voltage_mv = (adc_value * ADC_REF_VOLTAGE_MV * AVDD_SCALE_FACTOR) / 4095u;
+  // AVDD = (ADC_value / 4095) * Vref * scale
+  uint32_t voltage_mv = (adc_value * battery_ref_mv * battery_scale_factor) / 4095u;
 
   if (voltage_mv >= BATTERY_MIN_VALID_MV && voltage_mv <= BATTERY_MAX_VALID_MV) {
     battery_last_valid = true;
