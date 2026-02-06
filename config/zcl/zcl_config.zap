@@ -757,6 +757,22 @@
               "reportableChange": 0
             },
             {
+              "name": "Current File Version",
+              "code": 2,
+              "mfgCode": null,
+              "side": "client",
+              "type": "int32u",
+              "included": 1,
+              "storageOption": "RAM",
+              "singleton": 0,
+              "bounded": 0,
+              "defaultValue": "0xffffffff",
+              "reportable": 0,
+              "minInterval": 1,
+              "maxInterval": 65534,
+              "reportableChange": 0
+            },
+            {
               "name": "OTA Upgrade Status",
               "code": 6,
               "mfgCode": null,

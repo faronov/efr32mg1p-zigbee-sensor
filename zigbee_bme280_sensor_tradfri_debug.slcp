@@ -219,6 +219,8 @@ define:
     value: 10000
   - name: APP_DEBUG_BOOT_SPAM_PERIOD_MS
     value: 1000
+  - name: APP_DEBUG_FAKE_SENSOR_VALUES
+    value: 1
   - name: APP_BUILD_TAG
     value: '"dbg-netreset-otaoff-bootspam-crashprint"'
 

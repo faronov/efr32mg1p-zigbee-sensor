@@ -22,9 +22,15 @@
 // Event control for periodic updates
 static sl_zigbee_event_t sensor_update_event;
 static bool sensor_update_event_initialized = false;
+static bool sensor_ready = false;
+static bool battery_ready = false;
 
 // Configurable sensor update interval
 static uint32_t sensor_update_interval_ms = SENSOR_UPDATE_INTERVAL_MS;
+
+#ifndef APP_DEBUG_FAKE_SENSOR_VALUES
+#define APP_DEBUG_FAKE_SENSOR_VALUES 0
+#endif
 
 // Forward declaration
 static void sensor_update_event_handler(sl_zigbee_event_t *event);
@@ -32,25 +38,33 @@ static void sensor_update_event_handler(sl_zigbee_event_t *event);
 bool app_sensor_init(void)
 {
   sensor_update_event_initialized = false;
+  sensor_ready = false;
+  battery_ready = false;
+
+  // Initialize battery monitoring regardless of sensor presence.
+  battery_ready = battery_init();
+  if (!battery_ready) {
+    emberAfCorePrintln("Error: Battery monitoring initialization failed");
+  } else {
+    emberAfCorePrintln("Battery monitoring initialized successfully");
+  }
 
   // Initialize BME280 sensor
   if (!bme280_init()) {
     emberAfCorePrintln("Error: BME280 initialization failed");
-    return false;
+    sensor_ready = false;
+  } else {
+    sensor_ready = true;
+    emberAfCorePrintln("Detected sensor chip ID: 0x%02X (%s)",
+                       bme280_get_chip_id(),
+                       bme280_has_humidity() ? "BME280" : "BMP280");
+    emberAfCorePrintln("BME280 sensor initialized successfully");
   }
 
-  emberAfCorePrintln("Detected sensor chip ID: 0x%02X (%s)",
-                     bme280_get_chip_id(),
-                     bme280_has_humidity() ? "BME280" : "BMP280");
-  emberAfCorePrintln("BME280 sensor initialized successfully");
-
-  // Initialize battery monitoring
-  if (!battery_init()) {
-    emberAfCorePrintln("Error: Battery monitoring initialization failed");
+  if (!sensor_ready && !battery_ready) {
+    emberAfCorePrintln("Error: neither sensor nor battery monitor initialized");
     return false;
   }
-
-  emberAfCorePrintln("Battery monitoring initialized successfully");
 
   // Load configured interval from NVM
   const app_config_t* config = app_config_get();
@@ -118,22 +132,36 @@ void app_sensor_update(void)
 {
   bme280_data_t sensor_data;
   EmberAfStatus status;
-  bool has_humidity = bme280_has_humidity();
+  bool has_humidity = sensor_ready ? bme280_has_humidity() : true;
+  bool have_sensor_sample = false;
 
   // Read sensor data
-  if (!bme280_read_data(&sensor_data)) {
-    emberAfCorePrintln("Error: Failed to read BME280 data");
-    return;
+  if (sensor_ready) {
+    if (bme280_read_data(&sensor_data)) {
+      have_sensor_sample = true;
+    } else {
+      emberAfCorePrintln("Error: Failed to read BME280 data");
+    }
   }
 
-  if (has_humidity) {
+  if (!have_sensor_sample && APP_DEBUG_FAKE_SENSOR_VALUES) {
+    // Deterministic fallback values for debug when no physical sensor is present.
+    sensor_data.temperature = 2150;  // 21.50 C
+    sensor_data.humidity = 5000;     // 50.00 %
+    sensor_data.pressure = 101325;   // Pa
+    has_humidity = true;
+    have_sensor_sample = true;
+    emberAfCorePrintln("Sensor: using debug fallback values");
+  }
+
+  if (have_sensor_sample && has_humidity) {
     emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=%d.%02d %%, P=%d Pa",
                        sensor_data.temperature / 100,
                        sensor_data.temperature % 100,
                        sensor_data.humidity / 100,
                        sensor_data.humidity % 100,
                        sensor_data.pressure);
-  } else {
+  } else if (have_sensor_sample) {
     emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=--, P=%d Pa",
                        sensor_data.temperature / 100,
                        sensor_data.temperature % 100,
@@ -144,102 +172,117 @@ void app_sensor_update(void)
   const app_config_t* config = app_config_get();
 
   // Apply calibration offsets
-  int32_t temp_calibrated = sensor_data.temperature + config->temperature_offset_centidegrees;
+  int32_t temp_calibrated = 0;
   int32_t humidity_calibrated = 0;
-  if (has_humidity) {
-    humidity_calibrated = sensor_data.humidity + config->humidity_offset_centipercent;
+  int32_t pressure_calibrated = 0;
+  if (have_sensor_sample) {
+    temp_calibrated = sensor_data.temperature + config->temperature_offset_centidegrees;
+    if (has_humidity) {
+      humidity_calibrated = sensor_data.humidity + config->humidity_offset_centipercent;
+    }
+    pressure_calibrated = sensor_data.pressure + (config->pressure_offset_centikilopascals * 10); // Convert 0.01 kPa to Pa
   }
-  int32_t pressure_calibrated = sensor_data.pressure + (config->pressure_offset_centikilopascals * 10); // Convert 0.01 kPa to Pa
 
-  if (has_humidity) {
+  if (have_sensor_sample && has_humidity) {
     emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=%d.%02d %%, P=%d Pa",
                        (int)(temp_calibrated / 100),
                        (int)(temp_calibrated % 100),
                        (int)(humidity_calibrated / 100),
                        (int)(humidity_calibrated % 100),
                        (int)pressure_calibrated);
-  } else {
+  } else if (have_sensor_sample) {
     emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=--, P=%d Pa",
                        (int)(temp_calibrated / 100),
                        (int)(temp_calibrated % 100),
                        (int)pressure_calibrated);
   }
 
-  // Update Temperature Measurement cluster (0x0402)
-  // MeasuredValue is int16, in 0.01°C units
-  int16_t temp_value = (int16_t)temp_calibrated;
-  status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                       ZCL_TEMP_MEASUREMENT_CLUSTER_ID,
-                                       ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID,
-                                       (uint8_t *)&temp_value,
-                                       ZCL_INT16S_ATTRIBUTE_TYPE);
-  if (status != EMBER_ZCL_STATUS_SUCCESS) {
-    emberAfCorePrintln("Error: Failed to update temperature attribute (0x%x)", status);
+  if (have_sensor_sample) {
+    // Update Temperature Measurement cluster (0x0402)
+    // MeasuredValue is int16, in 0.01°C units
+    int16_t temp_value = (int16_t)temp_calibrated;
+    status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                         ZCL_TEMP_MEASUREMENT_CLUSTER_ID,
+                                         ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID,
+                                         (uint8_t *)&temp_value,
+                                         ZCL_INT16S_ATTRIBUTE_TYPE);
+    if (status != EMBER_ZCL_STATUS_SUCCESS) {
+      emberAfCorePrintln("Error: Failed to update temperature attribute (0x%x)", status);
+    }
+
+    if (has_humidity) {
+      // Update Relative Humidity Measurement cluster (0x0405)
+      // MeasuredValue is uint16, in 0.01%RH units
+      uint16_t humidity_value = (uint16_t)humidity_calibrated;
+      status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                           ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
+                                           ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
+                                           (uint8_t *)&humidity_value,
+                                           ZCL_INT16U_ATTRIBUTE_TYPE);
+      if (status != EMBER_ZCL_STATUS_SUCCESS) {
+        emberAfCorePrintln("Error: Failed to update humidity attribute (0x%x)", status);
+      }
+    } else {
+      emberAfCorePrintln("Humidity not supported by sensor (BMP280)");
+    }
+
+    // Update Pressure Measurement cluster (0x0403)
+    // MeasuredValue is int16, in kPa units (divide Pa by 1000)
+    // Zigbee spec: signed 16-bit integer in kPa
+    int16_t pressure_value = (int16_t)(pressure_calibrated / 1000);
+    status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                         ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID,
+                                         ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID,
+                                         (uint8_t *)&pressure_value,
+                                         ZCL_INT16S_ATTRIBUTE_TYPE);
+    if (status != EMBER_ZCL_STATUS_SUCCESS) {
+      emberAfCorePrintln("Error: Failed to update pressure attribute (0x%x)", status);
+    }
   }
 
-  if (has_humidity) {
-    // Update Relative Humidity Measurement cluster (0x0405)
-    // MeasuredValue is uint16, in 0.01%RH units
-    uint16_t humidity_value = (uint16_t)humidity_calibrated;
+  if (battery_ready) {
+    // Update Power Configuration cluster (0x0001)
+    // Read battery voltage and percentage
+    uint16_t battery_voltage_mv = battery_read_voltage_mv();
+    uint8_t battery_voltage_100mv = battery_read_voltage_100mv();
+    uint8_t battery_percentage = battery_calculate_percentage(battery_voltage_mv);
+
+    emberAfCorePrintln("Battery: %d mV (%d %%), raw: %d/200",
+                       battery_voltage_mv,
+                       battery_percentage / 2, // Convert to percentage (200 = 100%)
+                       battery_percentage);
+
+    // Update BatteryVoltage attribute (0x0020)
+    // uint8, in 100mV units (e.g., 30 = 3.0V)
     status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                         ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
-                                         ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
-                                         (uint8_t *)&humidity_value,
-                                         ZCL_INT16U_ATTRIBUTE_TYPE);
+                                         ZCL_POWER_CONFIG_CLUSTER_ID,
+                                         ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID,
+                                         (uint8_t *)&battery_voltage_100mv,
+                                         ZCL_INT8U_ATTRIBUTE_TYPE);
     if (status != EMBER_ZCL_STATUS_SUCCESS) {
-      emberAfCorePrintln("Error: Failed to update humidity attribute (0x%x)", status);
+      emberAfCorePrintln("Error: Failed to update battery voltage attribute (0x%x)", status);
+    }
+
+    // Update BatteryPercentageRemaining attribute (0x0021)
+    // uint8, 0-200 range (0.5% resolution, 200 = 100%)
+    status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                         ZCL_POWER_CONFIG_CLUSTER_ID,
+                                         ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID,
+                                         (uint8_t *)&battery_percentage,
+                                         ZCL_INT8U_ATTRIBUTE_TYPE);
+    if (status != EMBER_ZCL_STATUS_SUCCESS) {
+      emberAfCorePrintln("Error: Failed to update battery percentage attribute (0x%x)", status);
     }
   } else {
-    emberAfCorePrintln("Humidity not supported by sensor (BMP280)");
-  }
-
-  // Update Pressure Measurement cluster (0x0403)
-  // MeasuredValue is int16, in kPa units (divide Pa by 1000)
-  // Zigbee spec: signed 16-bit integer in kPa
-  int16_t pressure_value = (int16_t)(pressure_calibrated / 1000);
-  status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                       ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID,
-                                       ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID,
-                                       (uint8_t *)&pressure_value,
-                                       ZCL_INT16S_ATTRIBUTE_TYPE);
-  if (status != EMBER_ZCL_STATUS_SUCCESS) {
-    emberAfCorePrintln("Error: Failed to update pressure attribute (0x%x)", status);
-  }
-
-  // Update Power Configuration cluster (0x0001)
-  // Read battery voltage and percentage
-  uint16_t battery_voltage_mv = battery_read_voltage_mv();
-  uint8_t battery_voltage_100mv = battery_read_voltage_100mv();
-  uint8_t battery_percentage = battery_calculate_percentage(battery_voltage_mv);
-
-  emberAfCorePrintln("Battery: %d mV (%d %%), raw: %d/200",
-                     battery_voltage_mv,
-                     battery_percentage / 2, // Convert to percentage (200 = 100%)
-                     battery_percentage);
-
-  // Update BatteryVoltage attribute (0x0020)
-  // uint8, in 100mV units (e.g., 30 = 3.0V)
-  status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                       ZCL_POWER_CONFIG_CLUSTER_ID,
-                                       ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID,
-                                       (uint8_t *)&battery_voltage_100mv,
-                                       ZCL_INT8U_ATTRIBUTE_TYPE);
-  if (status != EMBER_ZCL_STATUS_SUCCESS) {
-    emberAfCorePrintln("Error: Failed to update battery voltage attribute (0x%x)", status);
-  }
-
-  // Update BatteryPercentageRemaining attribute (0x0021)
-  // uint8, 0-200 range (0.5% resolution, 200 = 100%)
-  status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                       ZCL_POWER_CONFIG_CLUSTER_ID,
-                                       ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID,
-                                       (uint8_t *)&battery_percentage,
-                                       ZCL_INT8U_ATTRIBUTE_TYPE);
-  if (status != EMBER_ZCL_STATUS_SUCCESS) {
-    emberAfCorePrintln("Error: Failed to update battery percentage attribute (0x%x)", status);
+    emberAfCorePrintln("Battery monitor not initialized");
   }
 
   // Trigger attribute reporting (if configured by coordinator)
   // The reporting mechanism will automatically send reports if bound
-  emberAfCorePrintln("Sensor and battery attributes updated successfully");
+  emberAfCorePrintln("Sensor/battery attribute update complete");
+}
+
+bool app_sensor_is_ready(void)
+{
+  return sensor_ready;
 }

@@ -58,4 +58,11 @@ void app_sensor_start_periodic_updates(void);
  */
 void app_sensor_set_interval(uint32_t interval_ms);
 
+/**
+ * @brief Check whether sensor stack is initialized and ready.
+ *
+ * @return true if sensor init succeeded and reads can be performed.
+ */
+bool app_sensor_is_ready(void);
+
 #endif // APP_SENSOR_H
