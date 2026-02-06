@@ -209,6 +209,13 @@ void emberAfInitCallback(void)
   af_init_force_pending = false;
   af_init_force_tick = 0;
 
+#ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
+  // TRADFRI boards may not have an external pull-up on BTN0 (PB13).
+  // Force internal pull-up + input filter to avoid floating/false presses.
+  GPIO_PinModeSet(gpioPortB, 13, gpioModeInputPullFilter, 1);
+  APP_DEBUG_PRINTF("BTN0: internal pull-up enabled (PB13)\n");
+#endif
+
 #if APP_DEBUG_RESET_NETWORK
   app_debug_reset_network_state();
 #endif
