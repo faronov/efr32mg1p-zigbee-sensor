@@ -198,6 +198,8 @@ define:
     value: 1
   - name: APP_DEBUG_NO_SLEEP
     value: 1
+  - name: APP_DEBUG_RESET_NETWORK
+    value: 1
   - name: APP_DEBUG_MAIN_HEARTBEAT
     value: 1
   - name: APP_DEBUG_POLL_BUTTON

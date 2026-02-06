@@ -11,6 +11,7 @@
 #include "app_config.h"
 #include "stack/include/network-formation.h"  // For manual network join
 #include "stack/include/security.h"
+#include "stack/include/binding-table.h"
 #include "sl_sleeptimer.h"
 #include "em_cmu.h"
 #include "em_gpio.h"
@@ -83,6 +84,9 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_SPI_ONLY
 #define APP_DEBUG_SPI_ONLY 0
 #endif
+#ifndef APP_DEBUG_RESET_NETWORK
+#define APP_DEBUG_RESET_NETWORK 0
+#endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
 static void handle_short_press(void);
@@ -133,6 +137,9 @@ static bool basic_identity_pending = false;
 static bool af_init_force_pending = false;
 static uint32_t af_init_force_tick = 0;
 static uint32_t basic_identity_tick = 0;
+#if APP_DEBUG_RESET_NETWORK
+static bool debug_reset_network_done = false;
+#endif
 
 void app_debug_poll(void);
 static bool join_pending = false;
@@ -166,6 +173,9 @@ static void app_flash_send_cmd(GPIO_Port_TypeDef port,
 static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
                                     unsigned int pin,
                                     const char *label);
+#if APP_DEBUG_RESET_NETWORK
+static void app_debug_reset_network_state(void);
+#endif
 
 /**
  * @brief Zigbee application init callback
@@ -188,6 +198,10 @@ void emberAfInitCallback(void)
   af_init_seen = true;
   af_init_force_pending = false;
   af_init_force_tick = 0;
+
+#if APP_DEBUG_RESET_NETWORK
+  app_debug_reset_network_state();
+#endif
   emberAfCorePrintln("Zigbee BME280 Sensor Application");
   emberAfCorePrintln("Silicon Labs EFR32MG1P + Bosch BME280");
   emberAfCorePrintln("Press BTN0 to join network or trigger sensor reading");
@@ -223,6 +237,28 @@ void emberAfInitCallback(void)
 #endif
   }
 }
+
+#if APP_DEBUG_RESET_NETWORK
+static void app_debug_reset_network_state(void)
+{
+  if (debug_reset_network_done) {
+    return;
+  }
+  debug_reset_network_done = true;
+  emberAfCorePrintln("Debug: resetting network state");
+  EmberStatus leave_status = emberLeaveNetwork();
+  emberAfCorePrintln("Debug: leave network -> 0x%02X", leave_status);
+  EmberStatus bind_status = emberClearBindingTable();
+  emberAfCorePrintln("Debug: clear binding table -> 0x%02X", bind_status);
+  EmberStatus key_status = emberClearKeyTable();
+  emberAfCorePrintln("Debug: clear key table -> 0x%02X", key_status);
+  join_attempt_count = 0;
+  current_channel_index = 0;
+  join_scan_in_progress = false;
+  join_network_found = false;
+  network_join_in_progress = false;
+}
+#endif
 
 void app_debug_force_af_init(void)
 {
