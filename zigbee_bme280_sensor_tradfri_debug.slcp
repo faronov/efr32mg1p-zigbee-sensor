@@ -202,11 +202,11 @@ define:
   - name: APP_DEBUG_NO_SLEEP
     value: 0
   - name: APP_DEBUG_RESET_NETWORK
-    value: 1
+    value: 0
   - name: APP_DEBUG_MAIN_HEARTBEAT
     value: 1
   - name: APP_DEBUG_POLL_BUTTON
-    value: 0
+    value: 1
   - name: APP_DEBUG_FORCE_AF_INIT
     value: 1
   - name: APP_DEBUG_SPI_ONLY
@@ -232,7 +232,7 @@ define:
   - name: APP_DEBUG_AUTO_JOIN_ON_BOOT
     value: 0
   - name: APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
-    value: 1
+    value: 0
   - name: APP_BUILD_TAG
     value: '"dbg-netreset-otaoff-bootspam-crashprint"'
 
