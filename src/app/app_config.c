@@ -53,6 +53,9 @@ void app_config_init(void)
                                  (uint8_t *)&interval,
                                  sizeof(interval));
   config.sensor_read_interval_seconds = (status == EMBER_ZCL_STATUS_SUCCESS) ? interval : 60;
+  if (config.sensor_read_interval_seconds < 10 || config.sensor_read_interval_seconds > 3600) {
+    config.sensor_read_interval_seconds = 60;
+  }
 
   // Load temperature offset
   int16_t temp_offset;

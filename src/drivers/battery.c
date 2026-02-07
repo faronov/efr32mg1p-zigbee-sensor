@@ -25,6 +25,7 @@
 // ADC sanity limits to reject obvious bad reads.
 #define BATTERY_MIN_VALID_MV        1200
 #define BATTERY_MAX_VALID_MV        3600
+#define BATTERY_ADC_WAIT_MAX_CYCLES 1000000u
 
 static bool battery_adc_ready = false;
 static uint16_t battery_last_raw_adc = 0;
@@ -86,8 +87,14 @@ uint16_t battery_read_voltage_mv(void)
   for (uint8_t i = 0; i < samples; i++) {
     ADC_IntClear(ADC0, ADC_IF_SINGLE);
     ADC_Start(ADC0, adcStartSingle);
-    while ((ADC_IntGet(ADC0) & ADC_IF_SINGLE) == 0u) {
+    uint32_t wait_cycles = BATTERY_ADC_WAIT_MAX_CYCLES;
+    while ((ADC_IntGet(ADC0) & ADC_IF_SINGLE) == 0u && wait_cycles > 0u) {
       // wait
+      wait_cycles--;
+    }
+    if (wait_cycles == 0u) {
+      battery_last_valid = false;
+      return battery_last_good_mv;
     }
     sum += ADC_DataSingleGet(ADC0) & 0x0FFFu;
   }

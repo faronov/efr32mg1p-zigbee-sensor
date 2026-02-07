@@ -197,9 +197,9 @@ bool app_sensor_init(void)
   emberAfCorePrintln("Reporting config: min=%ds max=%ds dT=%d dRH=%d dP=%d",
                      APP_REPORT_MIN_INTERVAL_S,
                      APP_REPORT_MAX_INTERVAL_S,
-                     APP_REPORT_TEMP_CHANGE_CENTI,
-                     APP_REPORT_HUM_CHANGE_CENTI,
-                     APP_REPORT_PRESS_CHANGE_KPA);
+                     config->report_threshold_temperature,
+                     config->report_threshold_humidity,
+                     config->report_threshold_pressure);
 
   return true;
 }
@@ -293,6 +293,12 @@ void app_sensor_update(void)
 
   // Get configuration and apply calibration offsets
   const app_config_t* config = app_config_get();
+  int32_t temp_threshold = (config->report_threshold_temperature > 0)
+                           ? config->report_threshold_temperature : 1;
+  int32_t hum_threshold = (config->report_threshold_humidity > 0)
+                          ? config->report_threshold_humidity : 1;
+  int32_t pressure_threshold_centikpa = (config->report_threshold_pressure > 0)
+                                        ? config->report_threshold_pressure : 1;
 
   // Apply calibration offsets
   int32_t temp_calibrated = 0;
@@ -324,7 +330,7 @@ void app_sensor_update(void)
     // Update Temperature Measurement cluster (0x0402)
     // MeasuredValue is int16, in 0.01°C units
     int16_t temp_value = (int16_t)temp_calibrated;
-    if (app_report_gate(&temp_report_state, temp_calibrated, APP_REPORT_TEMP_CHANGE_CENTI, now_ms)) {
+    if (app_report_gate(&temp_report_state, temp_calibrated, temp_threshold, now_ms)) {
       status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
                                            ZCL_TEMP_MEASUREMENT_CLUSTER_ID,
                                            ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID,
@@ -339,7 +345,7 @@ void app_sensor_update(void)
       // Update Relative Humidity Measurement cluster (0x0405)
       // MeasuredValue is uint16, in 0.01%RH units
       uint16_t humidity_value = (uint16_t)humidity_calibrated;
-      if (app_report_gate(&hum_report_state, humidity_calibrated, APP_REPORT_HUM_CHANGE_CENTI, now_ms)) {
+      if (app_report_gate(&hum_report_state, humidity_calibrated, hum_threshold, now_ms)) {
         status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
                                              ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
                                              ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
@@ -357,7 +363,8 @@ void app_sensor_update(void)
     // MeasuredValue is int16, in kPa units (divide Pa by 1000)
     // Zigbee spec: signed 16-bit integer in kPa
     int16_t pressure_value = (int16_t)(pressure_calibrated / 1000);
-    if (app_report_gate(&press_report_state, pressure_value, APP_REPORT_PRESS_CHANGE_KPA, now_ms)) {
+    int32_t pressure_centikpa = pressure_calibrated / 10; // 0.01 kPa units
+    if (app_report_gate(&press_report_state, pressure_centikpa, pressure_threshold_centikpa, now_ms)) {
       status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
                                            ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID,
                                            ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID,

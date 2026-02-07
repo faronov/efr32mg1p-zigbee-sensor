@@ -175,8 +175,10 @@ static bool debug_reset_network_done = false;
 #endif
 
 void app_debug_poll(void);
+bool app_debug_button_ready(void);
 static bool join_pending = false;
 static bool join_security_configured = false;
+static bool rejoin_after_leave_request = false;
 
 #ifndef EMBER_ENCRYPTION_KEY_SIZE
 #define EMBER_ENCRYPTION_KEY_SIZE 16
@@ -337,8 +339,7 @@ void app_debug_poll(void)
     if (af_init_force_tick == 0) {
       af_init_force_tick = now;
     } else if (sl_sleeptimer_tick_to_ms(now - af_init_force_tick) >= 2000) {
-      APP_DEBUG_PRINTF("AF init forced (timeout)\n");
-      emberAfInitCallback();
+      APP_DEBUG_PRINTF("AF init timeout (no forced callback)\n");
       af_init_force_pending = false;
     }
   }
@@ -371,6 +372,11 @@ void app_debug_poll(void)
     }
   }
 #endif
+}
+
+bool app_debug_button_ready(void)
+{
+  return af_init_seen;
 }
 
 static bool log_basic_identity(void)
@@ -609,6 +615,7 @@ void emberAfStackStatusCallback(EmberStatus status)
     network_join_in_progress = false;
     join_scan_in_progress = false;
     join_network_found = false;
+    rejoin_after_leave_request = false;
 
     // Cancel any pending rejoin attempts - network is up (TEMPORARILY DISABLED)
     // rejoin_state = REJOIN_STATE_DONE;
@@ -650,6 +657,12 @@ void emberAfStackStatusCallback(EmberStatus status)
     // emberAfCorePrintln("Scheduling optimized rejoin in 100ms...");
     // rejoin_state = REJOIN_STATE_IDLE;
     // sl_zigbee_event_set_delay_ms(&rejoin_retry_event, 100);
+
+    if (rejoin_after_leave_request) {
+      rejoin_after_leave_request = false;
+      emberAfCorePrintln("Long press: network left, starting rejoin");
+      handle_short_press();
+    }
   }
 }
 
@@ -1123,49 +1136,14 @@ static void handle_long_press(void)
 
   if (network_state == EMBER_JOINED_NETWORK) {
     emberAfCorePrintln("Leaving network and rejoining...");
-
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-    // Flash LED rapidly to indicate leave operation
-    for (int i = 0; i < 5; i++) {
-      sl_led_toggle(&sl_led_led0);
-      sl_sleeptimer_delay_millisecond(100);
-    }
-#endif
+    rejoin_after_leave_request = true;
 
     // Leave the network
     EmberStatus leave_status = emberLeaveNetwork();
     if (leave_status == EMBER_SUCCESS) {
-      emberAfCorePrintln("Left network successfully");
-
-      // Reset join attempt counter and channel index for new join
-      join_attempt_count = 0;
-      current_channel_index = 0;
-      join_scan_in_progress = false;
-      join_network_found = false;
-      network_join_in_progress = true;
-
-      // Small delay to ensure leave completes
-      sl_sleeptimer_delay_millisecond(500);
-
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-      // Start LED blinking to indicate joining
-      led_blink_active = true;
-      sl_zigbee_event_set_active(&led_blink_event);
-#endif
-
-      // Start manual network join to rejoin (no longer using network steering plugin)
-      EmberStatus join_status = start_join_scan();
-      if (join_status != EMBER_SUCCESS) {
-        emberAfCorePrintln("Failed to start rejoin: 0x%x", join_status);
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-        if (!network_join_in_progress) {
-          led_blink_active = false;
-          sl_zigbee_event_set_inactive(&led_blink_event);
-          sl_led_turn_off(&sl_led_led0);
-        }
-#endif
-      }
+      emberAfCorePrintln("Leave requested, waiting for network down");
     } else {
+      rejoin_after_leave_request = false;
       emberAfCorePrintln("Failed to leave network: 0x%x", leave_status);
     }
   } else {
