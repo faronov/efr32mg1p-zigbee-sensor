@@ -76,17 +76,6 @@ static uint32_t app_get_ms(void)
   return (uint32_t)sl_sleeptimer_tick_to_ms(ticks);
 }
 
-static void app_mark_reportable_change(uint8_t endpoint,
-                                       EmberAfClusterId cluster_id,
-                                       EmberAfAttributeId attribute_id)
-{
-  emberAfReportingAttributeChangeCallback(endpoint,
-                                          cluster_id,
-                                          attribute_id,
-                                          CLUSTER_MASK_SERVER,
-                                          EMBER_AF_NULL_MANUFACTURER_CODE);
-}
-
 static int32_t app_abs_i32(int32_t value)
 {
   return (value < 0) ? -value : value;
@@ -349,10 +338,6 @@ void app_sensor_update(void)
                                            ZCL_INT16S_ATTRIBUTE_TYPE);
       if (status != EMBER_ZCL_STATUS_SUCCESS) {
         emberAfCorePrintln("Error: Failed to update temperature attribute (0x%x)", status);
-      } else {
-        app_mark_reportable_change(SENSOR_ENDPOINT,
-                                   ZCL_TEMP_MEASUREMENT_CLUSTER_ID,
-                                   ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID);
       }
     }
 
@@ -368,10 +353,6 @@ void app_sensor_update(void)
                                              ZCL_INT16U_ATTRIBUTE_TYPE);
         if (status != EMBER_ZCL_STATUS_SUCCESS) {
           emberAfCorePrintln("Error: Failed to update humidity attribute (0x%x)", status);
-        } else {
-          app_mark_reportable_change(SENSOR_ENDPOINT,
-                                     ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
-                                     ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID);
         }
       }
     } else {
@@ -391,10 +372,6 @@ void app_sensor_update(void)
                                            ZCL_INT16S_ATTRIBUTE_TYPE);
       if (status != EMBER_ZCL_STATUS_SUCCESS) {
         emberAfCorePrintln("Error: Failed to update pressure attribute (0x%x)", status);
-      } else {
-        app_mark_reportable_change(SENSOR_ENDPOINT,
-                                   ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID,
-                                   ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID);
       }
     }
   }
@@ -424,10 +401,6 @@ void app_sensor_update(void)
                                          ZCL_INT8U_ATTRIBUTE_TYPE);
     if (status != EMBER_ZCL_STATUS_SUCCESS) {
       emberAfCorePrintln("Error: Failed to update battery voltage attribute (0x%x)", status);
-    } else {
-      app_mark_reportable_change(SENSOR_ENDPOINT,
-                                 ZCL_POWER_CONFIG_CLUSTER_ID,
-                                 ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID);
     }
 
     // Update BatteryPercentageRemaining attribute (0x0021)
@@ -439,10 +412,6 @@ void app_sensor_update(void)
                                          ZCL_INT8U_ATTRIBUTE_TYPE);
     if (status != EMBER_ZCL_STATUS_SUCCESS) {
       emberAfCorePrintln("Error: Failed to update battery percentage attribute (0x%x)", status);
-    } else {
-      app_mark_reportable_change(SENSOR_ENDPOINT,
-                                 ZCL_POWER_CONFIG_CLUSTER_ID,
-                                 ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID);
     }
   } else {
     emberAfCorePrintln("Battery monitor not initialized");
