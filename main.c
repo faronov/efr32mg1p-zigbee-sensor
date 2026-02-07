@@ -26,6 +26,7 @@ void sl_system_process_action(void);
 
 void app_debug_sanity(void);
 void app_debug_trigger_short_press(void);
+void app_debug_trigger_long_press(void);
 void app_debug_force_af_init(void);
 void app_debug_poll(void);
 
@@ -55,6 +56,9 @@ void app_debug_poll(void);
 #endif
 #ifndef APP_DEBUG_BOOT_SPAM_PERIOD_MS
 #define APP_DEBUG_BOOT_SPAM_PERIOD_MS 1000
+#endif
+#ifndef APP_DEBUG_LONG_PRESS_MS
+#define APP_DEBUG_LONG_PRESS_MS 5000
 #endif
 #ifndef APP_BUILD_TAG
 #define APP_BUILD_TAG "unknown"
@@ -198,13 +202,22 @@ int main(void)
 #if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) && defined(APP_DEBUG_POLL_BUTTON) && (APP_DEBUG_POLL_BUTTON != 0)
     // Simple polling to confirm BTN0 is wired and readable in debug.
     static sl_button_state_t last_state = SL_SIMPLE_BUTTON_RELEASED;
+    static uint32_t press_tick = 0;
     sl_button_state_t state = sl_button_get_state(&sl_button_btn0);
     if (state != last_state) {
       last_state = state;
       printf("BTN0: %s\n",
              (state == SL_SIMPLE_BUTTON_PRESSED) ? "PRESSED" : "RELEASED");
       if (state == SL_SIMPLE_BUTTON_PRESSED) {
-        app_debug_trigger_short_press();
+        press_tick = sl_sleeptimer_get_tick_count();
+      } else if (press_tick != 0) {
+        uint32_t held_ms = sl_sleeptimer_tick_to_ms(sl_sleeptimer_get_tick_count() - press_tick);
+        press_tick = 0;
+        if (held_ms >= APP_DEBUG_LONG_PRESS_MS) {
+          app_debug_trigger_long_press();
+        } else {
+          app_debug_trigger_short_press();
+        }
       }
     }
 #endif

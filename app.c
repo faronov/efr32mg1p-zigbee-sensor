@@ -140,6 +140,12 @@ void app_debug_trigger_short_press(void)
   handle_short_press();
 }
 
+void app_debug_trigger_long_press(void)
+{
+  APP_DEBUG_PRINTF("app_debug_trigger_long_press\n");
+  handle_long_press();
+}
+
 // Zigbee 3.0 channels (11-26)
 #define ZIGBEE_CHANNELS_MASK 0x07FFF800
 
@@ -795,6 +801,7 @@ void emberAfTickCallback(void)
   }
 
   // Check for short press
+#if !APP_DEBUG_POLL_BUTTON
   if (button_short_press_pending) {
     button_short_press_pending = false;  // Clear flag
     APP_DEBUG_PRINTF("Button short press\n");
@@ -809,6 +816,7 @@ void emberAfTickCallback(void)
     emberAfCorePrintln("Button: Long press detected (tick callback)");
     handle_long_press();
   }
+#endif
 }
 
 /**
