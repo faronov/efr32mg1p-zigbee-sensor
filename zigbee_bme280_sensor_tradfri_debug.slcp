@@ -226,7 +226,7 @@ define:
     value: 0
   # Keep sleepy end device in fast-poll mode after join to speed up coordinator interview.
   - name: APP_DEBUG_FAST_POLL_AFTER_JOIN_MS
-    value: 120000
+    value: 60000
   - name: APP_DEBUG_FAST_POLL_INTERVAL_MS
     value: 250
   - name: APP_BUILD_TAG

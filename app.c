@@ -101,11 +101,6 @@ static bool button_pressed = false;
 #endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
-extern bool emberAfSetShortPollIntervalMsCallback(uint32_t intervalMs);
-extern bool emberAfSetWakeTimeoutMsCallback(uint32_t intervalMs);
-#endif
-
 static void handle_short_press(void);
 
 void app_debug_sanity(void)
@@ -570,13 +565,11 @@ void emberAfStackStatusCallback(EmberStatus status)
 #endif
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
-    bool short_poll_ok = emberAfSetShortPollIntervalMsCallback(APP_DEBUG_FAST_POLL_INTERVAL_MS);
-    bool wake_timeout_ok = emberAfSetWakeTimeoutMsCallback(APP_DEBUG_FAST_POLL_AFTER_JOIN_MS);
-    APP_DEBUG_PRINTF("Debug: fast poll enabled for %lu ms (short=%lu ms, short_ok=%d wake_ok=%d)\n",
+    emberAfSetShortPollIntervalMsCallback((int16u)APP_DEBUG_FAST_POLL_INTERVAL_MS);
+    emberAfSetWakeTimeoutMsCallback((int16u)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS);
+    APP_DEBUG_PRINTF("Debug: fast poll enabled for %lu ms (short=%lu ms)\n",
                      (unsigned long)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS,
-                     (unsigned long)APP_DEBUG_FAST_POLL_INTERVAL_MS,
-                     short_poll_ok ? 1 : 0,
-                     wake_timeout_ok ? 1 : 0);
+                     (unsigned long)APP_DEBUG_FAST_POLL_INTERVAL_MS);
 #endif
 
     // Reset join attempt counter and scan state on success
