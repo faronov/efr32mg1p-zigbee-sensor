@@ -186,7 +186,6 @@ void app_debug_poll(void);
 bool app_debug_button_ready(void);
 static bool join_pending = false;
 static bool join_security_configured = false;
-static bool rejoin_after_leave_request = false;
 
 #ifndef EMBER_ENCRYPTION_KEY_SIZE
 #define EMBER_ENCRYPTION_KEY_SIZE 16
@@ -631,6 +630,7 @@ void emberAfStackStatusCallback(EmberStatus status)
   APP_DEBUG_PRINTF("Stack status: 0x%02x\n", status);
   if (status == EMBER_NETWORK_UP) {
     emberAfCorePrintln("Network joined successfully");
+    APP_DEBUG_PRINTF("Join: runtime node type=%u\n", emberGetNodeType());
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
     if (!app_join_awake_active) {
@@ -661,7 +661,6 @@ void emberAfStackStatusCallback(EmberStatus status)
     network_join_in_progress = false;
     join_scan_in_progress = false;
     join_network_found = false;
-    rejoin_after_leave_request = false;
 
     // Cancel any pending rejoin attempts - network is up (TEMPORARILY DISABLED)
     // rejoin_state = REJOIN_STATE_DONE;
@@ -712,11 +711,6 @@ void emberAfStackStatusCallback(EmberStatus status)
     // rejoin_state = REJOIN_STATE_IDLE;
     // sl_zigbee_event_set_delay_ms(&rejoin_retry_event, 100);
 
-    if (rejoin_after_leave_request) {
-      rejoin_after_leave_request = false;
-      emberAfCorePrintln("Long press: network left, starting rejoin");
-      handle_short_press();
-    }
   }
 }
 
@@ -807,7 +801,7 @@ void emberAfTickCallback(void)
   // Simple button is configured in poll mode on this board; poll here so
   // sl_button_on_change() is invoked reliably.
   sl_simple_button_poll_instances();
-#if (APP_DEBUG_POLL_BUTTON != 0)
+#if (APP_DEBUG_POLL_BUTTON == 0)
   // Fallback path: some TRADFRI revisions do not trigger on_change reliably.
   // Poll raw BTN0 (PB13, active low) and synthesize press events with debounce.
   bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
@@ -1182,26 +1176,26 @@ static void configure_join_security(void)
 /**
  * @brief Handle long button press (>=5 seconds)
  *
- * Long press causes the device to leave the current network
- * and immediately attempt to rejoin (useful for moving to a new coordinator).
+ * Long press toggles network state:
+ * - joined: leave network
+ * - not joined: start join
  */
 static void handle_long_press(void)
 {
   EmberNetworkStatus network_state = emberAfNetworkState();
 
   if (network_state == EMBER_JOINED_NETWORK) {
-    emberAfCorePrintln("Leaving network and rejoining...");
-    rejoin_after_leave_request = true;
+    emberAfCorePrintln("Long press: leaving network...");
 
     // Leave the network
     EmberStatus leave_status = emberLeaveNetwork();
     if (leave_status == EMBER_SUCCESS) {
       emberAfCorePrintln("Leave requested, waiting for network down");
     } else {
-      rejoin_after_leave_request = false;
       emberAfCorePrintln("Failed to leave network: 0x%x", leave_status);
     }
   } else {
-    emberAfCorePrintln("Not joined to network - long press ignored");
+    emberAfCorePrintln("Long press: not joined, starting join");
+    handle_short_press();
   }
 }

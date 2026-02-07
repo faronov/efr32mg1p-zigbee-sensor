@@ -203,12 +203,14 @@ int main(void)
     static bool btn_pressed = false;
     static uint32_t press_tick = 0;
     static uint32_t debounce_tick = 0;
-    static bool press_action_done = false;
+    static bool short_fallback_sent = false;
+    static bool long_fallback_sent = false;
     if (!app_debug_button_ready()) {
       btn_pressed = false;
       press_tick = 0;
       debounce_tick = 0;
-      press_action_done = false;
+      short_fallback_sent = false;
+      long_fallback_sent = false;
     } else {
       bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
 
@@ -223,32 +225,39 @@ int main(void)
           printf("BTN0: %s\n", btn_pressed ? "PRESSED" : "RELEASED");
           if (btn_pressed) {
             press_tick = now_tick;
-            press_action_done = false;
+            short_fallback_sent = false;
+            long_fallback_sent = false;
           } else if (press_tick != 0) {
             uint32_t held_ms = sl_sleeptimer_tick_to_ms(now_tick - press_tick);
             press_tick = 0;
-            if (!press_action_done) {
+            if (!long_fallback_sent && !short_fallback_sent) {
               if (held_ms >= APP_DEBUG_LONG_PRESS_MS) {
                 app_debug_trigger_long_press();
               } else {
                 app_debug_trigger_short_press();
               }
             }
-            press_action_done = false;
+            short_fallback_sent = false;
+            long_fallback_sent = false;
           }
         }
       } else {
         debounce_tick = 0;
       }
 
-      // Fallback: if release edge is missed, synthesize ONLY short press.
-      // Long press must require a real release edge to avoid accidental leave/rejoin.
-      if (btn_pressed && press_tick != 0 && !press_action_done) {
+      // Fallback: if release edge is missed, synthesize presses by hold time.
+      // Allow LONG to still fire even if SHORT already fired earlier.
+      if (btn_pressed && press_tick != 0) {
         uint32_t held_ms = sl_sleeptimer_tick_to_ms(sl_sleeptimer_get_tick_count() - press_tick);
-        if (held_ms >= APP_DEBUG_SHORT_FALLBACK_MS) {
+        if (!long_fallback_sent && held_ms >= APP_DEBUG_LONG_PRESS_MS) {
+          printf("BTN0: fallback LONG (no release edge)\n");
+          app_debug_trigger_long_press();
+          long_fallback_sent = true;
+          short_fallback_sent = true;
+        } else if (!short_fallback_sent && held_ms >= APP_DEBUG_SHORT_FALLBACK_MS) {
           printf("BTN0: fallback SHORT (no release edge)\n");
           app_debug_trigger_short_press();
-          press_action_done = true;
+          short_fallback_sent = true;
         }
       }
     }

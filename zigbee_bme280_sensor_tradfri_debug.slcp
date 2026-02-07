@@ -75,10 +75,10 @@ configuration:
   - name: EMBER_AF_PRINT_CORE
     value: 1
 
-  # Configure as Zigbee Sleepy End Device so coordinators classify battery entity correctly.
-  # Debug keeps EM0 via APP_DEBUG_NO_SLEEP, but network role stays sleepy/battery-powered.
+  # Debug build: use non-sleepy END_DEVICE for stable interview/traffic on TRADFRI board.
+  # Sleepy mode can be enabled in release after polling path is fully validated on coordinator.
   - name: SLI_ZIGBEE_PRIMARY_NETWORK_DEVICE_TYPE
-    value: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_SLEEPY_END_DEVICE
+    value: SLI_ZIGBEE_NETWORK_DEVICE_TYPE_END_DEVICE
 
   # Increase stack sizes and reduce event usage (fix event-queue.c:294 assert)
   - name: EMBER_AF_PLUGIN_IDLE_SLEEP_USE_BUTTONS
@@ -238,7 +238,7 @@ define:
   - name: APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
     value: 0
   - name: APP_DEBUG_JOIN_AS_END_DEVICE
-    value: 0
+    value: 1
   - name: APP_BUILD_TAG
     value: '"dbg-netreset-otaoff-bootspam-crashprint"'
 
