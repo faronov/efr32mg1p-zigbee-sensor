@@ -129,14 +129,9 @@ int main(void)
 #endif
 
 #if APP_DEBUG_FORCE_AF_INIT
-  // Force AF init in debug builds in case the framework init isn't wired.
-  // Some SDK variants don't expose init level enums/macros; default to "DONE".
-#ifndef EMBER_AF_INIT_LEVEL_DONE
-#define EMBER_AF_INIT_LEVEL_DONE 0xFFu
-#endif
-  uint8_t init_level = (uint8_t)EMBER_AF_INIT_LEVEL_DONE;
-  emberAfInit(init_level);
-  printf("Debug: forced emberAfInit level=%u\n", (unsigned)init_level);
+  // Enable AF-init watchdog; fallback callback is handled in app_debug_poll().
+  // Avoid direct emberAfInit() call here to keep framework init sequence intact.
+  printf("Debug: AF init watchdog enabled\n");
   app_debug_force_af_init();
 #endif
 
