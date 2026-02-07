@@ -20,6 +20,7 @@ component:
 
   # Identify cluster support (LED blink when identified)
   - id: zigbee_identify
+  - id: zigbee_reporting
 
   # OTA bootloader support
   - id: zigbee_ota_client_policy
@@ -68,6 +69,8 @@ configuration:
   # Each binding ~16 bytes, total ~80 bytes RAM
   - name: EMBER_BINDING_TABLE_SIZE
     value: 5
+  - name: EMBER_AF_PLUGIN_REPORTING_TABLE_SIZE
+    value: 8
 
   # Reduced NVM size for Series 1
   - name: NVM3_DEFAULT_NVM_SIZE

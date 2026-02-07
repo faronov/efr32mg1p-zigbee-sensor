@@ -241,14 +241,11 @@ int main(void)
         debounce_tick = 0;
       }
 
-      // Fallback: if release edge is missed, synthesize action by hold time.
+      // Fallback: if release edge is missed, synthesize ONLY short press.
+      // Long press must require a real release edge to avoid accidental leave/rejoin.
       if (btn_pressed && press_tick != 0 && !press_action_done) {
         uint32_t held_ms = sl_sleeptimer_tick_to_ms(sl_sleeptimer_get_tick_count() - press_tick);
-        if (held_ms >= APP_DEBUG_LONG_PRESS_MS) {
-          printf("BTN0: fallback LONG (no release edge)\n");
-          app_debug_trigger_long_press();
-          press_action_done = true;
-        } else if (held_ms >= APP_DEBUG_SHORT_FALLBACK_MS) {
+        if (held_ms >= APP_DEBUG_SHORT_FALLBACK_MS) {
           printf("BTN0: fallback SHORT (no release edge)\n");
           app_debug_trigger_short_press();
           press_action_done = true;
