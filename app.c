@@ -1038,6 +1038,12 @@ static EmberStatus start_join_scan(void)
  */
 void emberAfNetworkFoundCallback(EmberZigbeeNetwork *networkFound, uint8_t lqi, int8_t rssi)
 {
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+  (void)networkFound;
+  (void)lqi;
+  (void)rssi;
+  return;
+#endif
   if (!network_join_in_progress || networkFound == NULL) {
     return;
   }
@@ -1067,6 +1073,11 @@ void emberAfNetworkFoundCallback(EmberZigbeeNetwork *networkFound, uint8_t lqi, 
  */
 void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
 {
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+  (void)channel;
+  (void)status;
+  return;
+#endif
   if (!network_join_in_progress) {
     return;
   }
@@ -1192,7 +1203,13 @@ static void handle_short_press(void)
         join_scan_in_progress = false;
         join_network_found = false;
       } else {
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+        network_join_in_progress = false;
+        join_scan_in_progress = false;
+        join_network_found = false;
+#else
         try_next_channel();
+#endif
       }
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
