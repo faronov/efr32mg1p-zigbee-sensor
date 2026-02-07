@@ -637,9 +637,8 @@ void emberAfStackStatusCallback(EmberStatus status)
     sl_zigbee_event_set_delay_ms(&led_off_event, 3000);
 #endif
 
-    // Run immediate update so coordinator sees fresh values right after interview,
-    // then start periodic reporting updates.
-    app_sensor_update();
+    // Avoid heavy sensor transactions right at join/interview start.
+    // Start periodic updates and let first sample happen on timer.
     app_sensor_start_periodic_updates();
 
     // Note: Binding is handled by coordinator (Zigbee2MQTT/ZHA/deCONZ)
