@@ -200,25 +200,35 @@ int main(void)
 #endif
 
 #if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) && defined(APP_DEBUG_POLL_BUTTON) && (APP_DEBUG_POLL_BUTTON != 0)
-    // Simple polling to confirm BTN0 is wired and readable in debug.
-    static sl_button_state_t last_state = SL_SIMPLE_BUTTON_RELEASED;
+    // Poll raw BTN0 pin (PB13, active low) to avoid simple-button glitches on TRADFRI.
+    static bool btn_pressed = false;
     static uint32_t press_tick = 0;
-    sl_button_state_t state = sl_button_get_state(&sl_button_btn0);
-    if (state != last_state) {
-      last_state = state;
-      printf("BTN0: %s\n",
-             (state == SL_SIMPLE_BUTTON_PRESSED) ? "PRESSED" : "RELEASED");
-      if (state == SL_SIMPLE_BUTTON_PRESSED) {
-        press_tick = sl_sleeptimer_get_tick_count();
-      } else if (press_tick != 0) {
-        uint32_t held_ms = sl_sleeptimer_tick_to_ms(sl_sleeptimer_get_tick_count() - press_tick);
-        press_tick = 0;
-        if (held_ms >= APP_DEBUG_LONG_PRESS_MS) {
-          app_debug_trigger_long_press();
-        } else {
-          app_debug_trigger_short_press();
+    static uint32_t debounce_tick = 0;
+    bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
+
+    if (raw_pressed != btn_pressed) {
+      uint32_t now_tick = sl_sleeptimer_get_tick_count();
+      if (debounce_tick == 0) {
+        debounce_tick = now_tick;
+      }
+      if (sl_sleeptimer_tick_to_ms(now_tick - debounce_tick) >= 30) {
+        btn_pressed = raw_pressed;
+        debounce_tick = 0;
+        printf("BTN0: %s\n", btn_pressed ? "PRESSED" : "RELEASED");
+        if (btn_pressed) {
+          press_tick = now_tick;
+        } else if (press_tick != 0) {
+          uint32_t held_ms = sl_sleeptimer_tick_to_ms(now_tick - press_tick);
+          press_tick = 0;
+          if (held_ms >= APP_DEBUG_LONG_PRESS_MS) {
+            app_debug_trigger_long_press();
+          } else {
+            app_debug_trigger_short_press();
+          }
         }
       }
+    } else {
+      debounce_tick = 0;
     }
 #endif
 
