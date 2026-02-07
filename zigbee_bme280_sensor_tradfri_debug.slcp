@@ -212,7 +212,7 @@ define:
   - name: APP_DEBUG_POLL_BUTTON
     value: 1
   - name: APP_DEBUG_FORCE_AF_INIT
-    value: 1
+    value: 0
   - name: APP_DEBUG_SPI_ONLY
     value: 0
   - name: APP_DEBUG_BOOT_DELAY_MS
