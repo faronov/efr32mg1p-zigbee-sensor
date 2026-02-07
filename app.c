@@ -173,6 +173,10 @@ static uint32_t btn0_fallback_press_tick = 0;
 static bool app_join_awake_active = false;
 static uint32_t app_join_awake_start_tick = 0;
 #endif
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+static bool app_fast_poll_active = false;
+static uint32_t app_fast_poll_start_tick = 0;
+#endif
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -373,6 +377,19 @@ void app_debug_poll(void)
       app_join_awake_active = false;
       app_join_awake_start_tick = 0;
       APP_DEBUG_PRINTF("Debug: post-join awake window ended\n");
+    }
+  }
+#endif
+
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+  if (app_fast_poll_active && app_fast_poll_start_tick != 0) {
+    uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_fast_poll_start_tick);
+    if (elapsed_ms >= APP_DEBUG_FAST_POLL_AFTER_JOIN_MS) {
+      emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
+      emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
+      app_fast_poll_active = false;
+      app_fast_poll_start_tick = 0;
+      APP_DEBUG_PRINTF("Debug: fast poll window ended\n");
     }
   }
 #endif
@@ -606,8 +623,12 @@ void emberAfStackStatusCallback(EmberStatus status)
 #endif
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+    emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
+    emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
     emberAfSetShortPollIntervalMsCallback((int16u)APP_DEBUG_FAST_POLL_INTERVAL_MS);
     emberAfSetWakeTimeoutMsCallback((int16u)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS);
+    app_fast_poll_active = true;
+    app_fast_poll_start_tick = sl_sleeptimer_get_tick_count();
     APP_DEBUG_PRINTF("Debug: fast poll enabled for %lu ms (short=%lu ms)\n",
                      (unsigned long)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS,
                      (unsigned long)APP_DEBUG_FAST_POLL_INTERVAL_MS);
@@ -646,6 +667,13 @@ void emberAfStackStatusCallback(EmberStatus status)
 
   } else if (status == EMBER_NETWORK_DOWN) {
     emberAfCorePrintln("Network down - will attempt optimized rejoin");
+
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+    emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
+    emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
+    app_fast_poll_active = false;
+    app_fast_poll_start_tick = 0;
+#endif
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Turn LED off when network is down
