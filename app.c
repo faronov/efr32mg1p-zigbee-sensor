@@ -216,6 +216,7 @@ static void app_flash_send_cmd(GPIO_Port_TypeDef port,
 static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
                                     unsigned int pin,
                                     const char *label);
+static void app_init_once(void);
 #if APP_DEBUG_RESET_NETWORK
 static void app_debug_reset_network_state(void);
 #endif
@@ -226,7 +227,7 @@ static void app_debug_reset_network_state(void);
  * Called when the Zigbee stack has completed initialization.
  * This is where we initialize application components.
  */
-void emberAfMainInitCallback(void)
+static void app_init_once(void)
 {
 #if APP_DEBUG_SPI_ONLY
   APP_DEBUG_PRINTF("SPI-only debug mode\n");
@@ -302,6 +303,11 @@ void emberAfMainInitCallback(void)
 #endif
 }
 
+void emberAfMainInitCallback(void)
+{
+  app_init_once();
+}
+
 #if APP_DEBUG_RESET_NETWORK
 static void app_debug_reset_network_state(void)
 {
@@ -348,7 +354,7 @@ void app_debug_poll(void)
       af_init_force_tick = now;
     } else if (sl_sleeptimer_tick_to_ms(now - af_init_force_tick) >= 2000) {
       APP_DEBUG_PRINTF("AF init timeout - fallback callback\n");
-      emberAfMainInitCallback();
+      app_init_once();
       af_init_force_pending = false;
     }
   }
@@ -801,7 +807,7 @@ void emberAfTickCallback(void)
   // Simple button is configured in poll mode on this board; poll here so
   // sl_button_on_change() is invoked reliably.
   sl_simple_button_poll_instances();
-#if (APP_DEBUG_POLL_BUTTON == 0)
+#if (APP_DEBUG_POLL_BUTTON != 0)
   // Fallback path: some TRADFRI revisions do not trigger on_change reliably.
   // Poll raw BTN0 (PB13, active low) and synthesize press events with debounce.
   bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
@@ -861,7 +867,6 @@ void emberAfTickCallback(void)
   }
 
   // Check for short press
-#if !APP_DEBUG_POLL_BUTTON
   if (button_short_press_pending) {
     button_short_press_pending = false;  // Clear flag
     APP_DEBUG_PRINTF("Button short press\n");
@@ -876,7 +881,6 @@ void emberAfTickCallback(void)
     emberAfCorePrintln("Button: Long press detected (tick callback)");
     handle_long_press();
   }
-#endif
 }
 
 /**
