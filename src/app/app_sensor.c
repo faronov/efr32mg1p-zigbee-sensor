@@ -11,9 +11,6 @@
 #include "app/framework/include/af.h"
 #include "sl_sleeptimer.h"
 #include <stdio.h>
-#if defined(SL_CATALOG_ZIGBEE_REPORTING_PRESENT)
-#include "app/framework/plugin/reporting/reporting.h"
-#endif
 
 // Endpoint where sensor clusters are located
 #define SENSOR_ENDPOINT  1
@@ -83,17 +80,11 @@ static void app_mark_reportable_change(uint8_t endpoint,
                                        EmberAfClusterId cluster_id,
                                        EmberAfAttributeId attribute_id)
 {
-#if defined(SL_CATALOG_ZIGBEE_REPORTING_PRESENT)
-  emberAfPluginReportingAttributeChangeCallback(endpoint,
-                                                cluster_id,
-                                                attribute_id,
-                                                CLUSTER_MASK_SERVER,
-                                                EMBER_AF_NULL_MANUFACTURER_CODE);
-#else
-  (void)endpoint;
-  (void)cluster_id;
-  (void)attribute_id;
-#endif
+  emberAfReportingAttributeChangeCallback(endpoint,
+                                          cluster_id,
+                                          attribute_id,
+                                          CLUSTER_MASK_SERVER,
+                                          EMBER_AF_NULL_MANUFACTURER_CODE);
 }
 
 static int32_t app_abs_i32(int32_t value)
