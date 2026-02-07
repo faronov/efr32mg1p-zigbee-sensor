@@ -630,7 +630,10 @@ void emberAfStackStatusCallback(EmberStatus status)
   APP_DEBUG_PRINTF("Stack status: 0x%02x\n", status);
   if (status == EMBER_NETWORK_UP) {
     emberAfCorePrintln("Network joined successfully");
-    APP_DEBUG_PRINTF("Join: runtime node type=%u\n", emberGetNodeType());
+    EmberNodeType runtime_node_type = EMBER_UNKNOWN_DEVICE;
+    if (emberGetNodeType(&runtime_node_type) == EMBER_SUCCESS) {
+      APP_DEBUG_PRINTF("Join: runtime node type=%u\n", runtime_node_type);
+    }
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
     if (!app_join_awake_active) {
