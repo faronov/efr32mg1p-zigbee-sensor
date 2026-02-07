@@ -226,7 +226,7 @@ static void app_debug_reset_network_state(void);
  * Called when the Zigbee stack has completed initialization.
  * This is where we initialize application components.
  */
-void emberAfInitCallback(void)
+void emberAfMainInitCallback(void)
 {
 #if APP_DEBUG_SPI_ONLY
   APP_DEBUG_PRINTF("SPI-only debug mode\n");
@@ -348,7 +348,7 @@ void app_debug_poll(void)
       af_init_force_tick = now;
     } else if (sl_sleeptimer_tick_to_ms(now - af_init_force_tick) >= 2000) {
       APP_DEBUG_PRINTF("AF init timeout - fallback callback\n");
-      emberAfInitCallback();
+      emberAfMainInitCallback();
       af_init_force_pending = false;
     }
   }
