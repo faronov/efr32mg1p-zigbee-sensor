@@ -303,7 +303,9 @@ static void app_init_once(void)
 
 void emberAfMainInitCallback(void)
 {
-  app_init_once();
+  // In GSDK 4.5 this callback happens early in AF startup sequence.
+  // Defer heavy app init until endpoints are configured.
+  APP_DEBUG_PRINTF("AF main init callback\n");
 }
 
 #if APP_DEBUG_RESET_NETWORK
@@ -341,6 +343,12 @@ void app_debug_force_af_init(void)
 void app_debug_poll(void)
 {
   uint32_t now = sl_sleeptimer_get_tick_count();
+
+  // Initialize once the AF endpoint table is ready.
+  if (!af_init_seen && emberAfEndpointCount() > 0) {
+    APP_DEBUG_PRINTF("AF init deferred: endpoints ready\n");
+    app_init_once();
+  }
 
   if (!af_init_reported && af_init_seen) {
     af_init_reported = true;
@@ -795,7 +803,7 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
  * This is called from main context and is perfect for checking button flags
  * set by the button ISR. No event scheduling needed!
  */
-void emberAfTickCallback(void)
+void emberAfMainTickCallback(void)
 {
   static uint32_t last_heartbeat_tick = 0;
   uint32_t now = sl_sleeptimer_get_tick_count();
@@ -1117,6 +1125,20 @@ static void handle_short_press(void)
                        join_attempt_count + 1);
     APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
     configure_join_security();
+
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+    // Keep Sleepy End Device in short poll mode across join + interview window.
+    // This matches SDK guidance for reliable TC key update/interview traffic.
+    emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
+    emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
+    emberAfSetShortPollIntervalMsCallback((int16u)APP_DEBUG_FAST_POLL_INTERVAL_MS);
+    emberAfSetWakeTimeoutMsCallback((int16u)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS);
+    app_fast_poll_active = true;
+    app_fast_poll_start_tick = sl_sleeptimer_get_tick_count();
+    APP_DEBUG_PRINTF("Join: pre-join fast poll enabled (%lu ms, short=%lu ms)\n",
+                     (unsigned long)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS,
+                     (unsigned long)APP_DEBUG_FAST_POLL_INTERVAL_MS);
+#endif
 
     // Reset to start of channel list
     current_channel_index = 0;
