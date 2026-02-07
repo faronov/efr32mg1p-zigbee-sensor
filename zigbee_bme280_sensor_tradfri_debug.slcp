@@ -22,6 +22,7 @@ component:
   # Identify cluster support (LED blink when identified)
   - id: zigbee_identify
   - id: zigbee_reporting
+  - id: zigbee_end_device_support
 
   # OTA bootloader support
   - id: zigbee_ota_client_policy
