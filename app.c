@@ -12,6 +12,7 @@
 #include "stack/include/network-formation.h"  // For manual network join
 #include "stack/include/security.h"
 #include "stack/include/binding-table.h"
+#include "hal.h"
 #include "sl_sleeptimer.h"
 #include "em_cmu.h"
 #include "em_gpio.h"
@@ -102,6 +103,9 @@ static bool button_pressed = false;
 #endif
 #ifndef APP_DEBUG_AUTO_JOIN_ON_BOOT
 #define APP_DEBUG_AUTO_JOIN_ON_BOOT 0
+#endif
+#ifndef APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
+#define APP_DEBUG_AUTO_JOIN_ON_PIN_RESET 0
 #endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
@@ -269,6 +273,15 @@ void emberAfInitCallback(void)
 #if APP_DEBUG_AUTO_JOIN_ON_BOOT
   APP_DEBUG_PRINTF("Debug: auto-join on boot\n");
   handle_short_press();
+#endif
+
+#if APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
+  // TRADFRI button can be wired to reset line on some hardware revisions.
+  // If boot reason is external pin reset, treat it as an implicit join request.
+  if (halGetResetInfo() == 0x03u) {
+    APP_DEBUG_PRINTF("Debug: auto-join after pin reset\n");
+    handle_short_press();
+  }
 #endif
 }
 
