@@ -233,6 +233,8 @@ define:
     value: 0
   - name: APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
     value: 0
+  - name: APP_DEBUG_JOIN_AS_END_DEVICE
+    value: 1
   - name: APP_BUILD_TAG
     value: '"dbg-netreset-otaoff-bootspam-crashprint"'
 

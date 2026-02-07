@@ -107,6 +107,9 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
 #define APP_DEBUG_AUTO_JOIN_ON_PIN_RESET 0
 #endif
+#ifndef APP_DEBUG_JOIN_AS_END_DEVICE
+#define APP_DEBUG_JOIN_AS_END_DEVICE 0
+#endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
 static void handle_short_press(void);
@@ -1009,7 +1012,10 @@ void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
     params.nwkUpdateId = join_candidate.nwkUpdateId;
     params.channels = BIT32(join_candidate.channel);
 
-    EmberStatus join_status = emberJoinNetwork(EMBER_SLEEPY_END_DEVICE, &params);
+    EmberNodeType node_type = APP_DEBUG_JOIN_AS_END_DEVICE ? EMBER_END_DEVICE : EMBER_SLEEPY_END_DEVICE;
+    APP_DEBUG_PRINTF("Join: node type=%s\n",
+                     APP_DEBUG_JOIN_AS_END_DEVICE ? "END_DEVICE" : "SLEEPY_END_DEVICE");
+    EmberStatus join_status = emberJoinNetwork(node_type, &params);
     APP_DEBUG_PRINTF("Join: emberJoinNetwork -> 0x%02x\n", join_status);
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
