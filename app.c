@@ -110,6 +110,7 @@ static bool button_pressed = false;
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
 static void handle_short_press(void);
+static void handle_long_press(void);
 
 void app_debug_sanity(void)
 {
