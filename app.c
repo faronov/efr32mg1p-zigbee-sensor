@@ -53,6 +53,7 @@ static volatile bool button_long_press_pending = false;
 static uint32_t button_press_start_tick = 0;
 static bool button_pressed = false;
 #define LONG_PRESS_THRESHOLD_MS 5000  // 5 seconds for long press (leave/rejoin network)
+#define BUTTON_DEBOUNCE_MS 30
 
 // Optimized rejoin state machine (TEMPORARILY DISABLED - event queue issue)
 // typedef enum {
@@ -152,6 +153,8 @@ static bool basic_identity_pending = false;
 static bool af_init_force_pending = false;
 static uint32_t af_init_force_tick = 0;
 static uint32_t basic_identity_tick = 0;
+static bool btn0_fallback_pressed = false;
+static uint32_t btn0_fallback_press_tick = 0;
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
 static bool app_join_awake_active = false;
 static uint32_t app_join_awake_start_tick = 0;
@@ -719,6 +722,26 @@ void emberAfTickCallback(void)
   // Simple button is configured in poll mode on this board; poll here so
   // sl_button_on_change() is invoked reliably.
   sl_simple_button_poll_instances();
+#if (APP_DEBUG_POLL_BUTTON == 0)
+  // Fallback path: some TRADFRI revisions do not trigger on_change reliably.
+  // Poll raw BTN0 (PB13, active low) and synthesize press events with debounce.
+  bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
+  if (raw_pressed && !btn0_fallback_pressed) {
+    btn0_fallback_pressed = true;
+    btn0_fallback_press_tick = now;
+  } else if (!raw_pressed && btn0_fallback_pressed) {
+    btn0_fallback_pressed = false;
+    uint32_t duration_ms = sl_sleeptimer_tick_to_ms(now - btn0_fallback_press_tick);
+    if (duration_ms >= BUTTON_DEBOUNCE_MS) {
+      if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
+        button_long_press_pending = true;
+      } else {
+        button_short_press_pending = true;
+      }
+    }
+    btn0_fallback_press_tick = 0;
+  }
+#endif
 #endif
 
   app_debug_poll();
