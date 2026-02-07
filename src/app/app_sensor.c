@@ -36,32 +36,6 @@ static uint32_t sensor_update_interval_ms = SENSOR_UPDATE_INTERVAL_MS;
 #define APP_FORCE_SENSOR_INTERVAL_MS 10000
 #endif
 
-#ifndef APP_REPORT_MIN_INTERVAL_S
-#define APP_REPORT_MIN_INTERVAL_S 10
-#endif
-#ifndef APP_REPORT_MAX_INTERVAL_S
-#define APP_REPORT_MAX_INTERVAL_S 300
-#endif
-#ifndef APP_REPORT_TEMP_CHANGE_CENTI
-#define APP_REPORT_TEMP_CHANGE_CENTI 50
-#endif
-#ifndef APP_REPORT_HUM_CHANGE_CENTI
-#define APP_REPORT_HUM_CHANGE_CENTI 100
-#endif
-#ifndef APP_REPORT_PRESS_CHANGE_KPA
-#define APP_REPORT_PRESS_CHANGE_KPA 1
-#endif
-
-typedef struct {
-  bool initialized;
-  int32_t last_value;
-  uint32_t last_report_ms;
-} app_report_state_t;
-
-static app_report_state_t temp_report_state = { false, 0, 0 };
-static app_report_state_t hum_report_state = { false, 0, 0 };
-static app_report_state_t press_report_state = { false, 0, 0 };
-
 static uint32_t fake_last_change_ms = 0;
 static bme280_data_t fake_sensor_data = {
   .temperature = 2150, // 21.50 C
@@ -74,38 +48,6 @@ static uint32_t app_get_ms(void)
 {
   uint32_t ticks = sl_sleeptimer_get_tick_count();
   return (uint32_t)sl_sleeptimer_tick_to_ms(ticks);
-}
-
-static int32_t app_abs_i32(int32_t value)
-{
-  return (value < 0) ? -value : value;
-}
-
-static bool app_report_gate(app_report_state_t *state,
-                            int32_t value,
-                            int32_t change_threshold,
-                            uint32_t now_ms)
-{
-  uint32_t min_ms = (uint32_t)APP_REPORT_MIN_INTERVAL_S * 1000u;
-  uint32_t max_ms = (uint32_t)APP_REPORT_MAX_INTERVAL_S * 1000u;
-
-  if (!state->initialized) {
-    state->initialized = true;
-    state->last_value = value;
-    state->last_report_ms = now_ms;
-    return true;
-  }
-
-  uint32_t elapsed = now_ms - state->last_report_ms;
-  int32_t delta = app_abs_i32(value - state->last_value);
-
-  if (elapsed >= max_ms || (elapsed >= min_ms && delta >= change_threshold)) {
-    state->last_value = value;
-    state->last_report_ms = now_ms;
-    return true;
-  }
-
-  return false;
 }
 
 static uint32_t app_fake_prng_next(uint32_t salt)
@@ -194,9 +136,7 @@ bool app_sensor_init(void)
   sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
 
   emberAfCorePrintln("Sensor poll interval: %d seconds", sensor_update_interval_ms / 1000);
-  emberAfCorePrintln("Reporting config: min=%ds max=%ds dT=%d dRH=%d dP=%d",
-                     APP_REPORT_MIN_INTERVAL_S,
-                     APP_REPORT_MAX_INTERVAL_S,
+  emberAfCorePrintln("Reporting thresholds (local attrs): dT=%d dRH=%d dP=%d",
                      config->report_threshold_temperature,
                      config->report_threshold_humidity,
                      config->report_threshold_pressure);
@@ -293,13 +233,6 @@ void app_sensor_update(void)
 
   // Get configuration and apply calibration offsets
   const app_config_t* config = app_config_get();
-  int32_t temp_threshold = (config->report_threshold_temperature > 0)
-                           ? config->report_threshold_temperature : 1;
-  int32_t hum_threshold = (config->report_threshold_humidity > 0)
-                          ? config->report_threshold_humidity : 1;
-  int32_t pressure_threshold_centikpa = (config->report_threshold_pressure > 0)
-                                        ? config->report_threshold_pressure : 1;
-
   // Apply calibration offsets
   int32_t temp_calibrated = 0;
   int32_t humidity_calibrated = 0;
@@ -330,30 +263,26 @@ void app_sensor_update(void)
     // Update Temperature Measurement cluster (0x0402)
     // MeasuredValue is int16, in 0.01°C units
     int16_t temp_value = (int16_t)temp_calibrated;
-    if (app_report_gate(&temp_report_state, temp_calibrated, temp_threshold, now_ms)) {
-      status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                           ZCL_TEMP_MEASUREMENT_CLUSTER_ID,
-                                           ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID,
-                                           (uint8_t *)&temp_value,
-                                           ZCL_INT16S_ATTRIBUTE_TYPE);
-      if (status != EMBER_ZCL_STATUS_SUCCESS) {
-        emberAfCorePrintln("Error: Failed to update temperature attribute (0x%x)", status);
-      }
+    status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                         ZCL_TEMP_MEASUREMENT_CLUSTER_ID,
+                                         ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID,
+                                         (uint8_t *)&temp_value,
+                                         ZCL_INT16S_ATTRIBUTE_TYPE);
+    if (status != EMBER_ZCL_STATUS_SUCCESS) {
+      emberAfCorePrintln("Error: Failed to update temperature attribute (0x%x)", status);
     }
 
     if (has_humidity) {
       // Update Relative Humidity Measurement cluster (0x0405)
       // MeasuredValue is uint16, in 0.01%RH units
       uint16_t humidity_value = (uint16_t)humidity_calibrated;
-      if (app_report_gate(&hum_report_state, humidity_calibrated, hum_threshold, now_ms)) {
-        status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                             ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
-                                             ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
-                                             (uint8_t *)&humidity_value,
-                                             ZCL_INT16U_ATTRIBUTE_TYPE);
-        if (status != EMBER_ZCL_STATUS_SUCCESS) {
-          emberAfCorePrintln("Error: Failed to update humidity attribute (0x%x)", status);
-        }
+      status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                           ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
+                                           ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
+                                           (uint8_t *)&humidity_value,
+                                           ZCL_INT16U_ATTRIBUTE_TYPE);
+      if (status != EMBER_ZCL_STATUS_SUCCESS) {
+        emberAfCorePrintln("Error: Failed to update humidity attribute (0x%x)", status);
       }
     } else {
       emberAfCorePrintln("Humidity not supported by sensor (BMP280)");
@@ -363,16 +292,13 @@ void app_sensor_update(void)
     // MeasuredValue is int16, in kPa units (divide Pa by 1000)
     // Zigbee spec: signed 16-bit integer in kPa
     int16_t pressure_value = (int16_t)(pressure_calibrated / 1000);
-    int32_t pressure_centikpa = pressure_calibrated / 10; // 0.01 kPa units
-    if (app_report_gate(&press_report_state, pressure_centikpa, pressure_threshold_centikpa, now_ms)) {
-      status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
-                                           ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID,
-                                           ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID,
-                                           (uint8_t *)&pressure_value,
-                                           ZCL_INT16S_ATTRIBUTE_TYPE);
-      if (status != EMBER_ZCL_STATUS_SUCCESS) {
-        emberAfCorePrintln("Error: Failed to update pressure attribute (0x%x)", status);
-      }
+    status = emberAfWriteServerAttribute(SENSOR_ENDPOINT,
+                                         ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID,
+                                         ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID,
+                                         (uint8_t *)&pressure_value,
+                                         ZCL_INT16S_ATTRIBUTE_TYPE);
+    if (status != EMBER_ZCL_STATUS_SUCCESS) {
+      emberAfCorePrintln("Error: Failed to update pressure attribute (0x%x)", status);
     }
   }
 

@@ -717,6 +717,22 @@ void emberAfStackStatusCallback(EmberStatus status)
   }
 }
 
+bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
+{
+  if (cmd != NULL && cmd->mfgSpecific == 0u) {
+    if (cmd->commandId == ZCL_CONFIGURE_REPORTING_COMMAND_ID
+        || cmd->commandId == ZCL_READ_REPORTING_CONFIGURATION_COMMAND_ID) {
+      APP_DEBUG_PRINTF("ZCL cfg-report rx: ep=%u clus=0x%04x cmd=0x%02x dir=%u len=%u\n",
+                       cmd->apsFrame->destinationEndpoint,
+                       cmd->apsFrame->clusterId,
+                       cmd->commandId,
+                       (unsigned)((cmd->buffer[0] & ZCL_FRAME_CONTROL_CLIENT_TO_SERVER) ? 1 : 0),
+                       cmd->bufLen);
+    }
+  }
+  return false;
+}
+
 /**
  * @brief Button press callback
  *
