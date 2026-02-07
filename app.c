@@ -714,6 +714,13 @@ void emberAfTickCallback(void)
 {
   static uint32_t last_heartbeat_tick = 0;
   uint32_t now = sl_sleeptimer_get_tick_count();
+
+#ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
+  // Simple button is configured in poll mode on this board; poll here so
+  // sl_button_on_change() is invoked reliably.
+  sl_simple_button_poll_instances();
+#endif
+
   app_debug_poll();
 
 #if APP_DEBUG_SPI_ONLY
