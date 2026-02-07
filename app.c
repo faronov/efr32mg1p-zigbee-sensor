@@ -99,6 +99,9 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_FAST_POLL_INTERVAL_MS
 #define APP_DEBUG_FAST_POLL_INTERVAL_MS 250
 #endif
+#ifndef APP_DEBUG_AUTO_JOIN_ON_BOOT
+#define APP_DEBUG_AUTO_JOIN_ON_BOOT 0
+#endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
 static void handle_short_press(void);
@@ -259,6 +262,11 @@ void emberAfInitCallback(void)
     }
 #endif
   }
+
+#if APP_DEBUG_AUTO_JOIN_ON_BOOT
+  APP_DEBUG_PRINTF("Debug: auto-join on boot\n");
+  handle_short_press();
+#endif
 }
 
 #if APP_DEBUG_RESET_NETWORK

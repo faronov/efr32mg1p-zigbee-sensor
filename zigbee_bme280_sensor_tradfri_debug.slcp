@@ -229,6 +229,8 @@ define:
     value: 60000
   - name: APP_DEBUG_FAST_POLL_INTERVAL_MS
     value: 250
+  - name: APP_DEBUG_AUTO_JOIN_ON_BOOT
+    value: 1
   - name: APP_BUILD_TAG
     value: '"dbg-netreset-otaoff-bootspam-crashprint"'
 
