@@ -6,7 +6,9 @@
 #include "sl_component_catalog.h"
 #include "zigbee_app_framework_event.h"
 #include "app/framework/include/af.h"
-// #include "app/framework/plugin/network-steering/network-steering.h" // REMOVED - causes event queue crash
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+#include "app/framework/plugin/network-steering/network-steering.h"
+#endif
 #include "app_sensor.h"
 #include "app_config.h"
 #include "stack/include/network-formation.h"  // For manual network join
@@ -1142,11 +1144,10 @@ static void handle_short_press(void)
       return;
     }
 
-    // Not on network - start manual network join
+    // Not on network - start join flow
     emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
                        join_attempt_count + 1);
     APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
-    configure_join_security();
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
     // Keep Sleepy End Device in short poll mode across join + interview window.
@@ -1175,8 +1176,13 @@ static void handle_short_press(void)
     sl_zigbee_event_set_active(&led_blink_event);
 #endif
 
-    // Start manual network join (no longer using network steering plugin)
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+    EmberStatus join_status = emberAfPluginNetworkSteeringStart();
+    APP_DEBUG_PRINTF("Join: emberAfPluginNetworkSteeringStart -> 0x%02x\n", join_status);
+#else
+    configure_join_security();
     EmberStatus join_status = start_join_scan();
+#endif
 
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
@@ -1200,6 +1206,28 @@ static void handle_short_press(void)
     }
   }
 }
+
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
+                                                  uint8_t totalBeacons,
+                                                  uint8_t joinAttempts,
+                                                  uint8_t finalState)
+{
+  APP_DEBUG_PRINTF("Join: steering complete status=0x%02x beacons=%u attempts=%u state=%u\n",
+                   status, totalBeacons, joinAttempts, finalState);
+  if (status != EMBER_SUCCESS) {
+    network_join_in_progress = false;
+    join_scan_in_progress = false;
+    join_network_found = false;
+    join_attempt_count++;
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+    led_blink_active = false;
+    sl_zigbee_event_set_inactive(&led_blink_event);
+    sl_led_turn_off(&sl_led_led0);
+#endif
+  }
+}
+#endif
 
 static void configure_join_security(void)
 {

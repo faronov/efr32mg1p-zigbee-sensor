@@ -14,9 +14,9 @@ component:
   - id: zigbee_pro_leaf_stack
   - id: zigbee_zcl_framework_core
 
-  # Network joining (manual implementation - network steering plugin causes event queue crash)
-  # - id: zigbee_network_steering (REMOVED - crashes event queue)
-  # - id: zigbee_scan_dispatch (REMOVED - not needed without network steering)
+  # Network joining (SDK-managed steering flow)
+  - id: zigbee_network_steering
+  - id: zigbee_scan_dispatch
 
   # Identify cluster support (LED blink when identified)
   - id: zigbee_identify
