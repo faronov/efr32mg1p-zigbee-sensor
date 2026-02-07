@@ -165,7 +165,7 @@ jobs:
 
           # Create OTA files for TRÅDFRI
           echo "Creating OTA files for TRÅDFRI v${VERSION}..."
-          bash tools/create_ota_file.sh "$VERSION" || echo "⚠️ OTA file creation failed (non-blocking)"
+          bash tools/create_ota_file.sh "$VERSION"
 
       - name: Verify Basic identity attributes
         if: success()
