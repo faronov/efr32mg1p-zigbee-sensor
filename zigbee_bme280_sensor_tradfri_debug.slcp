@@ -225,10 +225,10 @@ define:
     value: 1
   # Disabled due to observed FLT reset after join on TRADFRI hardware.
   - name: APP_DEBUG_AWAKE_AFTER_JOIN_MS
-    value: 0
+    value: 15000
   # Keep sleepy end device in fast-poll mode after join to speed up coordinator interview.
   - name: APP_DEBUG_FAST_POLL_AFTER_JOIN_MS
-    value: 120000
+    value: 60000
   - name: APP_DEBUG_FAST_POLL_INTERVAL_MS
     value: 250
   - name: APP_DEBUG_AUTO_JOIN_ON_BOOT

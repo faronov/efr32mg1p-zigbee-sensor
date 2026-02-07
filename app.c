@@ -22,6 +22,7 @@
 #endif
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 // Optional SPIDRV init symbols (generated when SPIDRV component is present).
 __attribute__((weak)) void sl_spidrv_exp_init(void);
@@ -111,6 +112,11 @@ static bool button_pressed = false;
 #define APP_DEBUG_JOIN_AS_END_DEVICE 0
 #endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
+
+static uint16_t clamp_u16_ms(uint32_t value_ms)
+{
+  return (value_ms > UINT16_MAX) ? UINT16_MAX : (uint16_t)value_ms;
+}
 
 static void handle_short_press(void);
 static void handle_long_press(void);
@@ -656,8 +662,8 @@ void emberAfStackStatusCallback(EmberStatus status)
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
     emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
-    emberAfSetShortPollIntervalMsCallback((int16u)APP_DEBUG_FAST_POLL_INTERVAL_MS);
-    emberAfSetWakeTimeoutMsCallback((int16u)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS);
+    emberAfSetShortPollIntervalMsCallback(clamp_u16_ms(APP_DEBUG_FAST_POLL_INTERVAL_MS));
+    emberAfSetWakeTimeoutMsCallback(clamp_u16_ms(APP_DEBUG_FAST_POLL_AFTER_JOIN_MS));
     app_fast_poll_active = true;
     app_fast_poll_start_tick = sl_sleeptimer_get_tick_count();
     app_fast_poll_last_manual_poll_tick = 0;
@@ -1147,8 +1153,8 @@ static void handle_short_press(void)
     // This matches SDK guidance for reliable TC key update/interview traffic.
     emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
     emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
-    emberAfSetShortPollIntervalMsCallback((int16u)APP_DEBUG_FAST_POLL_INTERVAL_MS);
-    emberAfSetWakeTimeoutMsCallback((int16u)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS);
+    emberAfSetShortPollIntervalMsCallback(clamp_u16_ms(APP_DEBUG_FAST_POLL_INTERVAL_MS));
+    emberAfSetWakeTimeoutMsCallback(clamp_u16_ms(APP_DEBUG_FAST_POLL_AFTER_JOIN_MS));
     app_fast_poll_active = true;
     app_fast_poll_start_tick = sl_sleeptimer_get_tick_count();
     app_fast_poll_last_manual_poll_tick = 0;
