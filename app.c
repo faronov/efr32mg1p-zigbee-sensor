@@ -339,7 +339,8 @@ void app_debug_poll(void)
     if (af_init_force_tick == 0) {
       af_init_force_tick = now;
     } else if (sl_sleeptimer_tick_to_ms(now - af_init_force_tick) >= 2000) {
-      APP_DEBUG_PRINTF("AF init timeout (no forced callback)\n");
+      APP_DEBUG_PRINTF("AF init timeout - fallback callback\n");
+      emberAfInitCallback();
       af_init_force_pending = false;
     }
   }
