@@ -626,11 +626,9 @@ void emberAfStackStatusCallback(EmberStatus status)
     sl_zigbee_event_set_delay_ms(&led_off_event, 3000);
 #endif
 
-    // Perform initial sensor reading after joining
-    app_sensor_update();
-
-    // Restart periodic sensor updates
-    app_sensor_start_periodic_updates();
+    // TEMP DEBUG: post-join sensor/report path is disabled to isolate FLT resets.
+    // Join/interview must remain stable first; sensor reporting can be re-enabled after.
+    emberAfCorePrintln("Debug: post-join sensor/report disabled");
 
     // Note: Binding is handled by coordinator (Zigbee2MQTT/ZHA/deCONZ)
     // No device-side binding code needed - see BINDING_GUIDE.md
