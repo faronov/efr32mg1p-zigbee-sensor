@@ -176,7 +176,6 @@ static uint32_t app_join_awake_start_tick = 0;
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
 static bool app_fast_poll_active = false;
 static uint32_t app_fast_poll_start_tick = 0;
-static uint32_t app_fast_poll_last_manual_poll_tick = 0;
 #endif
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
@@ -389,25 +388,12 @@ void app_debug_poll(void)
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
   if (app_fast_poll_active && app_fast_poll_start_tick != 0) {
-    EmberNetworkStatus nwk = emberAfNetworkState();
-    if (nwk == EMBER_JOINED_NETWORK
-        && (app_fast_poll_last_manual_poll_tick == 0
-            || sl_sleeptimer_tick_to_ms(now - app_fast_poll_last_manual_poll_tick)
-            >= APP_DEBUG_FAST_POLL_INTERVAL_MS)) {
-      EmberStatus poll_status = emberPollForData();
-      app_fast_poll_last_manual_poll_tick = now;
-      if (poll_status != EMBER_SUCCESS && poll_status != EMBER_MAC_NO_DATA) {
-        APP_DEBUG_PRINTF("Debug: emberPollForData -> 0x%02x\n", poll_status);
-      }
-    }
-
     uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_fast_poll_start_tick);
     if (elapsed_ms >= APP_DEBUG_FAST_POLL_AFTER_JOIN_MS) {
       emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
       emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
       app_fast_poll_active = false;
       app_fast_poll_start_tick = 0;
-      app_fast_poll_last_manual_poll_tick = 0;
       APP_DEBUG_PRINTF("Debug: fast poll window ended\n");
     }
   }
@@ -652,7 +638,6 @@ void emberAfStackStatusCallback(EmberStatus status)
     emberAfSetWakeTimeoutMsCallback((int16u)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS);
     app_fast_poll_active = true;
     app_fast_poll_start_tick = sl_sleeptimer_get_tick_count();
-    app_fast_poll_last_manual_poll_tick = 0;
     APP_DEBUG_PRINTF("Debug: fast poll enabled for %lu ms (short=%lu ms)\n",
                      (unsigned long)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS,
                      (unsigned long)APP_DEBUG_FAST_POLL_INTERVAL_MS);
@@ -696,7 +681,6 @@ void emberAfStackStatusCallback(EmberStatus status)
     emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
     app_fast_poll_active = false;
     app_fast_poll_start_tick = 0;
-    app_fast_poll_last_manual_poll_tick = 0;
 #endif
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
