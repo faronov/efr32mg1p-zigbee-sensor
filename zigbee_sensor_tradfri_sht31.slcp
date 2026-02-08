@@ -125,7 +125,7 @@ source:
   - path: src/app/app_config.c
   - path: src/drivers/hal_i2c.c
   - path: src/drivers/hal_eeprom.c
-  - path: src/drivers/bme280/bme280_min.c
+  - path: src/drivers/sht31.c
   - path: src/drivers/battery.c
 
 include:
@@ -133,7 +133,6 @@ include:
   - path: include
   - path: src/app
   - path: src/drivers
-  - path: src/drivers/bme280
 
 config_file:
   - path: config/zcl/zcl_sht31.zap
