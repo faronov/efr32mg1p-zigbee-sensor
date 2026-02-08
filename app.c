@@ -463,7 +463,9 @@ void app_debug_poll(void)
     uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_fast_poll_start_tick);
     if (elapsed_ms >= APP_DEBUG_FAST_POLL_AFTER_JOIN_MS) {
       emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
+      emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL);
       emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
+      emberAfSetDefaultSleepControl(EMBER_AF_OK_TO_SLEEP);
       app_fast_poll_active = false;
       app_fast_poll_start_tick = 0;
       APP_DEBUG_PRINTF("Debug: fast poll window ended\n");
@@ -751,9 +753,11 @@ void emberAfStackStatusCallback(EmberStatus status)
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
+    emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL);
     emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
     emberAfSetShortPollIntervalMsCallback((int16u)APP_DEBUG_FAST_POLL_INTERVAL_MS);
     emberAfSetWakeTimeoutMsCallback((int16u)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS);
+    emberAfSetDefaultSleepControl(EMBER_AF_STAY_AWAKE);
     app_fast_poll_active = true;
     app_fast_poll_start_tick = sl_sleeptimer_get_tick_count();
     APP_DEBUG_PRINTF("Debug: fast poll enabled for %lu ms (short=%lu ms)\n",
@@ -796,7 +800,9 @@ void emberAfStackStatusCallback(EmberStatus status)
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
+    emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL);
     emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
+    emberAfSetDefaultSleepControl(EMBER_AF_OK_TO_SLEEP);
     app_fast_poll_active = false;
     app_fast_poll_start_tick = 0;
 #endif
