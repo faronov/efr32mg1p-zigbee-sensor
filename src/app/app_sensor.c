@@ -152,23 +152,13 @@ bool app_sensor_init(void)
   sensor_update_interval_ms = APP_FORCE_SENSOR_INTERVAL_MS;
 #endif
 
-  // Start periodic sleeptimer updates. Callback only sets a flag;
-  // actual sensor/attribute work is done in main context.
-  sl_status_t timer_status =
-    sl_sleeptimer_start_periodic_timer_ms(&sensor_update_timer,
-                                          sensor_update_interval_ms,
-                                          sensor_update_timer_callback,
-                                          NULL,
-                                          0,
-                                          0);
-  if (timer_status != SL_STATUS_OK) {
-    emberAfCorePrintln("Error: sensor periodic timer start failed (0x%lx)",
-                       (unsigned long)timer_status);
-  } else {
-    sensor_timer_running = true;
-  }
+  // Do not start periodic timer while network is down.
+  // It will be armed on EMBER_NETWORK_UP via app_sensor_start_periodic_updates().
+  sensor_timer_running = false;
+  sensor_update_pending = false;
 
-  emberAfCorePrintln("Sensor poll interval: %d seconds", sensor_update_interval_ms / 1000);
+  emberAfCorePrintln("Sensor poll interval: %d seconds (armed on network up)",
+                     sensor_update_interval_ms / 1000);
   emberAfCorePrintln("Reporting thresholds (local attrs): dT=%d dRH=%d dP=%d",
                      config->report_threshold_temperature,
                      config->report_threshold_humidity,
@@ -201,6 +191,21 @@ void app_sensor_start_periodic_updates(void)
   sensor_network_down_logged = false;
   emberAfCorePrintln("Starting periodic sensor updates (interval: %d seconds)",
                      sensor_update_interval_ms / 1000);
+}
+
+void app_sensor_stop_periodic_updates(void)
+{
+  if (sensor_timer_running) {
+    sl_status_t timer_status = sl_sleeptimer_stop_timer(&sensor_update_timer);
+    if (timer_status != SL_STATUS_OK) {
+      emberAfCorePrintln("Warning: sensor timer stop failed (0x%lx)",
+                         (unsigned long)timer_status);
+    }
+    sensor_timer_running = false;
+  }
+
+  sensor_update_pending = false;
+  sensor_network_down_logged = false;
 }
 
 void app_sensor_process(void)

@@ -21,8 +21,8 @@
 /**
  * @brief Initialize sensor integration
  *
- * Initializes the BME280 sensor and sets up periodic timer
- * for sensor readings.
+ * Initializes the BME280 sensor. Periodic timer is armed only when
+ * network is up via app_sensor_start_periodic_updates().
  *
  * @return true if successful, false otherwise
  */
@@ -47,6 +47,14 @@ void app_sensor_update(void);
  * they were suspended due to network unavailability.
  */
 void app_sensor_start_periodic_updates(void);
+
+/**
+ * @brief Stop periodic sensor updates
+ *
+ * Stops periodic timer and clears pending update flag. Use when network
+ * goes down to minimize wakeups/power consumption for sleepy end devices.
+ */
+void app_sensor_stop_periodic_updates(void);
 
 /**
  * @brief Set sensor reading interval

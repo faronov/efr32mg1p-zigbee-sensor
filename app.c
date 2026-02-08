@@ -870,8 +870,8 @@ void emberAfStackStatusCallback(EmberStatus status)
     sl_zigbee_event_set_inactive(&led_off_event);
 #endif
 
-    // Sensor timer will automatically stop reading when event handler checks network state
-    // Device will use minimal power while waiting for network
+    // Stop periodic sensor timer while network is down to avoid 10s wakeups.
+    app_sensor_stop_periodic_updates();
 
     // Optimized rejoin TEMPORARILY DISABLED - event queue issue
     // emberAfCorePrintln("Scheduling optimized rejoin in 100ms...");
