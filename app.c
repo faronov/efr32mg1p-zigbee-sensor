@@ -1286,6 +1286,10 @@ static void handle_short_press(void)
     EmberStatus join_status = EMBER_INVALID_CALL;
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
     // When network steering is linked, use only plugin API to avoid scan callback conflicts.
+    // Keep post-join behavior quiet and deterministic:
+    // - skip steering-driven TC link key update workflow
+    // - keep join focused on association/interview
+    sli_zigbee_af_network_steering_options_mask = EMBER_AF_PLUGIN_NETWORK_STEERING_OPTIONS_NO_TCLK_UPDATE;
     join_status = emberAfPluginNetworkSteeringStart();
     APP_DEBUG_PRINTF("Join: emberAfPluginNetworkSteeringStart -> 0x%02x\n", join_status);
 #else
