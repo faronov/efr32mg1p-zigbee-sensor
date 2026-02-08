@@ -185,6 +185,7 @@ static uint32_t app_join_awake_start_tick = 0;
 static bool app_fast_poll_active = false;
 static uint32_t app_fast_poll_start_tick = 0;
 #endif
+static bool post_join_start_pending = false;
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -402,7 +403,7 @@ void app_debug_poll(void)
   }
 #endif
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0) && !defined(SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT)
   if (app_fast_poll_active && app_fast_poll_start_tick != 0) {
     uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_fast_poll_start_tick);
     if (elapsed_ms >= APP_DEBUG_FAST_POLL_AFTER_JOIN_MS) {
@@ -647,7 +648,7 @@ void emberAfStackStatusCallback(EmberStatus status)
     }
 #endif
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0) && !defined(SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT)
     emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
     emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
     emberAfSetShortPollIntervalMsCallback(clamp_u16_ms(APP_DEBUG_FAST_POLL_INTERVAL_MS));
@@ -682,9 +683,14 @@ void emberAfStackStatusCallback(EmberStatus status)
     sl_zigbee_event_set_delay_ms(&led_off_event, 3000);
 #endif
 
-    // Avoid heavy sensor transactions right at join/interview start.
-    // Start periodic updates and let first sample happen on timer.
+    // With network steering, defer sensor timer start until steering complete
+    // callback to avoid interfering with trust-center key update/configuring.
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+    post_join_start_pending = true;
+    APP_DEBUG_PRINTF("Join: deferring periodic sensor start until steering complete\n");
+#else
     app_sensor_start_periodic_updates();
+#endif
 
     // Note: Binding is handled by coordinator (Zigbee2MQTT/ZHA/deCONZ)
     // No device-side binding code needed - see BINDING_GUIDE.md
@@ -692,12 +698,13 @@ void emberAfStackStatusCallback(EmberStatus status)
   } else if (status == EMBER_NETWORK_DOWN) {
     emberAfCorePrintln("Network down - will attempt optimized rejoin");
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0) && !defined(SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT)
     emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
     emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
     app_fast_poll_active = false;
     app_fast_poll_start_tick = 0;
 #endif
+    post_join_start_pending = false;
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Turn LED off when network is down
@@ -1144,7 +1151,7 @@ static void handle_short_press(void)
                        join_attempt_count + 1);
     APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0) && !defined(SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT)
     // Keep Sleepy End Device in short poll mode across join + interview window.
     // This matches SDK guidance for reliable TC key update/interview traffic.
     emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
@@ -1215,11 +1222,19 @@ void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
 {
   APP_DEBUG_PRINTF("Join: steering complete status=0x%02x beacons=%u attempts=%u state=%u\n",
                    status, totalBeacons, joinAttempts, finalState);
+  if (status == EMBER_SUCCESS
+      && post_join_start_pending
+      && emberAfNetworkState() == EMBER_JOINED_NETWORK) {
+    post_join_start_pending = false;
+    APP_DEBUG_PRINTF("Join: steering complete, starting periodic sensor updates\n");
+    app_sensor_start_periodic_updates();
+  }
   if (status != EMBER_SUCCESS) {
     network_join_in_progress = false;
     join_scan_in_progress = false;
     join_network_found = false;
     join_attempt_count++;
+    post_join_start_pending = false;
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     led_blink_active = false;
     sl_zigbee_event_set_inactive(&led_blink_event);
