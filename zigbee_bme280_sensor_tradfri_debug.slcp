@@ -14,15 +14,10 @@ component:
   - id: zigbee_pro_leaf_stack
   - id: zigbee_zcl_framework_core
 
-  # Network joining (SDK-managed steering flow)
-  - id: zigbee_network_steering
-  - id: zigbee_scan_dispatch
-
   # Identify cluster support (LED blink when identified)
   - id: zigbee_identify
   - id: zigbee_reporting
   - id: zigbee_end_device_support
-  - id: zigbee_update_tc_link_key
 
   # OTA bootloader support
   - id: zigbee_ota_client_policy
