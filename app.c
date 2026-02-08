@@ -189,6 +189,10 @@ static bool post_join_start_pending = false;
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
 static uint32_t post_join_manual_poll_tick = 0;
 #endif
+static bool post_join_poll_boost_active = false;
+static bool post_join_rx_seen = false;
+static uint32_t post_join_poll_boost_start_tick = 0;
+static uint32_t post_join_poll_boost_last_tick = 0;
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -418,6 +422,24 @@ void app_debug_poll(void)
     }
   }
 #endif
+
+  // For Sleepy End Device interview on Series-1, force parent polling right
+  // after join until first incoming ZCL is observed.
+  if (post_join_poll_boost_active && emberAfNetworkState() == EMBER_JOINED_NETWORK) {
+    uint32_t boost_elapsed_ms = sl_sleeptimer_tick_to_ms(now - post_join_poll_boost_start_tick);
+    if (post_join_rx_seen || boost_elapsed_ms >= 120000u) {
+      post_join_poll_boost_active = false;
+      APP_DEBUG_PRINTF("Debug: post-join poll boost %s\n",
+                       post_join_rx_seen ? "stopped (rx seen)" : "timed out");
+    } else if (post_join_poll_boost_last_tick == 0
+               || sl_sleeptimer_tick_to_ms(now - post_join_poll_boost_last_tick) >= 100u) {
+      EmberStatus poll_status = emberPollForData();
+      post_join_poll_boost_last_tick = now;
+      if (poll_status != EMBER_SUCCESS) {
+        APP_DEBUG_PRINTF("Debug: boost emberPollForData -> 0x%02x\n", poll_status);
+      }
+    }
+  }
 
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
   // SDK steering occasionally stalls interview on Series-1 sleepy devices.
@@ -657,6 +679,11 @@ void emberAfStackStatusCallback(EmberStatus status)
     if (emberGetNodeType(&runtime_node_type) == EMBER_SUCCESS) {
       APP_DEBUG_PRINTF("Join: runtime node type=%u\n", runtime_node_type);
     }
+    post_join_rx_seen = false;
+    post_join_poll_boost_active = true;
+    post_join_poll_boost_start_tick = sl_sleeptimer_get_tick_count();
+    post_join_poll_boost_last_tick = 0;
+    APP_DEBUG_PRINTF("Debug: post-join poll boost enabled\n");
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
     if (!app_join_awake_active) {
@@ -729,6 +756,8 @@ void emberAfStackStatusCallback(EmberStatus status)
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
     post_join_manual_poll_tick = 0;
 #endif
+    post_join_poll_boost_active = false;
+    post_join_rx_seen = false;
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Turn LED off when network is down
@@ -750,6 +779,7 @@ void emberAfStackStatusCallback(EmberStatus status)
 
 bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
 {
+  post_join_rx_seen = true;
   if (cmd != NULL && cmd->mfgSpecific == 0u) {
     if (cmd->commandId == ZCL_CONFIGURE_REPORTING_COMMAND_ID
         || cmd->commandId == ZCL_READ_REPORTING_CONFIGURATION_COMMAND_ID) {
