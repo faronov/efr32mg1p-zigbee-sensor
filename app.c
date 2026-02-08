@@ -707,7 +707,7 @@ void emberAfStackStatusCallback(EmberStatus status)
   }
 }
 
-void emberPollCompleteHandler(EmberStatus status)
+void emberAfPluginEndDeviceSupportPollCompletedCallback(EmberStatus status)
 {
   // Avoid log spam on normal idle polls.
   if (status != EMBER_MAC_NO_DATA) {
