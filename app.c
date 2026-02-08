@@ -6,7 +6,9 @@
 #include "sl_component_catalog.h"
 #include "zigbee_app_framework_event.h"
 #include "app/framework/include/af.h"
-// #include "app/framework/plugin/network-steering/network-steering.h" // REMOVED - causes event queue crash
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+#include "app/framework/plugin/network-steering/network-steering.h"
+#endif
 #include "app_sensor.h"
 #include "app_config.h"
 #include "stack/include/network-formation.h"  // For manual network join
@@ -218,6 +220,27 @@ static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
 static void app_init_once(void);
 #if APP_DEBUG_RESET_NETWORK
 static void app_debug_reset_network_state(void);
+#endif
+
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
+                                                  uint8_t totalBeacons,
+                                                  uint8_t joinAttempts,
+                                                  uint8_t finalState)
+{
+  APP_DEBUG_PRINTF("Join: steering complete status=0x%02x beacons=%u attempts=%u state=%u\n",
+                   status,
+                   totalBeacons,
+                   joinAttempts,
+                   finalState);
+
+  // If stack is still down after steering completion, allow a new button-triggered join attempt.
+  if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
+    network_join_in_progress = false;
+    join_scan_in_progress = false;
+    join_network_found = false;
+  }
+}
 #endif
 
 /**
@@ -1020,6 +1043,13 @@ static EmberStatus start_join_scan(void)
  */
 void emberAfNetworkFoundCallback(EmberZigbeeNetwork *networkFound, uint8_t lqi, int8_t rssi)
 {
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+  // Network Steering plugin owns scan callbacks when present.
+  (void)networkFound;
+  (void)lqi;
+  (void)rssi;
+  return;
+#else
   if (!network_join_in_progress || networkFound == NULL) {
     return;
   }
@@ -1042,6 +1072,7 @@ void emberAfNetworkFoundCallback(EmberZigbeeNetwork *networkFound, uint8_t lqi, 
                      lqi,
                      rssi);
   }
+#endif
 }
 
 /**
@@ -1049,6 +1080,12 @@ void emberAfNetworkFoundCallback(EmberZigbeeNetwork *networkFound, uint8_t lqi, 
  */
 void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
 {
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+  // Network Steering plugin owns scan callbacks when present.
+  (void)channel;
+  (void)status;
+  return;
+#else
   if (!network_join_in_progress) {
     return;
   }
@@ -1086,6 +1123,7 @@ void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
 
   // No joinable network on this channel - try next channel
   try_next_channel();
+#endif
 }
 
 /**
@@ -1126,7 +1164,7 @@ static void handle_short_press(void)
       return;
     }
 
-    // Not on network - start manual network join
+    // Not on network - start join
     emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
                        join_attempt_count + 1);
     APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
@@ -1144,8 +1182,17 @@ static void handle_short_press(void)
     sl_zigbee_event_set_active(&led_blink_event);
 #endif
 
-    // Start manual network join (no longer using network steering plugin)
-    EmberStatus join_status = start_join_scan();
+    EmberStatus join_status = EMBER_INVALID_CALL;
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+    // When network steering is linked, use only plugin API to avoid scan callback conflicts.
+    emberAfCorePrintln("NWK Steering: issuing scan on primary channels (mask 0x%08lx)",
+                       (unsigned long)EMBER_AF_PLUGIN_NETWORK_STEERING_CHANNEL_MASK);
+    join_status = emberAfPluginNetworkSteeringStart();
+    APP_DEBUG_PRINTF("Join: emberAfPluginNetworkSteeringStart -> 0x%02x\n", join_status);
+#else
+    // Manual active scan + join path for builds without network steering plugin.
+    join_status = start_join_scan();
+#endif
 
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
