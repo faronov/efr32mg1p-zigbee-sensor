@@ -20,6 +20,8 @@
 // ZAP uses "RELATIVE_HUMIDITY" not "HUMIDITY", so we create shorter aliases
 #define ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID      ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID
 #define ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID ZCL_RELATIVE_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID
+#define APP_SERVER_CLUSTER_MASK 0x01
+#define APP_NULL_MFG_CODE       0x0000
 
 static bool sensor_ready = false;
 static bool battery_ready = false;
@@ -320,6 +322,12 @@ void app_sensor_update(void)
                                          ZCL_INT16S_ATTRIBUTE_TYPE);
     if (status != EMBER_ZCL_STATUS_SUCCESS) {
       emberAfCorePrintln("Error: Failed to update temperature attribute (0x%x)", status);
+    } else {
+      emberAfReportingAttributeChangeCallback(SENSOR_ENDPOINT,
+                                              ZCL_TEMP_MEASUREMENT_CLUSTER_ID,
+                                              ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID,
+                                              APP_SERVER_CLUSTER_MASK,
+                                              APP_NULL_MFG_CODE);
     }
 
     if (has_humidity) {
@@ -333,6 +341,12 @@ void app_sensor_update(void)
                                            ZCL_INT16U_ATTRIBUTE_TYPE);
       if (status != EMBER_ZCL_STATUS_SUCCESS) {
         emberAfCorePrintln("Error: Failed to update humidity attribute (0x%x)", status);
+      } else {
+        emberAfReportingAttributeChangeCallback(SENSOR_ENDPOINT,
+                                                ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID,
+                                                ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID,
+                                                APP_SERVER_CLUSTER_MASK,
+                                                APP_NULL_MFG_CODE);
       }
     } else {
       emberAfCorePrintln("Humidity not supported by sensor (BMP280)");
@@ -349,6 +363,12 @@ void app_sensor_update(void)
                                          ZCL_INT16S_ATTRIBUTE_TYPE);
     if (status != EMBER_ZCL_STATUS_SUCCESS) {
       emberAfCorePrintln("Error: Failed to update pressure attribute (0x%x)", status);
+    } else {
+      emberAfReportingAttributeChangeCallback(SENSOR_ENDPOINT,
+                                              ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID,
+                                              ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID,
+                                              APP_SERVER_CLUSTER_MASK,
+                                              APP_NULL_MFG_CODE);
     }
   }
 
@@ -377,6 +397,12 @@ void app_sensor_update(void)
                                          ZCL_INT8U_ATTRIBUTE_TYPE);
     if (status != EMBER_ZCL_STATUS_SUCCESS) {
       emberAfCorePrintln("Error: Failed to update battery voltage attribute (0x%x)", status);
+    } else {
+      emberAfReportingAttributeChangeCallback(SENSOR_ENDPOINT,
+                                              ZCL_POWER_CONFIG_CLUSTER_ID,
+                                              ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID,
+                                              APP_SERVER_CLUSTER_MASK,
+                                              APP_NULL_MFG_CODE);
     }
 
     // Update BatteryPercentageRemaining attribute (0x0021)
@@ -388,6 +414,12 @@ void app_sensor_update(void)
                                          ZCL_INT8U_ATTRIBUTE_TYPE);
     if (status != EMBER_ZCL_STATUS_SUCCESS) {
       emberAfCorePrintln("Error: Failed to update battery percentage attribute (0x%x)", status);
+    } else {
+      emberAfReportingAttributeChangeCallback(SENSOR_ENDPOINT,
+                                              ZCL_POWER_CONFIG_CLUSTER_ID,
+                                              ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID,
+                                              APP_SERVER_CLUSTER_MASK,
+                                              APP_NULL_MFG_CODE);
     }
   } else {
     emberAfCorePrintln("Battery monitor not initialized");
