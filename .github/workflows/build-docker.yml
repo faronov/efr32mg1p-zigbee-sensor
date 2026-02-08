@@ -262,6 +262,72 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🐳 Built with Silicon Labs tooling via slt" >> $GITHUB_STEP_SUMMARY
 
+  build-firmware-profiles:
+    name: Build firmware profile - ${{ matrix.profile }}
+    needs: [check-container, build-container]
+    if: always() && needs.check-container.result == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: bme280
+            slcp: zigbee_sensor_tradfri_bme280.slcp
+          - profile: bmp280
+            slcp: zigbee_sensor_tradfri_bmp280.slcp
+          - profile: sht31
+            slcp: zigbee_sensor_tradfri_sht31.slcp
+    container:
+      image: ${{ needs.check-container.outputs.container_name }}
+      options: --user root
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build profile firmware
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          export HOME=/root
+          export GSDK_DIR=/gecko_sdk_4.5.0
+          export BOARD=custom
+          export SLCP_FILE=${{ matrix.slcp }}
+
+          GCC_PKG=$(find /root/.silabs/slt/installs/conan/p -maxdepth 1 -type d -name "gcc-*" 2>/dev/null | grep -v "gcc-a51b5" | head -1)
+          if [ -z "$GCC_PKG" ]; then
+            echo "ERROR: GCC package not found!"
+            exit 1
+          fi
+          export PATH="$GCC_PKG/p/bin:$PATH"
+          arm-none-eabi-gcc --version | head -1
+
+          echo "Building profile=${{ matrix.profile }} slcp=${{ matrix.slcp }}"
+          bash tools/build.sh
+
+      - name: Upload profile artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: firmware-profile-${{ matrix.profile }}-${{ github.sha }}
+          path: |
+            firmware/build/**/*.out
+            firmware/build/**/*.hex
+            firmware/build/**/*.bin
+            firmware/build/**/*.s37
+            firmware/build/**/*.map
+            firmware/autogen/**
+            firmware/build/**/project/autogen/**
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Profile build summary
+        if: success()
+        run: |
+          echo "## ✅ Profile Build Successful - ${{ matrix.profile }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**SLCP**: ${{ matrix.slcp }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          find firmware -type f \( -name "*.out" -o -name "*.hex" -o -name "*.s37" \) -exec ls -lh {} \; 2>/dev/null | awk '{print $9, $5}' || echo "No files found"
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
   build-firmware-debug:
     name: Build firmware - TRÅDFRI (Debug)
     needs: [check-container, build-container]

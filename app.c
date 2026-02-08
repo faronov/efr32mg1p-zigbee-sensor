@@ -12,6 +12,7 @@
 #ifdef SL_CATALOG_ZIGBEE_REPORTING_PRESENT
 #include "app/framework/plugin/reporting/reporting.h"
 #endif
+#include "app_profile.h"
 #include "app_sensor.h"
 #include "app_config.h"
 #include "stack/include/network-formation.h"  // For manual network join
@@ -374,16 +375,24 @@ static void app_configure_default_reporting(void)
   entry.data.reported.minInterval = 10;
   entry.data.reported.maxInterval = 300;
   entry.data.reported.reportableChange = 100;  // 1.00 %RH (0.01% units)
+#if (APP_PROFILE_HAS_HUMIDITY != 0)
   st = emberAfPluginReportingConfigureReportedAttribute(&entry);
   APP_DEBUG_PRINTF("Reporting default: humidity -> 0x%02x\n", st);
+#else
+  APP_DEBUG_PRINTF("Reporting default: humidity skipped by profile\n");
+#endif
 
   entry.clusterId = ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID;
   entry.attributeId = ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID;
   entry.data.reported.minInterval = 10;
   entry.data.reported.maxInterval = 300;
   entry.data.reported.reportableChange = 1;    // 1 kPa (cluster units)
+#if (APP_PROFILE_HAS_PRESSURE != 0)
   st = emberAfPluginReportingConfigureReportedAttribute(&entry);
   APP_DEBUG_PRINTF("Reporting default: pressure -> 0x%02x\n", st);
+#else
+  APP_DEBUG_PRINTF("Reporting default: pressure skipped by profile\n");
+#endif
 
   entry.clusterId = ZCL_POWER_CONFIG_CLUSTER_ID;
   entry.attributeId = ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID;
