@@ -176,6 +176,8 @@ static bool basic_identity_pending = false;
 static bool af_init_force_pending = false;
 static uint32_t af_init_force_tick = 0;
 static uint32_t basic_identity_tick = 0;
+static bool btn0_fallback_pressed = false;
+static uint32_t btn0_fallback_press_tick = 0;
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
 static bool app_join_awake_active = false;
 static uint32_t app_join_awake_start_tick = 0;
@@ -277,6 +279,9 @@ static void app_init_once(void)
   // Force internal pull-up + input filter to avoid floating/false presses.
   GPIO_PinModeSet(gpioPortB, 13, gpioModeInputPullFilter, 1);
   APP_DEBUG_PRINTF("BTN0: internal pull-up enabled (PB13)\n");
+  // Re-arm simple_button after direct GPIO reconfiguration above.
+  sl_button_disable(&sl_button_btn0);
+  sl_button_enable(&sl_button_btn0);
 #endif
 
 #if APP_DEBUG_RESET_NETWORK
@@ -896,8 +901,32 @@ void emberAfTickCallback(void)
   uint32_t now = sl_sleeptimer_get_tick_count();
 
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
-  // Interrupt-driven simple_button path:
-  // sl_button_on_change() sets pending flags from ISR context.
+  // Keep poll call in debug builds as a fallback path on boards where
+  // interrupt edge delivery is unreliable.
+  sl_simple_button_poll_instances();
+
+  if (af_init_seen) {
+    // Safe edge-based fallback (no synthetic hold timeout path).
+    bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
+    if (raw_pressed && !btn0_fallback_pressed) {
+      btn0_fallback_pressed = true;
+      btn0_fallback_press_tick = now;
+      APP_DEBUG_PRINTF("BTN0: PRESSED\n");
+    } else if (!raw_pressed && btn0_fallback_pressed) {
+      btn0_fallback_pressed = false;
+      uint32_t duration_ms = sl_sleeptimer_tick_to_ms(now - btn0_fallback_press_tick);
+      btn0_fallback_press_tick = 0;
+      APP_DEBUG_PRINTF("BTN0: RELEASED\n");
+
+      if (duration_ms >= BUTTON_DEBOUNCE_MS) {
+        if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
+          button_long_press_pending = true;
+        } else {
+          button_short_press_pending = true;
+        }
+      }
+    }
+  }
 #endif
 
   app_debug_poll();
