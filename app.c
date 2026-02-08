@@ -186,6 +186,9 @@ static bool app_fast_poll_active = false;
 static uint32_t app_fast_poll_start_tick = 0;
 #endif
 static bool post_join_start_pending = false;
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+static uint32_t post_join_manual_poll_tick = 0;
+#endif
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -412,6 +415,23 @@ void app_debug_poll(void)
       app_fast_poll_active = false;
       app_fast_poll_start_tick = 0;
       APP_DEBUG_PRINTF("Debug: fast poll window ended\n");
+    }
+  }
+#endif
+
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+  // SDK steering occasionally stalls interview on Series-1 sleepy devices.
+  // While steering is still active after NETWORK_UP, force parent polls so
+  // queued APS/ZCL interview traffic is drained reliably.
+  if (post_join_start_pending && emberAfNetworkState() == EMBER_JOINED_NETWORK) {
+    if (post_join_manual_poll_tick == 0
+        || sl_sleeptimer_tick_to_ms(now - post_join_manual_poll_tick)
+           >= APP_DEBUG_FAST_POLL_INTERVAL_MS) {
+      EmberStatus poll_status = emberPollForData();
+      post_join_manual_poll_tick = now;
+      if (poll_status != EMBER_SUCCESS) {
+        APP_DEBUG_PRINTF("Debug: post-join emberPollForData -> 0x%02x\n", poll_status);
+      }
     }
   }
 #endif
@@ -687,6 +707,7 @@ void emberAfStackStatusCallback(EmberStatus status)
     // callback to avoid interfering with trust-center key update/configuring.
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
     post_join_start_pending = true;
+    post_join_manual_poll_tick = 0;
     APP_DEBUG_PRINTF("Join: deferring periodic sensor start until steering complete\n");
 #else
     app_sensor_start_periodic_updates();
@@ -705,6 +726,9 @@ void emberAfStackStatusCallback(EmberStatus status)
     app_fast_poll_start_tick = 0;
 #endif
     post_join_start_pending = false;
+#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+    post_join_manual_poll_tick = 0;
+#endif
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Turn LED off when network is down
@@ -1226,6 +1250,7 @@ void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
       && post_join_start_pending
       && emberAfNetworkState() == EMBER_JOINED_NETWORK) {
     post_join_start_pending = false;
+    post_join_manual_poll_tick = 0;
     APP_DEBUG_PRINTF("Join: steering complete, starting periodic sensor updates\n");
     app_sensor_start_periodic_updates();
   }
@@ -1235,6 +1260,7 @@ void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
     join_network_found = false;
     join_attempt_count++;
     post_join_start_pending = false;
+    post_join_manual_poll_tick = 0;
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     led_blink_active = false;
     sl_zigbee_event_set_inactive(&led_blink_event);
