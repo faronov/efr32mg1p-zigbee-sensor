@@ -6,7 +6,9 @@
 #include "app_sensor.h"
 #include "app_config.h"
 #include "app_profile.h"
+#if (APP_SENSOR_PROFILE != APP_SENSOR_PROFILE_SHT31)
 #include "bme280_min.h"
+#endif
 #include "sht31.h"
 #include "battery.h"
 #include "af.h"
@@ -58,7 +60,13 @@ static uint32_t sensor_update_interval_ms = SENSOR_UPDATE_INTERVAL_MS;
 #endif
 
 static uint32_t fake_last_change_ms = 0;
-static bme280_data_t fake_sensor_data = {
+typedef struct {
+  int32_t temperature;
+  uint32_t humidity;
+  uint32_t pressure;
+} app_fake_sensor_data_t;
+
+static app_fake_sensor_data_t fake_sensor_data = {
   .temperature = 2150, // 21.50 C
   .humidity = 5000,    // 50.00 %
   .pressure = 101325,  // Pa
