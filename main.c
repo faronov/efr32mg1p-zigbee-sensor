@@ -44,6 +44,9 @@ bool app_debug_button_ready(void);
 #ifndef APP_DEBUG_POLL_BUTTON
 #define APP_DEBUG_POLL_BUTTON 0
 #endif
+#ifndef APP_DEBUG_SLEEP_TRACE
+#define APP_DEBUG_SLEEP_TRACE 0
+#endif
 #ifndef APP_DEBUG_FORCE_AF_INIT
 #define APP_DEBUG_FORCE_AF_INIT 0
 #endif
@@ -209,7 +212,17 @@ int main(void)
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
     // Sleep until next event
+#if (APP_DEBUG_SLEEP_TRACE != 0)
+    uint32_t sleep_before = sl_sleeptimer_get_tick_count();
+#endif
     sl_power_manager_sleep();
+#if (APP_DEBUG_SLEEP_TRACE != 0)
+    uint32_t sleep_after = sl_sleeptimer_get_tick_count();
+    uint32_t slept_ms = sl_sleeptimer_tick_to_ms(sleep_after - sleep_before);
+    if (slept_ms >= 20) {
+      printf("Sleep trace: woke after %lu ms\n", (unsigned long)slept_ms);
+    }
+#endif
 #endif
   }
 #endif

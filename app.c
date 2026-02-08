@@ -179,8 +179,6 @@ static bool basic_identity_pending = false;
 static bool af_init_force_pending = false;
 static uint32_t af_init_force_tick = 0;
 static uint32_t basic_identity_tick = 0;
-static bool btn0_fallback_pressed = false;
-static uint32_t btn0_fallback_press_tick = 0;
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
 static bool app_join_awake_active = false;
 static uint32_t app_join_awake_start_tick = 0;
@@ -294,10 +292,6 @@ static void app_init_once(void)
   button_pressed = false;
   button_press_start_tick = 0;
 
-  // Align GPIO fallback state with the current pin level at init.
-  bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
-  btn0_fallback_pressed = raw_pressed;
-  btn0_fallback_press_tick = raw_pressed ? sl_sleeptimer_get_tick_count() : 0;
 #endif
 
 #if APP_DEBUG_RESET_NETWORK
@@ -466,33 +460,9 @@ void app_debug_poll(void)
   }
 
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
-  // Robust fallback: handle BTN0 from main loop too, because some builds/flows
-  // do not invoke emberAfTickCallback() reliably on this target.
-  if (af_init_seen) {
-    bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
-    if (raw_pressed && !btn0_fallback_pressed) {
-      btn0_fallback_pressed = true;
-      btn0_fallback_press_tick = now;
-      APP_DEBUG_PRINTF("BTN0: PRESSED\n");
-    } else if (!raw_pressed && btn0_fallback_pressed) {
-      btn0_fallback_pressed = false;
-      uint32_t duration_ms = sl_sleeptimer_tick_to_ms(now - btn0_fallback_press_tick);
-      btn0_fallback_press_tick = 0;
-      APP_DEBUG_PRINTF("BTN0: RELEASED\n");
-
-      if (duration_ms >= BUTTON_DEBOUNCE_MS) {
-        if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
-          if (!button_long_press_pending) {
-            button_long_press_pending = true;
-          }
-        } else {
-          if (!button_short_press_pending) {
-            button_short_press_pending = true;
-          }
-        }
-      }
-    }
-  }
+  // Keep simple_button state machine updated even if AF tick callback isn't
+  // scheduled frequently on this target.
+  sl_simple_button_poll_instances();
 #endif
 
   // Some debug builds run without AF tick wiring, so process deferred joins here.
@@ -964,11 +934,13 @@ void sl_button_on_change(const sl_button_t *handle)
       // Button pressed - record start time
       button_press_start_tick = sl_sleeptimer_get_tick_count();
       button_pressed = true;
+      APP_DEBUG_PRINTF("BTN0: PRESSED\n");
     } else {
       // Button released - check duration
       if (button_pressed) {
         uint32_t duration_ticks = sl_sleeptimer_get_tick_count() - button_press_start_tick;
         uint32_t duration_ms = sl_sleeptimer_tick_to_ms(duration_ticks);
+        APP_DEBUG_PRINTF("BTN0: RELEASED\n");
 
         // Set flags for main context to poll
         // These will be checked by button_poll_event_handler()
@@ -1026,35 +998,6 @@ void emberAfTickCallback(void)
 {
   static uint32_t last_heartbeat_tick = 0;
   uint32_t now = sl_sleeptimer_get_tick_count();
-
-#ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
-  // Keep poll call in debug builds as a fallback path on boards where
-  // interrupt edge delivery is unreliable.
-  sl_simple_button_poll_instances();
-
-  if (af_init_seen) {
-    // Safe edge-based fallback (no synthetic hold timeout path).
-    bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
-    if (raw_pressed && !btn0_fallback_pressed) {
-      btn0_fallback_pressed = true;
-      btn0_fallback_press_tick = now;
-      APP_DEBUG_PRINTF("BTN0: PRESSED\n");
-    } else if (!raw_pressed && btn0_fallback_pressed) {
-      btn0_fallback_pressed = false;
-      uint32_t duration_ms = sl_sleeptimer_tick_to_ms(now - btn0_fallback_press_tick);
-      btn0_fallback_press_tick = 0;
-      APP_DEBUG_PRINTF("BTN0: RELEASED\n");
-
-      if (duration_ms >= BUTTON_DEBOUNCE_MS) {
-        if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
-          button_long_press_pending = true;
-        } else {
-          button_short_press_pending = true;
-        }
-      }
-    }
-  }
-#endif
 
   app_debug_poll();
 

@@ -212,6 +212,8 @@ define:
     value: 1
   - name: APP_DEBUG_POLL_BUTTON
     value: 1
+  - name: APP_DEBUG_SLEEP_TRACE
+    value: 1
   - name: APP_DEBUG_FORCE_AF_INIT
     value: 0
   - name: APP_DEBUG_SPI_ONLY
