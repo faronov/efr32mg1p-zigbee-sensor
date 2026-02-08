@@ -14,6 +14,11 @@ component:
   - id: zigbee_pro_leaf_stack
   - id: zigbee_zcl_framework_core
 
+  # Network joining (manual implementation - network steering plugin causes event queue crash)
+  # - id: zigbee_network_steering (REMOVED - crashes event queue)
+  # - id: zigbee_scan_dispatch (REMOVED - not needed without network steering)
+  - id: zigbee_update_tc_link_key
+
   # Identify cluster support (LED blink when identified)
   - id: zigbee_identify
   - id: zigbee_reporting
@@ -86,8 +91,6 @@ configuration:
 
   - name: EMBER_AF_PLUGIN_NETWORK_STEERING_SCAN_DURATION
     value: 3
-  - name: EMBER_AF_PLUGIN_NETWORK_STEERING_TRY_ALL_KEYS
-    value: 0
   - name: EMBER_MAX_END_DEVICE_CHILDREN
     value: 0
   - name: EMBER_CHILD_TABLE_SIZE
@@ -200,7 +203,7 @@ define:
   - name: APP_DEBUG_DIAG_ALWAYS
     value: 1
   - name: APP_DEBUG_NO_SLEEP
-    value: 1
+    value: 0
   - name: APP_DEBUG_RESET_NETWORK
     value: 0
   - name: APP_DEBUG_MAIN_HEARTBEAT
@@ -223,10 +226,10 @@ define:
     value: 1
   # Disabled due to observed FLT reset after join on TRADFRI hardware.
   - name: APP_DEBUG_AWAKE_AFTER_JOIN_MS
-    value: 15000
+    value: 0
   # Keep sleepy end device in fast-poll mode after join to speed up coordinator interview.
   - name: APP_DEBUG_FAST_POLL_AFTER_JOIN_MS
-    value: 60000
+    value: 120000
   - name: APP_DEBUG_FAST_POLL_INTERVAL_MS
     value: 250
   - name: APP_DEBUG_AUTO_JOIN_ON_BOOT

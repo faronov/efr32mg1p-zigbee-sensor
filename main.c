@@ -43,9 +43,6 @@ bool app_debug_button_ready(void);
 #ifndef APP_DEBUG_POLL_BUTTON
 #define APP_DEBUG_POLL_BUTTON 0
 #endif
-#ifndef APP_DEBUG_MAIN_BUTTON_FALLBACK
-#define APP_DEBUG_MAIN_BUTTON_FALLBACK 0
-#endif
 #ifndef APP_DEBUG_FORCE_AF_INIT
 #define APP_DEBUG_FORCE_AF_INIT 0
 #endif
@@ -201,9 +198,7 @@ int main(void)
     }
 #endif
 
-#if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) \
-  && defined(APP_DEBUG_POLL_BUTTON) && (APP_DEBUG_POLL_BUTTON != 0) \
-  && defined(APP_DEBUG_MAIN_BUTTON_FALLBACK) && (APP_DEBUG_MAIN_BUTTON_FALLBACK != 0)
+#if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) && defined(APP_DEBUG_POLL_BUTTON) && (APP_DEBUG_POLL_BUTTON != 0)
     // Poll raw BTN0 pin (PB13, active low) from main loop as a hard fallback.
     static bool btn_pressed = false;
     static uint32_t press_tick = 0;

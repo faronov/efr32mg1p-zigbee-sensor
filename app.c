@@ -6,9 +6,7 @@
 #include "sl_component_catalog.h"
 #include "zigbee_app_framework_event.h"
 #include "app/framework/include/af.h"
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
-#include "app/framework/plugin/network-steering/network-steering.h"
-#endif
+// #include "app/framework/plugin/network-steering/network-steering.h" // REMOVED - causes event queue crash
 #include "app_sensor.h"
 #include "app_config.h"
 #include "stack/include/network-formation.h"  // For manual network join
@@ -24,7 +22,6 @@
 #endif
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
 
 // Optional SPIDRV init symbols (generated when SPIDRV component is present).
 __attribute__((weak)) void sl_spidrv_exp_init(void);
@@ -115,11 +112,6 @@ static bool button_pressed = false;
 #endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
 
-static uint16_t clamp_u16_ms(uint32_t value_ms)
-{
-  return (value_ms > UINT16_MAX) ? UINT16_MAX : (uint16_t)value_ms;
-}
-
 static void handle_short_press(void);
 static void handle_long_press(void);
 
@@ -185,14 +177,6 @@ static uint32_t app_join_awake_start_tick = 0;
 static bool app_fast_poll_active = false;
 static uint32_t app_fast_poll_start_tick = 0;
 #endif
-static bool post_join_start_pending = false;
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
-static uint32_t post_join_manual_poll_tick = 0;
-#endif
-static bool post_join_poll_boost_active = false;
-static bool post_join_rx_seen = false;
-static uint32_t post_join_poll_boost_start_tick = 0;
-static uint32_t post_join_poll_boost_last_tick = 0;
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -319,9 +303,7 @@ static void app_init_once(void)
 
 void emberAfMainInitCallback(void)
 {
-  // In GSDK 4.5 this callback happens early in AF startup sequence.
-  // Defer heavy app init until endpoints are configured.
-  APP_DEBUG_PRINTF("AF main init callback\n");
+  app_init_once();
 }
 
 #if APP_DEBUG_RESET_NETWORK
@@ -359,12 +341,6 @@ void app_debug_force_af_init(void)
 void app_debug_poll(void)
 {
   uint32_t now = sl_sleeptimer_get_tick_count();
-
-  // Initialize once the AF endpoint table is ready.
-  if (!af_init_seen && emberAfEndpointCount() > 0) {
-    APP_DEBUG_PRINTF("AF init deferred: endpoints ready\n");
-    app_init_once();
-  }
 
   if (!af_init_reported && af_init_seen) {
     af_init_reported = true;
@@ -410,7 +386,7 @@ void app_debug_poll(void)
   }
 #endif
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0) && !defined(SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT)
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
   if (app_fast_poll_active && app_fast_poll_start_tick != 0) {
     uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_fast_poll_start_tick);
     if (elapsed_ms >= APP_DEBUG_FAST_POLL_AFTER_JOIN_MS) {
@@ -419,41 +395,6 @@ void app_debug_poll(void)
       app_fast_poll_active = false;
       app_fast_poll_start_tick = 0;
       APP_DEBUG_PRINTF("Debug: fast poll window ended\n");
-    }
-  }
-#endif
-
-  // For Sleepy End Device interview on Series-1, force parent polling right
-  // after join until first incoming ZCL is observed.
-  if (post_join_poll_boost_active && emberAfNetworkState() == EMBER_JOINED_NETWORK) {
-    uint32_t boost_elapsed_ms = sl_sleeptimer_tick_to_ms(now - post_join_poll_boost_start_tick);
-    if (post_join_rx_seen || boost_elapsed_ms >= 120000u) {
-      post_join_poll_boost_active = false;
-      APP_DEBUG_PRINTF("Debug: post-join poll boost %s\n",
-                       post_join_rx_seen ? "stopped (rx seen)" : "timed out");
-    } else if (post_join_poll_boost_last_tick == 0
-               || sl_sleeptimer_tick_to_ms(now - post_join_poll_boost_last_tick) >= 100u) {
-      EmberStatus poll_status = emberPollForData();
-      post_join_poll_boost_last_tick = now;
-      if (poll_status != EMBER_SUCCESS) {
-        APP_DEBUG_PRINTF("Debug: boost emberPollForData -> 0x%02x\n", poll_status);
-      }
-    }
-  }
-
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
-  // SDK steering occasionally stalls interview on Series-1 sleepy devices.
-  // While steering is still active after NETWORK_UP, force parent polls so
-  // queued APS/ZCL interview traffic is drained reliably.
-  if (post_join_start_pending && emberAfNetworkState() == EMBER_JOINED_NETWORK) {
-    if (post_join_manual_poll_tick == 0
-        || sl_sleeptimer_tick_to_ms(now - post_join_manual_poll_tick)
-           >= APP_DEBUG_FAST_POLL_INTERVAL_MS) {
-      EmberStatus poll_status = emberPollForData();
-      post_join_manual_poll_tick = now;
-      if (poll_status != EMBER_SUCCESS) {
-        APP_DEBUG_PRINTF("Debug: post-join emberPollForData -> 0x%02x\n", poll_status);
-      }
     }
   }
 #endif
@@ -679,11 +620,6 @@ void emberAfStackStatusCallback(EmberStatus status)
     if (emberGetNodeType(&runtime_node_type) == EMBER_SUCCESS) {
       APP_DEBUG_PRINTF("Join: runtime node type=%u\n", runtime_node_type);
     }
-    post_join_rx_seen = false;
-    post_join_poll_boost_active = true;
-    post_join_poll_boost_start_tick = sl_sleeptimer_get_tick_count();
-    post_join_poll_boost_last_tick = 0;
-    APP_DEBUG_PRINTF("Debug: post-join poll boost enabled\n");
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
     if (!app_join_awake_active) {
@@ -695,11 +631,11 @@ void emberAfStackStatusCallback(EmberStatus status)
     }
 #endif
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0) && !defined(SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT)
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
     emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
-    emberAfSetShortPollIntervalMsCallback(clamp_u16_ms(APP_DEBUG_FAST_POLL_INTERVAL_MS));
-    emberAfSetWakeTimeoutMsCallback(clamp_u16_ms(APP_DEBUG_FAST_POLL_AFTER_JOIN_MS));
+    emberAfSetShortPollIntervalMsCallback((int16u)APP_DEBUG_FAST_POLL_INTERVAL_MS);
+    emberAfSetWakeTimeoutMsCallback((int16u)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS);
     app_fast_poll_active = true;
     app_fast_poll_start_tick = sl_sleeptimer_get_tick_count();
     APP_DEBUG_PRINTF("Debug: fast poll enabled for %lu ms (short=%lu ms)\n",
@@ -730,15 +666,9 @@ void emberAfStackStatusCallback(EmberStatus status)
     sl_zigbee_event_set_delay_ms(&led_off_event, 3000);
 #endif
 
-    // With network steering, defer sensor timer start until steering complete
-    // callback to avoid interfering with trust-center key update/configuring.
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
-    post_join_start_pending = true;
-    post_join_manual_poll_tick = 0;
-    APP_DEBUG_PRINTF("Join: deferring periodic sensor start until steering complete\n");
-#else
+    // Avoid heavy sensor transactions right at join/interview start.
+    // Start periodic updates and let first sample happen on timer.
     app_sensor_start_periodic_updates();
-#endif
 
     // Note: Binding is handled by coordinator (Zigbee2MQTT/ZHA/deCONZ)
     // No device-side binding code needed - see BINDING_GUIDE.md
@@ -746,18 +676,12 @@ void emberAfStackStatusCallback(EmberStatus status)
   } else if (status == EMBER_NETWORK_DOWN) {
     emberAfCorePrintln("Network down - will attempt optimized rejoin");
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0) && !defined(SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT)
+#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
     emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
     app_fast_poll_active = false;
     app_fast_poll_start_tick = 0;
 #endif
-    post_join_start_pending = false;
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
-    post_join_manual_poll_tick = 0;
-#endif
-    post_join_poll_boost_active = false;
-    post_join_rx_seen = false;
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Turn LED off when network is down
@@ -779,7 +703,6 @@ void emberAfStackStatusCallback(EmberStatus status)
 
 bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
 {
-  post_join_rx_seen = true;
   if (cmd != NULL && cmd->mfgSpecific == 0u) {
     if (cmd->commandId == ZCL_CONFIGURE_REPORTING_COMMAND_ID
         || cmd->commandId == ZCL_READ_REPORTING_CONFIGURATION_COMMAND_ID) {
@@ -872,7 +795,7 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
  * This is called from main context and is perfect for checking button flags
  * set by the button ISR. No event scheduling needed!
  */
-void emberAfMainTickCallback(void)
+void emberAfTickCallback(void)
 {
   static uint32_t last_heartbeat_tick = 0;
   uint32_t now = sl_sleeptimer_get_tick_count();
@@ -1083,12 +1006,6 @@ static EmberStatus start_join_scan(void)
  */
 void emberAfNetworkFoundCallback(EmberZigbeeNetwork *networkFound, uint8_t lqi, int8_t rssi)
 {
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
-  (void)networkFound;
-  (void)lqi;
-  (void)rssi;
-  return;
-#endif
   if (!network_join_in_progress || networkFound == NULL) {
     return;
   }
@@ -1118,11 +1035,6 @@ void emberAfNetworkFoundCallback(EmberZigbeeNetwork *networkFound, uint8_t lqi, 
  */
 void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
 {
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
-  (void)channel;
-  (void)status;
-  return;
-#endif
   if (!network_join_in_progress) {
     return;
   }
@@ -1200,24 +1112,11 @@ static void handle_short_press(void)
       return;
     }
 
-    // Not on network - start join flow
+    // Not on network - start manual network join
     emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
                        join_attempt_count + 1);
     APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
-
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0) && !defined(SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT)
-    // Keep Sleepy End Device in short poll mode across join + interview window.
-    // This matches SDK guidance for reliable TC key update/interview traffic.
-    emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
-    emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
-    emberAfSetShortPollIntervalMsCallback(clamp_u16_ms(APP_DEBUG_FAST_POLL_INTERVAL_MS));
-    emberAfSetWakeTimeoutMsCallback(clamp_u16_ms(APP_DEBUG_FAST_POLL_AFTER_JOIN_MS));
-    app_fast_poll_active = true;
-    app_fast_poll_start_tick = sl_sleeptimer_get_tick_count();
-    APP_DEBUG_PRINTF("Join: pre-join fast poll enabled (%lu ms, short=%lu ms)\n",
-                     (unsigned long)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS,
-                     (unsigned long)APP_DEBUG_FAST_POLL_INTERVAL_MS);
-#endif
+    configure_join_security();
 
     // Reset to start of channel list
     current_channel_index = 0;
@@ -1231,13 +1130,8 @@ static void handle_short_press(void)
     sl_zigbee_event_set_active(&led_blink_event);
 #endif
 
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
-    EmberStatus join_status = emberAfPluginNetworkSteeringStart();
-    APP_DEBUG_PRINTF("Join: emberAfPluginNetworkSteeringStart -> 0x%02x\n", join_status);
-#else
-    configure_join_security();
+    // Start manual network join (no longer using network steering plugin)
     EmberStatus join_status = start_join_scan();
-#endif
 
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
@@ -1247,13 +1141,7 @@ static void handle_short_press(void)
         join_scan_in_progress = false;
         join_network_found = false;
       } else {
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
-        network_join_in_progress = false;
-        join_scan_in_progress = false;
-        join_network_found = false;
-#else
         try_next_channel();
-#endif
       }
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
@@ -1267,38 +1155,6 @@ static void handle_short_press(void)
     }
   }
 }
-
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
-void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
-                                                  uint8_t totalBeacons,
-                                                  uint8_t joinAttempts,
-                                                  uint8_t finalState)
-{
-  APP_DEBUG_PRINTF("Join: steering complete status=0x%02x beacons=%u attempts=%u state=%u\n",
-                   status, totalBeacons, joinAttempts, finalState);
-  if (status == EMBER_SUCCESS
-      && post_join_start_pending
-      && emberAfNetworkState() == EMBER_JOINED_NETWORK) {
-    post_join_start_pending = false;
-    post_join_manual_poll_tick = 0;
-    APP_DEBUG_PRINTF("Join: steering complete, starting periodic sensor updates\n");
-    app_sensor_start_periodic_updates();
-  }
-  if (status != EMBER_SUCCESS) {
-    network_join_in_progress = false;
-    join_scan_in_progress = false;
-    join_network_found = false;
-    join_attempt_count++;
-    post_join_start_pending = false;
-    post_join_manual_poll_tick = 0;
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-    led_blink_active = false;
-    sl_zigbee_event_set_inactive(&led_blink_event);
-    sl_led_turn_off(&sl_led_led0);
-#endif
-  }
-}
-#endif
 
 static void configure_join_security(void)
 {
