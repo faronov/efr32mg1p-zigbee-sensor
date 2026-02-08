@@ -286,6 +286,18 @@ static void app_init_once(void)
   // Re-arm simple_button after direct GPIO reconfiguration above.
   sl_button_disable(&sl_button_btn0);
   sl_button_enable(&sl_button_btn0);
+
+  // Drop any stale press state captured before AF init was complete.
+  // This avoids false "long press" on the first post-boot release edge.
+  button_short_press_pending = false;
+  button_long_press_pending = false;
+  button_pressed = false;
+  button_press_start_tick = 0;
+
+  // Align GPIO fallback state with the current pin level at init.
+  bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
+  btn0_fallback_pressed = raw_pressed;
+  btn0_fallback_press_tick = raw_pressed ? sl_sleeptimer_get_tick_count() : 0;
 #endif
 
 #if APP_DEBUG_RESET_NETWORK
@@ -941,6 +953,13 @@ bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
 void sl_button_on_change(const sl_button_t *handle)
 {
   if (handle == &sl_button_btn0) {
+    // Ignore button edges before AF init to avoid stale hold-duration math.
+    if (!af_init_seen) {
+      button_pressed = false;
+      button_press_start_tick = 0;
+      return;
+    }
+
     if (sl_button_get_state(handle) == SL_SIMPLE_BUTTON_PRESSED) {
       // Button pressed - record start time
       button_press_start_tick = sl_sleeptimer_get_tick_count();
@@ -953,10 +972,12 @@ void sl_button_on_change(const sl_button_t *handle)
 
         // Set flags for main context to poll
         // These will be checked by button_poll_event_handler()
-        if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
-          button_long_press_pending = true;
-        } else {
-          button_short_press_pending = true;
+        if (duration_ms >= BUTTON_DEBOUNCE_MS) {
+          if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
+            button_long_press_pending = true;
+          } else {
+            button_short_press_pending = true;
+          }
         }
 
         button_pressed = false;
