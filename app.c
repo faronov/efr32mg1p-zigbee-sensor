@@ -9,6 +9,9 @@
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
 #include "app/framework/plugin/network-steering/network-steering.h"
 #endif
+#ifdef SL_CATALOG_ZIGBEE_REPORTING_PRESENT
+#include "app/framework/plugin/reporting/reporting.h"
+#endif
 #include "app_sensor.h"
 #include "app_config.h"
 #include "stack/include/network-formation.h"  // For manual network join
@@ -230,6 +233,7 @@ static void app_init_once(void);
 #if APP_DEBUG_RESET_NETWORK
 static void app_debug_reset_network_state(void);
 #endif
+static void app_configure_default_reporting(void);
 
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
 void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
@@ -322,6 +326,8 @@ static void app_init_once(void)
 #endif
   }
 
+  app_configure_default_reporting();
+
 #if APP_DEBUG_AUTO_JOIN_ON_BOOT
   APP_DEBUG_PRINTF("Debug: auto-join on boot\n");
   handle_short_press();
@@ -334,6 +340,60 @@ static void app_init_once(void)
     APP_DEBUG_PRINTF("Debug: auto-join after pin reset\n");
     handle_short_press();
   }
+#endif
+}
+
+static void app_configure_default_reporting(void)
+{
+#ifdef SL_CATALOG_ZIGBEE_REPORTING_PRESENT
+  EmberAfPluginReportingEntry entry;
+  EmberAfStatus st;
+
+  memset(&entry, 0, sizeof(entry));
+  entry.direction = EMBER_ZCL_REPORTING_DIRECTION_REPORTED;
+  entry.endpoint = 1;
+  entry.mask = CLUSTER_MASK_SERVER;
+  entry.manufacturerCode = EMBER_AF_NULL_MANUFACTURER_CODE;
+
+  entry.clusterId = ZCL_TEMP_MEASUREMENT_CLUSTER_ID;
+  entry.attributeId = ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID;
+  entry.data.reported.minInterval = 10;
+  entry.data.reported.maxInterval = 300;
+  entry.data.reported.reportableChange = 50;   // 0.50 C (0.01C units)
+  st = emberAfPluginReportingConfigureReportedAttribute(&entry);
+  APP_DEBUG_PRINTF("Reporting default: temp -> 0x%02x\n", st);
+
+  entry.clusterId = ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID;
+  entry.attributeId = ZCL_RELATIVE_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID;
+  entry.data.reported.minInterval = 10;
+  entry.data.reported.maxInterval = 300;
+  entry.data.reported.reportableChange = 100;  // 1.00 %RH (0.01% units)
+  st = emberAfPluginReportingConfigureReportedAttribute(&entry);
+  APP_DEBUG_PRINTF("Reporting default: humidity -> 0x%02x\n", st);
+
+  entry.clusterId = ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID;
+  entry.attributeId = ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID;
+  entry.data.reported.minInterval = 10;
+  entry.data.reported.maxInterval = 300;
+  entry.data.reported.reportableChange = 1;    // 1 kPa (cluster units)
+  st = emberAfPluginReportingConfigureReportedAttribute(&entry);
+  APP_DEBUG_PRINTF("Reporting default: pressure -> 0x%02x\n", st);
+
+  entry.clusterId = ZCL_POWER_CONFIG_CLUSTER_ID;
+  entry.attributeId = ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID;
+  entry.data.reported.minInterval = 30;
+  entry.data.reported.maxInterval = 1800;
+  entry.data.reported.reportableChange = 1;    // 0.1V (100mV units)
+  st = emberAfPluginReportingConfigureReportedAttribute(&entry);
+  APP_DEBUG_PRINTF("Reporting default: battery voltage -> 0x%02x\n", st);
+
+  entry.clusterId = ZCL_POWER_CONFIG_CLUSTER_ID;
+  entry.attributeId = ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID;
+  entry.data.reported.minInterval = 30;
+  entry.data.reported.maxInterval = 1800;
+  entry.data.reported.reportableChange = 2;    // 1% (0.5% units)
+  st = emberAfPluginReportingConfigureReportedAttribute(&entry);
+  APP_DEBUG_PRINTF("Reporting default: battery pct -> 0x%02x\n", st);
 #endif
 }
 
