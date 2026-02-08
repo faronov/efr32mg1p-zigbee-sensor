@@ -7,6 +7,7 @@
 #include "sl_system_init.h"
 #include "sl_event_handler.h"
 #include "sl_sleeptimer.h"
+#include "app_sensor.h"
 #include <stdio.h>
 #include <stdint.h>
 #include "app/framework/include/af.h"
@@ -197,6 +198,9 @@ int main(void)
       printf("Main loop heartbeat\n");
     }
 #endif
+
+    // Process periodic sensor work scheduled by sleeptimer callback.
+    app_sensor_process();
 
 #if APP_DEBUG_DIAG_ALWAYS || APP_DEBUG_FORCE_AF_INIT
     // Ensure debug AF init and identity checks run even if AF tick isn't wired.

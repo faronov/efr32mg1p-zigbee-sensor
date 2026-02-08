@@ -10,6 +10,7 @@
 #include "af.h"
 #include "app/framework/include/af.h"
 #include "sl_sleeptimer.h"
+#include "sl_status.h"
 #include <stdio.h>
 
 // Endpoint where sensor clusters are located
@@ -20,11 +21,12 @@
 #define ZCL_HUMIDITY_MEASUREMENT_CLUSTER_ID      ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID
 #define ZCL_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID ZCL_RELATIVE_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID
 
-// Event control for periodic updates
-static sl_zigbee_event_t sensor_update_event;
-static bool sensor_update_event_initialized = false;
 static bool sensor_ready = false;
 static bool battery_ready = false;
+static bool sensor_timer_running = false;
+static volatile bool sensor_update_pending = false;
+static bool sensor_network_down_logged = false;
+static sl_sleeptimer_timer_handle_t sensor_update_timer;
 
 // Configurable sensor update interval
 static uint32_t sensor_update_interval_ms = SENSOR_UPDATE_INTERVAL_MS;
@@ -89,14 +91,17 @@ static void app_update_fake_sensor_data(uint32_t now_ms)
   }
 }
 
-// Forward declaration
-static void sensor_update_event_handler(sl_zigbee_event_t *event);
+// Forward declarations
+static void sensor_update_timer_callback(sl_sleeptimer_timer_handle_t *handle, void *data);
+static void process_periodic_sensor_update(void);
 
 bool app_sensor_init(void)
 {
-  sensor_update_event_initialized = false;
   sensor_ready = false;
   battery_ready = false;
+  sensor_timer_running = false;
+  sensor_update_pending = false;
+  sensor_network_down_logged = false;
 
   // Initialize battery monitoring regardless of sensor presence.
   battery_ready = battery_init();
@@ -130,10 +135,21 @@ bool app_sensor_init(void)
   sensor_update_interval_ms = APP_FORCE_SENSOR_INTERVAL_MS;
 #endif
 
-  // Initialize and schedule the event for periodic updates
-  sl_zigbee_event_init(&sensor_update_event, sensor_update_event_handler);
-  sensor_update_event_initialized = true;
-  sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
+  // Start periodic sleeptimer updates. Callback only sets a flag;
+  // actual sensor/attribute work is done in main context.
+  sl_status_t timer_status =
+    sl_sleeptimer_start_periodic_timer_ms(&sensor_update_timer,
+                                          sensor_update_interval_ms,
+                                          sensor_update_timer_callback,
+                                          NULL,
+                                          0,
+                                          0);
+  if (timer_status != SL_STATUS_OK) {
+    emberAfCorePrintln("Error: sensor periodic timer start failed (0x%lx)",
+                       (unsigned long)timer_status);
+  } else {
+    sensor_timer_running = true;
+  }
 
   emberAfCorePrintln("Sensor poll interval: %d seconds", sensor_update_interval_ms / 1000);
   emberAfCorePrintln("Reporting thresholds (local attrs): dT=%d dRH=%d dP=%d",
@@ -146,31 +162,37 @@ bool app_sensor_init(void)
 
 void app_sensor_start_periodic_updates(void)
 {
-  if (!sensor_update_event_initialized) {
-    emberAfCorePrintln("Sensor periodic updates disabled: sensor/event not initialized");
-    return;
+  // Ensure periodic timer is running.
+  if (!sensor_timer_running) {
+    sl_status_t timer_status =
+      sl_sleeptimer_start_periodic_timer_ms(&sensor_update_timer,
+                                            sensor_update_interval_ms,
+                                            sensor_update_timer_callback,
+                                            NULL,
+                                            0,
+                                            0);
+    if (timer_status != SL_STATUS_OK) {
+      emberAfCorePrintln("Error: sensor periodic timer start failed (0x%lx)",
+                         (unsigned long)timer_status);
+      return;
+    }
+    sensor_timer_running = true;
   }
 
-  // (Re)start the periodic sensor update event
+  // Force an immediate sample after join.
+  sensor_update_pending = true;
+  sensor_network_down_logged = false;
   emberAfCorePrintln("Starting periodic sensor updates (interval: %d seconds)",
                      sensor_update_interval_ms / 1000);
-  sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
 }
 
-static void sensor_update_event_handler(sl_zigbee_event_t *event)
+void app_sensor_process(void)
 {
-  // Only read sensor if network is up (power optimization)
-  if (emberAfNetworkState() == EMBER_JOINED_NETWORK) {
-    // Perform sensor update
-    app_sensor_update();
-
-    // Reschedule for next update
-    sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
-  } else {
-    // Network down - stop periodic reads to save power
-    emberAfCorePrintln("Network down: sensor reads suspended");
-    // Event will be restarted by app_sensor_start_periodic_updates() when network comes back up
+  if (!sensor_update_pending) {
+    return;
   }
+  sensor_update_pending = false;
+  process_periodic_sensor_update();
 }
 
 void app_sensor_set_interval(uint32_t interval_ms)
@@ -183,13 +205,41 @@ void app_sensor_set_interval(uint32_t interval_ms)
   sensor_update_interval_ms = interval_ms;
   emberAfCorePrintln("Sensor update interval changed to %d seconds", interval_ms / 1000);
 
-  if (!sensor_update_event_initialized) {
-    emberAfCorePrintln("Sensor interval stored; periodic event will start after sensor init");
+  if (!sensor_timer_running) {
+    emberAfCorePrintln("Sensor interval stored; periodic timer will start after sensor init");
     return;
   }
 
-  // Restart the timer with new interval
-  sl_zigbee_event_set_delay_ms(&sensor_update_event, sensor_update_interval_ms);
+  sl_status_t timer_status =
+    sl_sleeptimer_restart_periodic_timer_ms(&sensor_update_timer,
+                                            sensor_update_interval_ms,
+                                            sensor_update_timer_callback,
+                                            NULL,
+                                            0,
+                                            0);
+  if (timer_status != SL_STATUS_OK) {
+    emberAfCorePrintln("Error: sensor periodic timer restart failed (0x%lx)",
+                       (unsigned long)timer_status);
+  }
+}
+
+static void sensor_update_timer_callback(sl_sleeptimer_timer_handle_t *handle, void *data)
+{
+  (void)handle;
+  (void)data;
+  sensor_update_pending = true;
+}
+
+static void process_periodic_sensor_update(void)
+{
+  // Only read sensor if network is up (power optimization)
+  if (emberAfNetworkState() == EMBER_JOINED_NETWORK) {
+    sensor_network_down_logged = false;
+    app_sensor_update();
+  } else if (!sensor_network_down_logged) {
+    emberAfCorePrintln("Network down: sensor reads suspended");
+    sensor_network_down_logged = true;
+  }
 }
 
 void app_sensor_update(void)

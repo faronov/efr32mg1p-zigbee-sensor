@@ -59,6 +59,14 @@ void app_sensor_start_periodic_updates(void);
 void app_sensor_set_interval(uint32_t interval_ms);
 
 /**
+ * @brief Process deferred sensor timer work in main context.
+ *
+ * Called from the main loop. Executes pending periodic sensor updates
+ * scheduled by sleeptimer callback (which runs in interrupt context).
+ */
+void app_sensor_process(void);
+
+/**
  * @brief Check whether sensor stack is initialized and ready.
  *
  * @return true if sensor init succeeded and reads can be performed.

@@ -176,8 +176,6 @@ static bool basic_identity_pending = false;
 static bool af_init_force_pending = false;
 static uint32_t af_init_force_tick = 0;
 static uint32_t basic_identity_tick = 0;
-static bool btn0_fallback_pressed = false;
-static uint32_t btn0_fallback_press_tick = 0;
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
 static bool app_join_awake_active = false;
 static uint32_t app_join_awake_start_tick = 0;
@@ -389,45 +387,6 @@ void app_debug_poll(void)
       af_init_force_pending = false;
     }
   }
-
-#if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) && defined(APP_DEBUG_POLL_BUTTON) && (APP_DEBUG_POLL_BUTTON != 0)
-  // Main-loop fallback for boards/builds where emberAfTickCallback button path
-  // is not executed reliably. Keep short/long press generation here as a backup.
-  if (af_init_seen) {
-    bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
-    if (raw_pressed && !btn0_fallback_pressed) {
-      btn0_fallback_pressed = true;
-      btn0_fallback_press_tick = now;
-      APP_DEBUG_PRINTF("BTN0: PRESSED\n");
-    } else if (!raw_pressed && btn0_fallback_pressed) {
-      btn0_fallback_pressed = false;
-      uint32_t duration_ms = sl_sleeptimer_tick_to_ms(now - btn0_fallback_press_tick);
-      btn0_fallback_press_tick = 0;
-      APP_DEBUG_PRINTF("BTN0: RELEASED\n");
-      if (duration_ms >= BUTTON_DEBOUNCE_MS) {
-        if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
-          app_debug_trigger_long_press();
-        } else {
-          app_debug_trigger_short_press();
-        }
-      }
-    } else if (raw_pressed && btn0_fallback_press_tick != 0) {
-      // If release edge is missed, synthesize short/long by hold time.
-      uint32_t held_ms = sl_sleeptimer_tick_to_ms(now - btn0_fallback_press_tick);
-      if (held_ms >= LONG_PRESS_THRESHOLD_MS) {
-        APP_DEBUG_PRINTF("BTN0: fallback LONG (no release edge)\n");
-        btn0_fallback_pressed = false;
-        btn0_fallback_press_tick = 0;
-        app_debug_trigger_long_press();
-      } else if (held_ms >= 1200) {
-        APP_DEBUG_PRINTF("BTN0: fallback SHORT (no release edge)\n");
-        btn0_fallback_pressed = false;
-        btn0_fallback_press_tick = 0;
-        app_debug_trigger_short_press();
-      }
-    }
-  }
-#endif
 
   // Some debug builds run without AF tick wiring, so process deferred joins here.
   if (join_pending && af_init_seen && !network_join_in_progress) {
@@ -937,29 +896,8 @@ void emberAfTickCallback(void)
   uint32_t now = sl_sleeptimer_get_tick_count();
 
 #ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
-  // Simple button is configured in poll mode on this board; poll here so
-  // sl_button_on_change() is invoked reliably.
-  sl_simple_button_poll_instances();
-#if (APP_DEBUG_POLL_BUTTON == 0)
-  // Fallback path: some TRADFRI revisions do not trigger on_change reliably.
-  // Poll raw BTN0 (PB13, active low) and synthesize press events with debounce.
-  bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
-  if (raw_pressed && !btn0_fallback_pressed) {
-    btn0_fallback_pressed = true;
-    btn0_fallback_press_tick = now;
-  } else if (!raw_pressed && btn0_fallback_pressed) {
-    btn0_fallback_pressed = false;
-    uint32_t duration_ms = sl_sleeptimer_tick_to_ms(now - btn0_fallback_press_tick);
-    if (duration_ms >= BUTTON_DEBOUNCE_MS) {
-      if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
-        button_long_press_pending = true;
-      } else {
-        button_short_press_pending = true;
-      }
-    }
-    btn0_fallback_press_tick = 0;
-  }
-#endif
+  // Interrupt-driven simple_button path:
+  // sl_button_on_change() sets pending flags from ISR context.
 #endif
 
   app_debug_poll();
