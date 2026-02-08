@@ -393,6 +393,36 @@ void app_debug_poll(void)
     }
   }
 
+#ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
+  // Robust fallback: handle BTN0 from main loop too, because some builds/flows
+  // do not invoke emberAfTickCallback() reliably on this target.
+  if (af_init_seen) {
+    bool raw_pressed = (GPIO_PinInGet(gpioPortB, 13) == 0);
+    if (raw_pressed && !btn0_fallback_pressed) {
+      btn0_fallback_pressed = true;
+      btn0_fallback_press_tick = now;
+      APP_DEBUG_PRINTF("BTN0: PRESSED\n");
+    } else if (!raw_pressed && btn0_fallback_pressed) {
+      btn0_fallback_pressed = false;
+      uint32_t duration_ms = sl_sleeptimer_tick_to_ms(now - btn0_fallback_press_tick);
+      btn0_fallback_press_tick = 0;
+      APP_DEBUG_PRINTF("BTN0: RELEASED\n");
+
+      if (duration_ms >= BUTTON_DEBOUNCE_MS) {
+        if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
+          if (!button_long_press_pending) {
+            button_long_press_pending = true;
+          }
+        } else {
+          if (!button_short_press_pending) {
+            button_short_press_pending = true;
+          }
+        }
+      }
+    }
+  }
+#endif
+
   // Some debug builds run without AF tick wiring, so process deferred joins here.
   if (join_pending && af_init_seen && !network_join_in_progress) {
     join_pending = false;
