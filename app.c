@@ -114,6 +114,12 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_MANUAL_POLL_INTERVAL_MS
 #define APP_DEBUG_MANUAL_POLL_INTERVAL_MS 250
 #endif
+#ifndef APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS
+#define APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS 30000
+#endif
+#ifndef APP_DEBUG_POLL_SIMPLE_BUTTON_INSTANCES
+#define APP_DEBUG_POLL_SIMPLE_BUTTON_INSTANCES 0
+#endif
 #ifndef APP_DEBUG_AUTO_JOIN_ON_BOOT
 #define APP_DEBUG_AUTO_JOIN_ON_BOOT 0
 #endif
@@ -191,6 +197,7 @@ static uint32_t app_fast_poll_start_tick = 0;
 static bool app_manual_poll_boost_active = false;
 static uint32_t app_manual_poll_boost_start_tick = 0;
 static uint32_t app_manual_poll_boost_last_tick = 0;
+static uint32_t app_button_unlock_tick = 0;
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -292,6 +299,7 @@ static void app_init_once(void)
   button_long_press_pending = false;
   button_pressed = false;
   button_press_start_tick = 0;
+  app_button_unlock_tick = 0;
 
 #endif
 
@@ -452,6 +460,8 @@ void app_debug_force_af_init(void)
 void app_debug_poll(void)
 {
   uint32_t now = sl_sleeptimer_get_tick_count();
+  bool button_guard_active = (app_button_unlock_tick != 0)
+                             && ((int32_t)(app_button_unlock_tick - now) > 0);
 
   if (!af_init_reported && af_init_seen) {
     af_init_reported = true;
@@ -468,7 +478,7 @@ void app_debug_poll(void)
     }
   }
 
-#ifdef SL_CATALOG_SIMPLE_BUTTON_PRESENT
+#if defined(SL_CATALOG_SIMPLE_BUTTON_PRESENT) && (APP_DEBUG_POLL_SIMPLE_BUTTON_INSTANCES != 0)
   // Keep simple_button state machine updated even if AF tick callback isn't
   // scheduled frequently on this target.
   sl_simple_button_poll_instances();
@@ -485,16 +495,24 @@ void app_debug_poll(void)
   // Consume button flags here as well to guarantee action dispatch.
   if (button_short_press_pending) {
     button_short_press_pending = false;
-    APP_DEBUG_PRINTF("Button short press\n");
-    emberAfCorePrintln("Button: Short press detected (poll callback)");
-    handle_short_press();
+    if (button_guard_active) {
+      APP_DEBUG_PRINTF("Button guard: short press ignored\n");
+    } else {
+      APP_DEBUG_PRINTF("Button short press\n");
+      emberAfCorePrintln("Button: Short press detected (poll callback)");
+      handle_short_press();
+    }
   }
 
   if (button_long_press_pending) {
     button_long_press_pending = false;
-    APP_DEBUG_PRINTF("Button long press\n");
-    emberAfCorePrintln("Button: Long press detected (poll callback)");
-    handle_long_press();
+    if (button_guard_active) {
+      APP_DEBUG_PRINTF("Button guard: long press ignored\n");
+    } else {
+      APP_DEBUG_PRINTF("Button long press\n");
+      emberAfCorePrintln("Button: Long press detected (poll callback)");
+      handle_long_press();
+    }
   }
 
   if (basic_identity_pending && af_init_seen) {
@@ -774,6 +792,7 @@ void emberAfStackStatusCallback(EmberStatus status)
   (void)status;
   return;
 #endif
+  uint32_t now = sl_sleeptimer_get_tick_count();
   APP_DEBUG_PRINTF("Stack status: 0x%02x\n", status);
   if (status == EMBER_NETWORK_UP) {
     emberAfCorePrintln("Network joined successfully");
@@ -786,6 +805,9 @@ void emberAfStackStatusCallback(EmberStatus status)
     // while still supporting networks that use end-device-timeout keep alive.
     EmberStatus ka_status = emberSetKeepAliveMode(EMBER_KEEP_ALIVE_SUPPORT_ALL);
     APP_DEBUG_PRINTF("Join: set keep-alive mode(all) -> 0x%02x\n", ka_status);
+    app_button_unlock_tick = now + sl_sleeptimer_ms_to_tick(APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS);
+    APP_DEBUG_PRINTF("Button guard: ignoring BTN0 for %lu ms after join\n",
+                     (unsigned long)APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS);
 
 #if (APP_DEBUG_MANUAL_POLL_BOOST_MS > 0)
     if (runtime_node_type == EMBER_SLEEPY_END_DEVICE) {
@@ -858,6 +880,7 @@ void emberAfStackStatusCallback(EmberStatus status)
 
   } else if (status == EMBER_NETWORK_DOWN) {
     emberAfCorePrintln("Network down - will attempt optimized rejoin");
+    app_button_unlock_tick = 0;
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
@@ -932,6 +955,16 @@ bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
 void sl_button_on_change(const sl_button_t *handle)
 {
   if (handle == &sl_button_btn0) {
+    if (app_button_unlock_tick != 0) {
+      uint32_t now = sl_sleeptimer_get_tick_count();
+      if ((int32_t)(app_button_unlock_tick - now) > 0) {
+        button_pressed = false;
+        button_press_start_tick = 0;
+        return;
+      }
+      app_button_unlock_tick = 0;
+    }
+
     // Ignore button edges before AF init to avoid stale hold-duration math.
     if (!af_init_seen) {
       button_pressed = false;
@@ -1007,6 +1040,8 @@ void emberAfTickCallback(void)
 {
   static uint32_t last_heartbeat_tick = 0;
   uint32_t now = sl_sleeptimer_get_tick_count();
+  bool button_guard_active = (app_button_unlock_tick != 0)
+                             && ((int32_t)(app_button_unlock_tick - now) > 0);
 
   app_debug_poll();
 
@@ -1048,17 +1083,25 @@ void emberAfTickCallback(void)
   // Check for short press
   if (button_short_press_pending) {
     button_short_press_pending = false;  // Clear flag
-    APP_DEBUG_PRINTF("Button short press\n");
-    emberAfCorePrintln("Button: Short press detected (tick callback)");
-    handle_short_press();
+    if (button_guard_active) {
+      APP_DEBUG_PRINTF("Button guard: short press ignored\n");
+    } else {
+      APP_DEBUG_PRINTF("Button short press\n");
+      emberAfCorePrintln("Button: Short press detected (tick callback)");
+      handle_short_press();
+    }
   }
 
   // Check for long press
   if (button_long_press_pending) {
     button_long_press_pending = false;  // Clear flag
-    APP_DEBUG_PRINTF("Button long press\n");
-    emberAfCorePrintln("Button: Long press detected (tick callback)");
-    handle_long_press();
+    if (button_guard_active) {
+      APP_DEBUG_PRINTF("Button guard: long press ignored\n");
+    } else {
+      APP_DEBUG_PRINTF("Button long press\n");
+      emberAfCorePrintln("Button: Long press detected (tick callback)");
+      handle_long_press();
+    }
   }
 }
 

@@ -344,11 +344,29 @@ void app_sensor_update(void)
   }
 
   if (have_sensor_sample) {
-    emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=%s, P=%s",
-                       (int)(raw_temperature / 100),
-                       (int)(raw_temperature % 100),
-                       has_humidity ? "available" : "--",
-                       has_pressure ? "available" : "--");
+    if (has_humidity && has_pressure) {
+      emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=%d.%02d %%, P=%ld Pa",
+                         (int)(raw_temperature / 100),
+                         (int)(raw_temperature % 100),
+                         (int)(raw_humidity / 100),
+                         (int)(raw_humidity % 100),
+                         (long)raw_pressure);
+    } else if (has_humidity) {
+      emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=%d.%02d %%, P=--",
+                         (int)(raw_temperature / 100),
+                         (int)(raw_temperature % 100),
+                         (int)(raw_humidity / 100),
+                         (int)(raw_humidity % 100));
+    } else if (has_pressure) {
+      emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=--, P=%ld Pa",
+                         (int)(raw_temperature / 100),
+                         (int)(raw_temperature % 100),
+                         (long)raw_pressure);
+    } else {
+      emberAfCorePrintln("Sensor read (raw): T=%d.%02d C, RH=--, P=--",
+                         (int)(raw_temperature / 100),
+                         (int)(raw_temperature % 100));
+    }
   }
 
   // Get configuration and apply calibration offsets
@@ -369,11 +387,29 @@ void app_sensor_update(void)
   }
 
   if (have_sensor_sample) {
-    emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=%s, P=%s",
-                       (int)(temp_calibrated / 100),
-                       (int)(temp_calibrated % 100),
-                       has_humidity ? "available" : "--",
-                       has_pressure ? "available" : "--");
+    if (has_humidity && has_pressure) {
+      emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=%d.%02d %%, P=%ld Pa",
+                         (int)(temp_calibrated / 100),
+                         (int)(temp_calibrated % 100),
+                         (int)(humidity_calibrated / 100),
+                         (int)(humidity_calibrated % 100),
+                         (long)pressure_calibrated);
+    } else if (has_humidity) {
+      emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=%d.%02d %%, P=--",
+                         (int)(temp_calibrated / 100),
+                         (int)(temp_calibrated % 100),
+                         (int)(humidity_calibrated / 100),
+                         (int)(humidity_calibrated % 100));
+    } else if (has_pressure) {
+      emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=--, P=%ld Pa",
+                         (int)(temp_calibrated / 100),
+                         (int)(temp_calibrated % 100),
+                         (long)pressure_calibrated);
+    } else {
+      emberAfCorePrintln("Sensor read (calibrated): T=%d.%02d C, RH=--, P=--",
+                         (int)(temp_calibrated / 100),
+                         (int)(temp_calibrated % 100));
+    }
   }
 
   if (have_sensor_sample) {
