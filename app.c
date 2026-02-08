@@ -12,6 +12,7 @@
 #include "stack/include/network-formation.h"  // For manual network join
 #include "stack/include/security.h"
 #include "stack/include/binding-table.h"
+#include "stack/include/child.h"
 #include "hal.h"
 #include "sl_sleeptimer.h"
 #include "em_cmu.h"
@@ -621,6 +622,11 @@ void emberAfStackStatusCallback(EmberStatus status)
       APP_DEBUG_PRINTF("Join: runtime node type=%u\n", runtime_node_type);
     }
 
+    // SED keep-alive policy per Ember 7.x SDK: allow MAC-data-poll keep alive,
+    // while still supporting networks that use end-device-timeout keep alive.
+    EmberStatus ka_status = emberSetKeepAliveMode(EMBER_KEEP_ALIVE_SUPPORT_ALL);
+    APP_DEBUG_PRINTF("Join: set keep-alive mode(all) -> 0x%02x\n", ka_status);
+
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
     if (!app_join_awake_active) {
       sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM0);
@@ -698,6 +704,14 @@ void emberAfStackStatusCallback(EmberStatus status)
     // rejoin_state = REJOIN_STATE_IDLE;
     // sl_zigbee_event_set_delay_ms(&rejoin_retry_event, 100);
 
+  }
+}
+
+void emberPollCompleteHandler(EmberStatus status)
+{
+  // Avoid log spam on normal idle polls.
+  if (status != EMBER_MAC_NO_DATA) {
+    APP_DEBUG_PRINTF("Poll complete: status=0x%02x\n", status);
   }
 }
 
