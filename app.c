@@ -430,6 +430,22 @@ void app_debug_poll(void)
     handle_short_press();
   }
 
+  // Some targets do not run emberAfTickCallback reliably in this app flow.
+  // Consume button flags here as well to guarantee action dispatch.
+  if (button_short_press_pending) {
+    button_short_press_pending = false;
+    APP_DEBUG_PRINTF("Button short press\n");
+    emberAfCorePrintln("Button: Short press detected (poll callback)");
+    handle_short_press();
+  }
+
+  if (button_long_press_pending) {
+    button_long_press_pending = false;
+    APP_DEBUG_PRINTF("Button long press\n");
+    emberAfCorePrintln("Button: Long press detected (poll callback)");
+    handle_long_press();
+  }
+
   if (basic_identity_pending && af_init_seen) {
     if (basic_identity_tick == 0 ||
         sl_sleeptimer_tick_to_ms(now - basic_identity_tick) >= 2000) {
