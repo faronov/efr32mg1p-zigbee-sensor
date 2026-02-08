@@ -163,7 +163,7 @@ define:
   - name: APP_SENSOR_PROFILE
     value: 2
   - name: APP_BUILD_TAG
-    value: "profile-bmp280"
+    value: '"profile-bmp280"'
 
   # Increase event queue capacity for Series 1 (fixes event-queue.c:294 crash)
   # Default is 5, increase to 8 to allow network scanning
