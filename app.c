@@ -104,6 +104,12 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_FAST_POLL_INTERVAL_MS
 #define APP_DEBUG_FAST_POLL_INTERVAL_MS 250
 #endif
+#ifndef APP_DEBUG_MANUAL_POLL_BOOST_MS
+#define APP_DEBUG_MANUAL_POLL_BOOST_MS 60000
+#endif
+#ifndef APP_DEBUG_MANUAL_POLL_INTERVAL_MS
+#define APP_DEBUG_MANUAL_POLL_INTERVAL_MS 250
+#endif
 #ifndef APP_DEBUG_AUTO_JOIN_ON_BOOT
 #define APP_DEBUG_AUTO_JOIN_ON_BOOT 0
 #endif
@@ -180,6 +186,9 @@ static uint32_t app_join_awake_start_tick = 0;
 static bool app_fast_poll_active = false;
 static uint32_t app_fast_poll_start_tick = 0;
 #endif
+static bool app_manual_poll_boost_active = false;
+static uint32_t app_manual_poll_boost_start_tick = 0;
+static uint32_t app_manual_poll_boost_last_tick = 0;
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -461,6 +470,32 @@ void app_debug_poll(void)
     }
   }
 #endif
+
+#if (APP_DEBUG_MANUAL_POLL_BOOST_MS > 0)
+  if (app_manual_poll_boost_active) {
+    if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
+      app_manual_poll_boost_active = false;
+      app_manual_poll_boost_start_tick = 0;
+      app_manual_poll_boost_last_tick = 0;
+    } else {
+      uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_manual_poll_boost_start_tick);
+      if (elapsed_ms >= APP_DEBUG_MANUAL_POLL_BOOST_MS) {
+        app_manual_poll_boost_active = false;
+        app_manual_poll_boost_start_tick = 0;
+        app_manual_poll_boost_last_tick = 0;
+        APP_DEBUG_PRINTF("Debug: manual poll boost window ended\n");
+      } else if (app_manual_poll_boost_last_tick == 0
+                 || sl_sleeptimer_tick_to_ms(now - app_manual_poll_boost_last_tick)
+                 >= APP_DEBUG_MANUAL_POLL_INTERVAL_MS) {
+        app_manual_poll_boost_last_tick = now;
+        EmberStatus poll_st = emberPollForData();
+        if (poll_st != EMBER_SUCCESS && poll_st != EMBER_MAC_SCANNING) {
+          APP_DEBUG_PRINTF("Debug: manual poll -> 0x%02x\n", poll_st);
+        }
+      }
+    }
+  }
+#endif
 }
 
 bool app_debug_button_ready(void)
@@ -689,6 +724,21 @@ void emberAfStackStatusCallback(EmberStatus status)
     EmberStatus ka_status = emberSetKeepAliveMode(EMBER_KEEP_ALIVE_SUPPORT_ALL);
     APP_DEBUG_PRINTF("Join: set keep-alive mode(all) -> 0x%02x\n", ka_status);
 
+#if (APP_DEBUG_MANUAL_POLL_BOOST_MS > 0)
+    if (runtime_node_type == EMBER_SLEEPY_END_DEVICE) {
+      app_manual_poll_boost_active = true;
+      app_manual_poll_boost_start_tick = sl_sleeptimer_get_tick_count();
+      app_manual_poll_boost_last_tick = 0;
+      APP_DEBUG_PRINTF("Debug: manual poll boost enabled for %lu ms (interval=%lu ms)\n",
+                       (unsigned long)APP_DEBUG_MANUAL_POLL_BOOST_MS,
+                       (unsigned long)APP_DEBUG_MANUAL_POLL_INTERVAL_MS);
+    } else {
+      app_manual_poll_boost_active = false;
+      app_manual_poll_boost_start_tick = 0;
+      app_manual_poll_boost_last_tick = 0;
+    }
+#endif
+
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
     if (!app_join_awake_active) {
       sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM0);
@@ -750,6 +800,10 @@ void emberAfStackStatusCallback(EmberStatus status)
     app_fast_poll_active = false;
     app_fast_poll_start_tick = 0;
 #endif
+
+    app_manual_poll_boost_active = false;
+    app_manual_poll_boost_start_tick = 0;
+    app_manual_poll_boost_last_tick = 0;
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Turn LED off when network is down
@@ -1207,7 +1261,9 @@ static void handle_short_press(void)
     emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
                        join_attempt_count + 1);
     APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
+#ifndef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
     configure_join_security();
+#endif
 
     // Reset to start of channel list
     current_channel_index = 0;
@@ -1224,8 +1280,6 @@ static void handle_short_press(void)
     EmberStatus join_status = EMBER_INVALID_CALL;
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
     // When network steering is linked, use only plugin API to avoid scan callback conflicts.
-    emberAfCorePrintln("NWK Steering: issuing scan on primary channels (mask 0x%08lx)",
-                       (unsigned long)EMBER_AF_PLUGIN_NETWORK_STEERING_CHANNEL_MASK);
     join_status = emberAfPluginNetworkSteeringStart();
     APP_DEBUG_PRINTF("Join: emberAfPluginNetworkSteeringStart -> 0x%02x\n", join_status);
 #else
