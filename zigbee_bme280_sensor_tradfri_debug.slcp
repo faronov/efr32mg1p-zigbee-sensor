@@ -250,7 +250,9 @@ define:
   - name: APP_DEBUG_SET_KEEPALIVE_ALL
     value: 0
   - name: APP_DEBUG_AUTO_JOIN_ON_BOOT
-    value: 0
+    value: 1
+  - name: APP_DEBUG_AUTO_JOIN_DELAY_MS
+    value: 5000
   - name: APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
     value: 0
   - name: APP_DEBUG_JOIN_AS_END_DEVICE
