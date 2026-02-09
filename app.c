@@ -146,6 +146,9 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_SET_KEEPALIVE_ALL
 #define APP_DEBUG_SET_KEEPALIVE_ALL 0
 #endif
+#ifndef APP_DEBUG_NO_SLEEP
+#define APP_DEBUG_NO_SLEEP 0
+#endif
 #ifndef APP_DEBUG_USE_NETWORK_STEERING
 #define APP_DEBUG_USE_NETWORK_STEERING 1
 #endif
@@ -615,13 +618,19 @@ void app_debug_poll(void)
   if (app_fast_poll_active && app_fast_poll_start_tick != 0) {
     uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_fast_poll_start_tick);
     if (elapsed_ms >= APP_DEBUG_FAST_POLL_AFTER_JOIN_MS) {
+#if (APP_DEBUG_NO_SLEEP != 0)
+      // In no-sleep debug mode keep short-poll/app-tasks active after the
+      // "window" so SWO remains alive and SED stays responsive for diagnostics.
+      APP_DEBUG_PRINTF("Debug: fast poll window ended (no-sleep mode, keeping short poll)\n");
+#else
       emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
       emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL);
       emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
       emberAfSetDefaultSleepControl(EMBER_AF_OK_TO_SLEEP);
+      APP_DEBUG_PRINTF("Debug: fast poll window ended\n");
+#endif
       app_fast_poll_active = false;
       app_fast_poll_start_tick = 0;
-      APP_DEBUG_PRINTF("Debug: fast poll window ended\n");
     }
   }
 #endif
