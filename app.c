@@ -60,7 +60,6 @@ static volatile bool button_long_press_pending = false;
 // Button press duration tracking
 static uint32_t button_press_start_tick = 0;
 static bool button_pressed = false;
-static bool button_long_press_latched = false;
 #define BUTTON_DEBOUNCE_MS 30
 #ifndef APP_BUTTON_LONG_PRESS_MS
 #define APP_BUTTON_LONG_PRESS_MS 5000  // default: 5 seconds for long press
@@ -314,7 +313,6 @@ static void app_init_once(void)
   button_short_press_pending = false;
   button_long_press_pending = false;
   button_pressed = false;
-  button_long_press_latched = false;
   button_press_start_tick = 0;
   app_button_unlock_tick = 0;
 
@@ -485,7 +483,6 @@ void app_debug_poll(void)
     button_short_press_pending = false;
     button_long_press_pending = false;
     button_pressed = false;
-    button_long_press_latched = false;
     button_press_start_tick = 0;
   }
 
@@ -540,19 +537,6 @@ void app_debug_poll(void)
       handle_long_press();
     }
   }
-
-  // Robust long-press detect: trigger while held (do not wait for RELEASE edge).
-  // This avoids missed long-press actions when release edges are noisy/missed.
-  if (button_pressed && !button_long_press_latched) {
-    uint32_t held_ticks = now - button_press_start_tick;
-    uint32_t held_ms = sl_sleeptimer_tick_to_ms(held_ticks);
-    if (held_ms >= APP_BUTTON_LONG_PRESS_MS) {
-      button_long_press_latched = true;
-      button_long_press_pending = true;
-      APP_DEBUG_PRINTF("BTN0: HOLD LONG (%lu ms)\n", (unsigned long)held_ms);
-    }
-  }
-
   if (basic_identity_pending && af_init_seen) {
     if (basic_identity_tick == 0 ||
         sl_sleeptimer_tick_to_ms(now - basic_identity_tick) >= 2000) {
@@ -1006,7 +990,6 @@ void sl_button_on_change(const sl_button_t *handle)
       button_short_press_pending = false;
       button_long_press_pending = false;
       button_pressed = false;
-      button_long_press_latched = false;
       button_press_start_tick = 0;
       return;
     }
@@ -1032,7 +1015,6 @@ void sl_button_on_change(const sl_button_t *handle)
       // Button pressed - record start time
       button_press_start_tick = sl_sleeptimer_get_tick_count();
       button_pressed = true;
-      button_long_press_latched = false;
       APP_DEBUG_PRINTF("BTN0: PRESSED\n");
     } else {
       // Button released - check duration
@@ -1044,7 +1026,7 @@ void sl_button_on_change(const sl_button_t *handle)
         // Set flags for main context to poll
         // These will be checked by button_poll_event_handler()
         if (duration_ms >= BUTTON_DEBOUNCE_MS) {
-          if (button_long_press_latched || duration_ms >= APP_BUTTON_LONG_PRESS_MS) {
+          if (duration_ms >= APP_BUTTON_LONG_PRESS_MS) {
             button_long_press_pending = true;
           } else {
             button_short_press_pending = true;
@@ -1052,7 +1034,6 @@ void sl_button_on_change(const sl_button_t *handle)
         }
 
         button_pressed = false;
-        button_long_press_latched = false;
       }
     }
   }
@@ -1105,7 +1086,6 @@ void emberAfTickCallback(void)
     button_short_press_pending = false;
     button_long_press_pending = false;
     button_pressed = false;
-    button_long_press_latched = false;
     button_press_start_tick = 0;
   }
 
