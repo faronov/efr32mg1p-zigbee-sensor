@@ -205,7 +205,7 @@ define:
   - name: APP_DEBUG_DIAG_ALWAYS
     value: 1
   - name: APP_DEBUG_NO_SLEEP
-    value: 0
+    value: 1
   - name: APP_DEBUG_RESET_NETWORK
     value: 0
   - name: APP_DEBUG_MAIN_HEARTBEAT
@@ -240,6 +240,12 @@ define:
     value: 120000
   - name: APP_DEBUG_FAST_POLL_INTERVAL_MS
     value: 250
+  # Disable manual poll bursts; rely on normal stack poll + temporary fast poll window.
+  - name: APP_DEBUG_MANUAL_POLL_BOOST_MS
+    value: 0
+  # Keep keep-alive policy on stack defaults for better parent compatibility.
+  - name: APP_DEBUG_SET_KEEPALIVE_ALL
+    value: 0
   - name: APP_DEBUG_AUTO_JOIN_ON_BOOT
     value: 0
   - name: APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
