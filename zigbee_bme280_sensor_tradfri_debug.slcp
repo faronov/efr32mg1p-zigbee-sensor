@@ -212,6 +212,10 @@ define:
     value: 1
   - name: APP_DEBUG_POLL_BUTTON
     value: 1
+  # Use manual active-scan join path in debug to avoid Network Steering side-effects
+  # (permit-join broadcast / rejoin churn) during SED interview.
+  - name: APP_DEBUG_USE_NETWORK_STEERING
+    value: 0
   - name: APP_DEBUG_SLEEP_TRACE
     value: 1
   - name: APP_DEBUG_FORCE_AF_INIT

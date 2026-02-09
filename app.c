@@ -129,7 +129,16 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_JOIN_AS_END_DEVICE
 #define APP_DEBUG_JOIN_AS_END_DEVICE 0
 #endif
+#ifndef APP_DEBUG_USE_NETWORK_STEERING
+#define APP_DEBUG_USE_NETWORK_STEERING 1
+#endif
 #define APP_DEBUG_PRINTF(...) printf(__VA_ARGS__)
+
+#if defined(SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT) && (APP_DEBUG_USE_NETWORK_STEERING != 0)
+#define APP_RUNTIME_NETWORK_STEERING 1
+#else
+#define APP_RUNTIME_NETWORK_STEERING 0
+#endif
 
 static void handle_short_press(void);
 static void handle_long_press(void);
@@ -241,7 +250,7 @@ static void app_debug_reset_network_state(void);
 #endif
 static void app_configure_default_reporting(void);
 
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+#if APP_RUNTIME_NETWORK_STEERING
 void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
                                                   uint8_t totalBeacons,
                                                   uint8_t joinAttempts,
@@ -1231,7 +1240,7 @@ static EmberStatus start_join_scan(void)
  */
 void emberAfNetworkFoundCallback(EmberZigbeeNetwork *networkFound, uint8_t lqi, int8_t rssi)
 {
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+#if APP_RUNTIME_NETWORK_STEERING
   // Network Steering plugin owns scan callbacks when present.
   (void)networkFound;
   (void)lqi;
@@ -1268,7 +1277,7 @@ void emberAfNetworkFoundCallback(EmberZigbeeNetwork *networkFound, uint8_t lqi, 
  */
 void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
 {
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+#if APP_RUNTIME_NETWORK_STEERING
   // Network Steering plugin owns scan callbacks when present.
   (void)channel;
   (void)status;
@@ -1356,7 +1365,7 @@ static void handle_short_press(void)
     emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
                        join_attempt_count + 1);
     APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
-#ifndef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+#if !APP_RUNTIME_NETWORK_STEERING
     configure_join_security();
 #endif
 
@@ -1373,7 +1382,7 @@ static void handle_short_press(void)
 #endif
 
     EmberStatus join_status = EMBER_INVALID_CALL;
-#ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
+#if APP_RUNTIME_NETWORK_STEERING
     // When network steering is linked, use only plugin API to avoid scan callback conflicts.
     // Keep post-join behavior quiet and deterministic:
     // - skip steering-driven TC link key update workflow
