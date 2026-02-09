@@ -241,7 +241,7 @@ static void handle_short_press(void);
 static void handle_long_press(void);
 static EmberStatus start_join_scan(void);
 static void try_next_channel(void);
-static void configure_join_security(void);
+static bool configure_join_security(void);
 static bool log_basic_identity(void);
 static void app_flash_probe(void);
 static void app_flash_enable_init(void);
@@ -927,6 +927,7 @@ void emberAfStackStatusCallback(EmberStatus status)
       emberAfCorePrintln("Network down - will attempt optimized rejoin");
     }
     app_button_unlock_tick = 0;
+    join_security_configured = false;
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
@@ -1428,7 +1429,10 @@ static void handle_short_press(void)
                        join_attempt_count + 1);
     APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
 #if !APP_RUNTIME_NETWORK_STEERING
-    configure_join_security();
+    if (!configure_join_security()) {
+      emberAfCorePrintln("Join aborted: security state setup failed");
+      return;
+    }
 #endif
 
     // Reset to start of channel list
@@ -1480,12 +1484,8 @@ static void handle_short_press(void)
   }
 }
 
-static void configure_join_security(void)
+static bool configure_join_security(void)
 {
-  if (join_security_configured) {
-    return;
-  }
-
   EmberInitialSecurityState state;
   memset(&state, 0, sizeof(state));
   memcpy(state.preconfiguredKey.contents, zigbee_alliance_key, EMBER_ENCRYPTION_KEY_SIZE);
@@ -1495,9 +1495,8 @@ static void configure_join_security(void)
 
   EmberStatus st = emberSetInitialSecurityState(&state);
   APP_DEBUG_PRINTF("Join: set security state -> 0x%02x\n", st);
-  if (st == EMBER_SUCCESS) {
-    join_security_configured = true;
-  }
+  join_security_configured = (st == EMBER_SUCCESS);
+  return join_security_configured;
 }
 
 /**
