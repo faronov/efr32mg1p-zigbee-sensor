@@ -122,6 +122,9 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_BUTTON_GUARD_AFTER_BOOT_MS
 #define APP_DEBUG_BUTTON_GUARD_AFTER_BOOT_MS 1500
 #endif
+#ifndef APP_DEBUG_BUTTON_GUARD_AFTER_LEAVE_MS
+#define APP_DEBUG_BUTTON_GUARD_AFTER_LEAVE_MS 5000
+#endif
 #ifndef APP_DEBUG_JOIN_RETRY_BACKOFF_MS
 #define APP_DEBUG_JOIN_RETRY_BACKOFF_MS 2000
 #endif
@@ -231,6 +234,7 @@ static bool app_manual_poll_boost_active = false;
 static uint32_t app_manual_poll_boost_start_tick = 0;
 static uint32_t app_manual_poll_boost_last_tick = 0;
 static uint32_t app_button_unlock_tick = 0;
+static uint32_t app_leave_unlock_tick = 0;
 static uint32_t app_join_retry_unlock_tick = 0;
 static bool app_auto_join_scheduled = false;
 static uint32_t app_auto_join_tick = 0;
@@ -284,6 +288,18 @@ static bool app_join_retry_blocked(uint32_t now)
   }
   if ((int32_t)(app_join_retry_unlock_tick - now) <= 0) {
     app_join_retry_unlock_tick = 0;
+    return false;
+  }
+  return true;
+}
+
+static bool app_leave_guard_active(uint32_t now)
+{
+  if (app_leave_unlock_tick == 0) {
+    return false;
+  }
+  if ((int32_t)(app_leave_unlock_tick - now) <= 0) {
+    app_leave_unlock_tick = 0;
     return false;
   }
   return true;
@@ -525,9 +541,19 @@ void app_debug_poll(void)
   uint32_t now_ms = sl_sleeptimer_tick_to_ms(now);
   bool button_guard_active = (app_button_unlock_tick != 0)
                              && ((int32_t)(app_button_unlock_tick - now) > 0);
+  bool leave_guard_active = app_leave_guard_active(now);
+  if (leave_guard_active) {
+    button_guard_active = true;
+  }
 
   // Hard gate: while joining, ignore all button activity completely.
   if (network_join_in_progress) {
+    button_short_press_pending = false;
+    button_long_press_pending = false;
+    button_pressed = false;
+    button_press_start_tick = 0;
+  }
+  if (leave_guard_active) {
     button_short_press_pending = false;
     button_long_press_pending = false;
     button_pressed = false;
@@ -994,12 +1020,16 @@ void emberAfStackStatusCallback(EmberStatus status)
     if (app_intentional_leave_pending) {
       emberAfCorePrintln("Network down after manual leave");
       app_intentional_leave_pending = false;
+      app_leave_unlock_tick = now + sl_sleeptimer_ms_to_tick(APP_DEBUG_BUTTON_GUARD_AFTER_LEAVE_MS);
+      app_set_join_retry_backoff(now, APP_DEBUG_BUTTON_GUARD_AFTER_LEAVE_MS);
+      APP_DEBUG_PRINTF("Button guard: ignoring BTN0 for %lu ms after leave\n",
+                       (unsigned long)APP_DEBUG_BUTTON_GUARD_AFTER_LEAVE_MS);
     } else {
       emberAfCorePrintln("Network down - will attempt optimized rejoin");
+      app_set_join_retry_backoff(now, APP_DEBUG_JOIN_RETRY_BACKOFF_AFTER_LEAVE_MS);
     }
     app_button_unlock_tick = 0;
     join_security_configured = false;
-    app_set_join_retry_backoff(now, APP_DEBUG_JOIN_RETRY_BACKOFF_AFTER_LEAVE_MS);
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
@@ -1542,6 +1572,10 @@ static void handle_long_press(void)
   if (network_state == EMBER_JOINED_NETWORK) {
     emberAfCorePrintln("Long press: leaving network...");
     app_intentional_leave_pending = true;
+    button_short_press_pending = false;
+    button_long_press_pending = false;
+    button_pressed = false;
+    button_press_start_tick = 0;
 
     // Leave the network
     EmberStatus leave_status = emberLeaveNetwork();
