@@ -232,6 +232,9 @@ define:
     value: 1000
   - name: APP_DEBUG_FAKE_SENSOR_VALUES
     value: 1
+  # Change fake values every 10s in debug to make ZHA updates clearly visible.
+  - name: APP_DEBUG_FAKE_DRIFT_MS
+    value: 10000
   # Disabled due to observed FLT reset after join on TRADFRI hardware.
   - name: APP_DEBUG_AWAKE_AFTER_JOIN_MS
     value: 0

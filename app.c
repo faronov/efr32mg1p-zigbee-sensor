@@ -474,7 +474,9 @@ void app_debug_force_af_init(void)
 
 void app_debug_poll(void)
 {
+  static uint32_t sensor_watchdog_last_tick = 0;
   uint32_t now = sl_sleeptimer_get_tick_count();
+  uint32_t now_ms = sl_sleeptimer_tick_to_ms(now);
   bool button_guard_active = (app_button_unlock_tick != 0)
                              && ((int32_t)(app_button_unlock_tick - now) > 0);
 
@@ -512,6 +514,23 @@ void app_debug_poll(void)
     join_pending = false;
     APP_DEBUG_PRINTF("Join: deferred request starting (poll)\n");
     handle_short_press();
+  }
+
+  // Self-heal: if joined and periodic sensor updates stall, re-arm them.
+  if (emberAfNetworkState() == EMBER_JOINED_NETWORK) {
+    if (sensor_watchdog_last_tick == 0
+        || sl_sleeptimer_tick_to_ms(now - sensor_watchdog_last_tick) >= 5000) {
+      sensor_watchdog_last_tick = now;
+      uint32_t last_update_ms = app_sensor_get_last_update_ms();
+      bool timer_running = app_sensor_is_timer_running();
+      if (!timer_running
+          || (last_update_ms != 0 && (now_ms - last_update_ms) > 45000)) {
+        APP_DEBUG_PRINTF("Sensor watchdog: restart periodic updates (timer=%d last_age=%lu ms)\n",
+                         timer_running ? 1 : 0,
+                         (unsigned long)(last_update_ms == 0 ? 0 : (now_ms - last_update_ms)));
+        app_sensor_start_periodic_updates();
+      }
+    }
   }
 
   // Some targets do not run emberAfTickCallback reliably in this app flow.

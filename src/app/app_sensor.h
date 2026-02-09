@@ -81,4 +81,18 @@ void app_sensor_process(void);
  */
 bool app_sensor_is_ready(void);
 
+/**
+ * @brief Check whether periodic sensor timer is currently running.
+ *
+ * @return true if periodic timer is armed.
+ */
+bool app_sensor_is_timer_running(void);
+
+/**
+ * @brief Get uptime timestamp (ms) of last successful sensor/battery update.
+ *
+ * @return Milliseconds since boot when app_sensor_update() last completed.
+ */
+uint32_t app_sensor_get_last_update_ms(void);
+
 #endif // APP_SENSOR_H

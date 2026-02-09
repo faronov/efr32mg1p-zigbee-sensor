@@ -47,6 +47,7 @@ static bool battery_ready = false;
 static bool sensor_timer_running = false;
 static volatile bool sensor_update_pending = false;
 static bool sensor_network_down_logged = false;
+static uint32_t sensor_last_update_ms = 0;
 static sl_sleeptimer_timer_handle_t sensor_update_timer;
 
 // Configurable sensor update interval
@@ -57,6 +58,9 @@ static uint32_t sensor_update_interval_ms = SENSOR_UPDATE_INTERVAL_MS;
 #endif
 #ifndef APP_FORCE_SENSOR_INTERVAL_MS
 #define APP_FORCE_SENSOR_INTERVAL_MS 10000
+#endif
+#ifndef APP_DEBUG_FAKE_DRIFT_MS
+#define APP_DEBUG_FAKE_DRIFT_MS 60000
 #endif
 
 static uint32_t fake_last_change_ms = 0;
@@ -92,7 +96,7 @@ static int32_t app_fake_apply_delta_percent(int32_t base, int8_t percent)
 
 static void app_update_fake_sensor_data(uint32_t now_ms)
 {
-  if (fake_last_change_ms != 0 && (now_ms - fake_last_change_ms) < 60000u) {
+  if (fake_last_change_ms != 0 && (now_ms - fake_last_change_ms) < APP_DEBUG_FAKE_DRIFT_MS) {
     return;
   }
   fake_last_change_ms = now_ms;
@@ -129,6 +133,7 @@ bool app_sensor_init(void)
   sensor_timer_running = false;
   sensor_update_pending = false;
   sensor_network_down_logged = false;
+  sensor_last_update_ms = 0;
 
   // Initialize battery monitoring regardless of sensor presence.
   battery_ready = battery_init();
@@ -529,10 +534,21 @@ void app_sensor_update(void)
 
   // Trigger attribute reporting (if configured by coordinator)
   // The reporting mechanism will automatically send reports if bound
+  sensor_last_update_ms = now_ms;
   emberAfCorePrintln("Sensor/battery attribute update complete");
 }
 
 bool app_sensor_is_ready(void)
 {
   return sensor_ready;
+}
+
+bool app_sensor_is_timer_running(void)
+{
+  return sensor_timer_running;
+}
+
+uint32_t app_sensor_get_last_update_ms(void)
+{
+  return sensor_last_update_ms;
 }
