@@ -480,6 +480,15 @@ void app_debug_poll(void)
   bool button_guard_active = (app_button_unlock_tick != 0)
                              && ((int32_t)(app_button_unlock_tick - now) > 0);
 
+  // Hard gate: while joining, ignore all button activity completely.
+  if (network_join_in_progress) {
+    button_short_press_pending = false;
+    button_long_press_pending = false;
+    button_pressed = false;
+    button_long_press_latched = false;
+    button_press_start_tick = 0;
+  }
+
   if (!af_init_reported && af_init_seen) {
     af_init_reported = true;
     APP_DEBUG_PRINTF("AF init seen (tick)\n");
@@ -992,6 +1001,15 @@ bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
 void sl_button_on_change(const sl_button_t *handle)
 {
   if (handle == &sl_button_btn0) {
+    if (network_join_in_progress) {
+      button_short_press_pending = false;
+      button_long_press_pending = false;
+      button_pressed = false;
+      button_long_press_latched = false;
+      button_press_start_tick = 0;
+      return;
+    }
+
     if (app_button_unlock_tick != 0) {
       uint32_t now = sl_sleeptimer_get_tick_count();
       if ((int32_t)(app_button_unlock_tick - now) > 0) {
@@ -1081,6 +1099,14 @@ void emberAfTickCallback(void)
   uint32_t now = sl_sleeptimer_get_tick_count();
   bool button_guard_active = (app_button_unlock_tick != 0)
                              && ((int32_t)(app_button_unlock_tick - now) > 0);
+
+  if (network_join_in_progress) {
+    button_short_press_pending = false;
+    button_long_press_pending = false;
+    button_pressed = false;
+    button_long_press_latched = false;
+    button_press_start_tick = 0;
+  }
 
   app_debug_poll();
 
