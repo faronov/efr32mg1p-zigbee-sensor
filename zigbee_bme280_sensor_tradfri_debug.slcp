@@ -252,6 +252,12 @@ define:
     value: 0
   - name: APP_DEBUG_JOIN_AS_END_DEVICE
     value: 0
+  # Make long press practical on the physical button.
+  - name: APP_BUTTON_LONG_PRESS_MS
+    value: 1500
+  # Short post-join guard to suppress spurious edges right after join.
+  - name: APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS
+    value: 5000
   - name: APP_BUILD_TAG
     value: '"dbg-netreset-otaoff-bootspam-crashprint"'
 

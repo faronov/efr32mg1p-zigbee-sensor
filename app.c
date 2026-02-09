@@ -60,8 +60,11 @@ static volatile bool button_long_press_pending = false;
 // Button press duration tracking
 static uint32_t button_press_start_tick = 0;
 static bool button_pressed = false;
-#define LONG_PRESS_THRESHOLD_MS 5000  // 5 seconds for long press (leave/rejoin network)
+static bool button_long_press_latched = false;
 #define BUTTON_DEBOUNCE_MS 30
+#ifndef APP_BUTTON_LONG_PRESS_MS
+#define APP_BUTTON_LONG_PRESS_MS 5000  // default: 5 seconds for long press
+#endif
 
 // Optimized rejoin state machine (TEMPORARILY DISABLED - event queue issue)
 // typedef enum {
@@ -128,6 +131,9 @@ static bool button_pressed = false;
 #endif
 #ifndef APP_DEBUG_JOIN_AS_END_DEVICE
 #define APP_DEBUG_JOIN_AS_END_DEVICE 0
+#endif
+#ifndef APP_DEBUG_SET_KEEPALIVE_ALL
+#define APP_DEBUG_SET_KEEPALIVE_ALL 0
 #endif
 #ifndef APP_DEBUG_USE_NETWORK_STEERING
 #define APP_DEBUG_USE_NETWORK_STEERING 1
@@ -307,6 +313,7 @@ static void app_init_once(void)
   button_short_press_pending = false;
   button_long_press_pending = false;
   button_pressed = false;
+  button_long_press_latched = false;
   button_press_start_tick = 0;
   app_button_unlock_tick = 0;
 
@@ -521,6 +528,18 @@ void app_debug_poll(void)
       APP_DEBUG_PRINTF("Button long press\n");
       emberAfCorePrintln("Button: Long press detected (poll callback)");
       handle_long_press();
+    }
+  }
+
+  // Robust long-press detect: trigger while held (do not wait for RELEASE edge).
+  // This avoids missed long-press actions when release edges are noisy/missed.
+  if (button_pressed && !button_long_press_latched) {
+    uint32_t held_ticks = now - button_press_start_tick;
+    uint32_t held_ms = sl_sleeptimer_tick_to_ms(held_ticks);
+    if (held_ms >= APP_BUTTON_LONG_PRESS_MS) {
+      button_long_press_latched = true;
+      button_long_press_pending = true;
+      APP_DEBUG_PRINTF("BTN0: HOLD LONG (%lu ms)\n", (unsigned long)held_ms);
     }
   }
 
@@ -810,10 +829,13 @@ void emberAfStackStatusCallback(EmberStatus status)
       APP_DEBUG_PRINTF("Join: runtime node type=%u\n", runtime_node_type);
     }
 
-    // SED keep-alive policy per Ember 7.x SDK: allow MAC-data-poll keep alive,
-    // while still supporting networks that use end-device-timeout keep alive.
+#if APP_DEBUG_SET_KEEPALIVE_ALL
+    // Optional debug override: force keep-alive support mode.
     EmberStatus ka_status = emberSetKeepAliveMode(EMBER_KEEP_ALIVE_SUPPORT_ALL);
     APP_DEBUG_PRINTF("Join: set keep-alive mode(all) -> 0x%02x\n", ka_status);
+#else
+    APP_DEBUG_PRINTF("Join: keep-alive mode: stack default\n");
+#endif
     app_button_unlock_tick = now + sl_sleeptimer_ms_to_tick(APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS);
     APP_DEBUG_PRINTF("Button guard: ignoring BTN0 for %lu ms after join\n",
                      (unsigned long)APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS);
@@ -985,18 +1007,19 @@ void sl_button_on_change(const sl_button_t *handle)
       // Button pressed - record start time
       button_press_start_tick = sl_sleeptimer_get_tick_count();
       button_pressed = true;
+      button_long_press_latched = false;
       APP_DEBUG_PRINTF("BTN0: PRESSED\n");
     } else {
       // Button released - check duration
       if (button_pressed) {
         uint32_t duration_ticks = sl_sleeptimer_get_tick_count() - button_press_start_tick;
         uint32_t duration_ms = sl_sleeptimer_tick_to_ms(duration_ticks);
-        APP_DEBUG_PRINTF("BTN0: RELEASED\n");
+        APP_DEBUG_PRINTF("BTN0: RELEASED (%lu ms)\n", (unsigned long)duration_ms);
 
         // Set flags for main context to poll
         // These will be checked by button_poll_event_handler()
         if (duration_ms >= BUTTON_DEBOUNCE_MS) {
-          if (duration_ms >= LONG_PRESS_THRESHOLD_MS) {
+          if (button_long_press_latched || duration_ms >= APP_BUTTON_LONG_PRESS_MS) {
             button_long_press_pending = true;
           } else {
             button_short_press_pending = true;
@@ -1004,6 +1027,7 @@ void sl_button_on_change(const sl_button_t *handle)
         }
 
         button_pressed = false;
+        button_long_press_latched = false;
       }
     }
   }
