@@ -135,10 +135,13 @@ static bool button_pressed = false;
 #define APP_DEBUG_POLL_SIMPLE_BUTTON_INSTANCES 0
 #endif
 #ifndef APP_DEBUG_AUTO_JOIN_ON_BOOT
-#define APP_DEBUG_AUTO_JOIN_ON_BOOT 0
+#define APP_DEBUG_AUTO_JOIN_ON_BOOT 1
 #endif
 #ifndef APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
 #define APP_DEBUG_AUTO_JOIN_ON_PIN_RESET 0
+#endif
+#ifndef APP_DEBUG_AUTO_JOIN_DELAY_MS
+#define APP_DEBUG_AUTO_JOIN_DELAY_MS 5000
 #endif
 #ifndef APP_DEBUG_JOIN_AS_END_DEVICE
 #define APP_DEBUG_JOIN_AS_END_DEVICE 0
@@ -229,6 +232,8 @@ static uint32_t app_manual_poll_boost_start_tick = 0;
 static uint32_t app_manual_poll_boost_last_tick = 0;
 static uint32_t app_button_unlock_tick = 0;
 static uint32_t app_join_retry_unlock_tick = 0;
+static bool app_auto_join_scheduled = false;
+static uint32_t app_auto_join_tick = 0;
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -395,8 +400,13 @@ static void app_init_once(void)
   app_configure_default_reporting();
 
 #if APP_DEBUG_AUTO_JOIN_ON_BOOT
-  APP_DEBUG_PRINTF("Debug: auto-join on boot\n");
-  handle_short_press();
+  if (emberAfNetworkState() != EMBER_JOINED_NETWORK && !network_join_in_progress) {
+    uint32_t now = sl_sleeptimer_get_tick_count();
+    app_auto_join_scheduled = true;
+    app_auto_join_tick = now + sl_sleeptimer_ms_to_tick(APP_DEBUG_AUTO_JOIN_DELAY_MS);
+    APP_DEBUG_PRINTF("Debug: auto-join scheduled in %lu ms\n",
+                     (unsigned long)APP_DEBUG_AUTO_JOIN_DELAY_MS);
+  }
 #endif
 
 #if APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
@@ -550,6 +560,21 @@ void app_debug_poll(void)
     join_pending = false;
     APP_DEBUG_PRINTF("Join: deferred request starting (poll)\n");
     handle_short_press();
+  }
+
+  if (app_auto_join_scheduled) {
+    EmberNetworkStatus state = emberAfNetworkState();
+    if (state == EMBER_JOINED_NETWORK || network_join_in_progress) {
+      app_auto_join_scheduled = false;
+      app_auto_join_tick = 0;
+    } else if (af_init_seen
+               && app_auto_join_tick != 0
+               && (int32_t)(now - app_auto_join_tick) >= 0) {
+      app_auto_join_scheduled = false;
+      app_auto_join_tick = 0;
+      APP_DEBUG_PRINTF("Debug: auto-join timer fired\n");
+      handle_short_press();
+    }
   }
 
   // Self-heal: if joined and periodic sensor updates stall, re-arm them.
