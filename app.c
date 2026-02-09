@@ -119,6 +119,18 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS
 #define APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS 30000
 #endif
+#ifndef APP_DEBUG_BUTTON_GUARD_AFTER_BOOT_MS
+#define APP_DEBUG_BUTTON_GUARD_AFTER_BOOT_MS 1500
+#endif
+#ifndef APP_DEBUG_JOIN_RETRY_BACKOFF_MS
+#define APP_DEBUG_JOIN_RETRY_BACKOFF_MS 2000
+#endif
+#ifndef APP_DEBUG_JOIN_RETRY_BACKOFF_AFTER_LEAVE_MS
+#define APP_DEBUG_JOIN_RETRY_BACKOFF_AFTER_LEAVE_MS 800
+#endif
+#ifndef APP_DEBUG_BUTTON_MAX_VALID_PRESS_MS
+#define APP_DEBUG_BUTTON_MAX_VALID_PRESS_MS 30000
+#endif
 #ifndef APP_DEBUG_POLL_SIMPLE_BUTTON_INSTANCES
 #define APP_DEBUG_POLL_SIMPLE_BUTTON_INSTANCES 0
 #endif
@@ -213,6 +225,7 @@ static bool app_manual_poll_boost_active = false;
 static uint32_t app_manual_poll_boost_start_tick = 0;
 static uint32_t app_manual_poll_boost_last_tick = 0;
 static uint32_t app_button_unlock_tick = 0;
+static uint32_t app_join_retry_unlock_tick = 0;
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -256,6 +269,23 @@ static void app_debug_reset_network_state(void);
 #endif
 static void app_configure_default_reporting(void);
 
+static bool app_join_retry_blocked(uint32_t now)
+{
+  if (app_join_retry_unlock_tick == 0) {
+    return false;
+  }
+  if ((int32_t)(app_join_retry_unlock_tick - now) <= 0) {
+    app_join_retry_unlock_tick = 0;
+    return false;
+  }
+  return true;
+}
+
+static void app_set_join_retry_backoff(uint32_t now, uint32_t delay_ms)
+{
+  app_join_retry_unlock_tick = now + sl_sleeptimer_ms_to_tick(delay_ms);
+}
+
 #if APP_RUNTIME_NETWORK_STEERING
 void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
                                                   uint8_t totalBeacons,
@@ -285,6 +315,7 @@ void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
  */
 static void app_init_once(void)
 {
+  uint32_t now = sl_sleeptimer_get_tick_count();
 #if APP_DEBUG_SPI_ONLY
   APP_DEBUG_PRINTF("SPI-only debug mode\n");
   app_flash_probe();
@@ -314,7 +345,9 @@ static void app_init_once(void)
   button_long_press_pending = false;
   button_pressed = false;
   button_press_start_tick = 0;
-  app_button_unlock_tick = 0;
+  app_button_unlock_tick = now + sl_sleeptimer_ms_to_tick(APP_DEBUG_BUTTON_GUARD_AFTER_BOOT_MS);
+  APP_DEBUG_PRINTF("Button guard: ignoring BTN0 for %lu ms after init\n",
+                   (unsigned long)APP_DEBUG_BUTTON_GUARD_AFTER_BOOT_MS);
 
 #endif
 
@@ -898,6 +931,7 @@ void emberAfStackStatusCallback(EmberStatus status)
     network_join_in_progress = false;
     join_scan_in_progress = false;
     join_network_found = false;
+    app_join_retry_unlock_tick = 0;
 
     // Cancel any pending rejoin attempts - network is up (TEMPORARILY DISABLED)
     // rejoin_state = REJOIN_STATE_DONE;
@@ -931,6 +965,7 @@ void emberAfStackStatusCallback(EmberStatus status)
     }
     app_button_unlock_tick = 0;
     join_security_configured = false;
+    app_set_join_retry_backoff(now, APP_DEBUG_JOIN_RETRY_BACKOFF_AFTER_LEAVE_MS);
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
@@ -1031,6 +1066,9 @@ void sl_button_on_change(const sl_button_t *handle)
     }
 
     if (sl_button_get_state(handle) == SL_SIMPLE_BUTTON_PRESSED) {
+      if (button_pressed) {
+        return;
+      }
       // Button pressed - record start time
       button_press_start_tick = sl_sleeptimer_get_tick_count();
       button_pressed = true;
@@ -1041,6 +1079,12 @@ void sl_button_on_change(const sl_button_t *handle)
         uint32_t duration_ticks = sl_sleeptimer_get_tick_count() - button_press_start_tick;
         uint32_t duration_ms = sl_sleeptimer_tick_to_ms(duration_ticks);
         APP_DEBUG_PRINTF("BTN0: RELEASED (%lu ms)\n", (unsigned long)duration_ms);
+
+        if (duration_ms > APP_DEBUG_BUTTON_MAX_VALID_PRESS_MS) {
+          // Treat extremely long holds as floating-line glitches.
+          button_pressed = false;
+          return;
+        }
 
         // Set flags for main context to poll
         // These will be checked by button_poll_event_handler()
@@ -1319,6 +1363,8 @@ void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
       join_scan_in_progress = false;
       join_network_found = false;
       current_channel_index = 0;
+      join_security_configured = false;
+      app_set_join_retry_backoff(sl_sleeptimer_get_tick_count(), APP_DEBUG_JOIN_RETRY_BACKOFF_MS);
       }
     return;
   }
@@ -1355,6 +1401,11 @@ static void handle_short_press(void)
 #endif
 
   } else {
+    uint32_t now = sl_sleeptimer_get_tick_count();
+    if (app_join_retry_blocked(now)) {
+      APP_DEBUG_PRINTF("Join: retry backoff active\n");
+      return;
+    }
     if (!af_init_seen) {
       APP_DEBUG_PRINTF("Join: AF init not ready - deferring\n");
       join_pending = true;
@@ -1405,11 +1456,13 @@ static void handle_short_press(void)
 
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
-      if (join_status == EMBER_INVALID_CALL) {
+      if (join_status == EMBER_INVALID_CALL || join_status == 0xA8) {
         emberAfCorePrintln("Join aborted: stack not ready");
         network_join_in_progress = false;
         join_scan_in_progress = false;
         join_network_found = false;
+        join_security_configured = false;
+        app_set_join_retry_backoff(sl_sleeptimer_get_tick_count(), APP_DEBUG_JOIN_RETRY_BACKOFF_MS);
       } else {
         try_next_channel();
       }
