@@ -60,7 +60,7 @@ static volatile bool button_long_press_pending = false;
 // Button press duration tracking
 static uint32_t button_press_start_tick = 0;
 static bool button_pressed = false;
-#define BUTTON_DEBOUNCE_MS 30
+#define BUTTON_DEBOUNCE_MS 80
 #ifndef APP_BUTTON_LONG_PRESS_MS
 #define APP_BUTTON_LONG_PRESS_MS 5000  // default: 5 seconds for long press
 #endif
@@ -1077,78 +1077,11 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
  */
 void emberAfTickCallback(void)
 {
-  static uint32_t last_heartbeat_tick = 0;
-  uint32_t now = sl_sleeptimer_get_tick_count();
-  bool button_guard_active = (app_button_unlock_tick != 0)
-                             && ((int32_t)(app_button_unlock_tick - now) > 0);
-
-  if (network_join_in_progress) {
-    button_short_press_pending = false;
-    button_long_press_pending = false;
-    button_pressed = false;
-    button_press_start_tick = 0;
-  }
-
+  // In debug profiles, app_debug_poll() is called from main loop.
+  // Avoid handling button/join logic in two places to prevent edge races.
+#if !(APP_DEBUG_DIAG_ALWAYS || APP_DEBUG_FORCE_AF_INIT)
   app_debug_poll();
-
-#if APP_DEBUG_SPI_ONLY
-  if (button_short_press_pending) {
-    button_short_press_pending = false;
-    APP_DEBUG_PRINTF("Button short press\n");
-    app_flash_probe();
-  }
-
-  if (button_long_press_pending) {
-    button_long_press_pending = false;
-    APP_DEBUG_PRINTF("Button long press\n");
-    app_flash_probe();
-  }
-  return;
 #endif
-
-  if (join_pending && af_init_seen && !network_join_in_progress) {
-    join_pending = false;
-    APP_DEBUG_PRINTF("Join: deferred request starting\n");
-    handle_short_press();
-  }
-
-  if (last_heartbeat_tick == 0 ||
-      sl_sleeptimer_tick_to_ms(now - last_heartbeat_tick) >= 5000) {
-    last_heartbeat_tick = now;
-    APP_DEBUG_PRINTF("Heartbeat: net=%d join_in_progress=%d\n",
-                     emberAfNetworkState(),
-                     network_join_in_progress);
-    if (APP_DEBUG_DIAG_ALWAYS) {
-      EmberNetworkStatus state = emberAfNetworkState();
-      APP_DEBUG_PRINTF("Zigbee state=%d, joined=%d\n",
-                       state,
-                       (state == EMBER_JOINED_NETWORK));
-    }
-  }
-
-  // Check for short press
-  if (button_short_press_pending) {
-    button_short_press_pending = false;  // Clear flag
-    if (button_guard_active) {
-      APP_DEBUG_PRINTF("Button guard: short press ignored\n");
-    } else {
-      APP_DEBUG_PRINTF("Button short press\n");
-      emberAfCorePrintln("Button: Short press detected (tick callback)");
-      handle_short_press();
-    }
-  }
-
-  // Check for long press
-  if (button_long_press_pending) {
-    button_long_press_pending = false;  // Clear flag
-    if (button_guard_active) {
-      APP_DEBUG_PRINTF("Button guard: long press ignored\n");
-    } else {
-      APP_DEBUG_PRINTF("Button long press\n");
-      emberAfCorePrintln("Button: Long press detected (tick callback)");
-      handle_long_press();
-    }
-  }
 }
 
 /**
@@ -1331,6 +1264,16 @@ void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
                    join_network_found ? 1 : 0);
 
   if (join_network_found) {
+    if (!configure_join_security()) {
+      emberAfCorePrintln("Join aborted: security state setup failed");
+      APP_DEBUG_PRINTF("Join: abort scan result join due to security setup failure\n");
+      network_join_in_progress = false;
+      join_scan_in_progress = false;
+      join_network_found = false;
+      current_channel_index = 0;
+      return;
+    }
+
     EmberNetworkParameters params;
     memset(&params, 0, sizeof(params));
     memcpy(params.extendedPanId, join_candidate.extendedPanId, EXTENDED_PAN_ID_SIZE);

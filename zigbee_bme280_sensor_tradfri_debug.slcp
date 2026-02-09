@@ -254,7 +254,7 @@ define:
     value: 0
   # Make long press practical on the physical button.
   - name: APP_BUTTON_LONG_PRESS_MS
-    value: 4000
+    value: 5000
   # Short post-join guard to suppress spurious edges right after join.
   - name: APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS
     value: 1000
