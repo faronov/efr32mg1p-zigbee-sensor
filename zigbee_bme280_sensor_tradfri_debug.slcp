@@ -217,7 +217,7 @@ define:
   - name: APP_DEBUG_USE_NETWORK_STEERING
     value: 0
   - name: APP_DEBUG_SLEEP_TRACE
-    value: 1
+    value: 0
   - name: APP_DEBUG_FORCE_AF_INIT
     value: 0
   - name: APP_DEBUG_SPI_ONLY
@@ -237,7 +237,7 @@ define:
     value: 0
   # Keep sleepy end device in fast-poll mode after join to speed up coordinator interview.
   - name: APP_DEBUG_FAST_POLL_AFTER_JOIN_MS
-    value: 120000
+    value: 30000
   - name: APP_DEBUG_FAST_POLL_INTERVAL_MS
     value: 250
   # Disable manual poll bursts; rely on normal stack poll + temporary fast poll window.
@@ -257,7 +257,7 @@ define:
     value: 1500
   # Short post-join guard to suppress spurious edges right after join.
   - name: APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS
-    value: 5000
+    value: 1000
   - name: APP_BUILD_TAG
     value: '"dbg-netreset-otaoff-bootspam-crashprint"'
 
