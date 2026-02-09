@@ -194,6 +194,7 @@ static uint8_t current_channel_index = 0;  // Index into channel_scan_order arra
 static bool network_join_in_progress = false;
 static bool join_scan_in_progress = false;
 static bool join_network_found = false;
+static bool app_intentional_leave_pending = false;
 static EmberZigbeeNetwork join_candidate;
 static bool af_init_seen = false;
 static bool af_init_reported = false;
@@ -910,7 +911,12 @@ void emberAfStackStatusCallback(EmberStatus status)
     // No device-side binding code needed - see BINDING_GUIDE.md
 
   } else if (status == EMBER_NETWORK_DOWN) {
-    emberAfCorePrintln("Network down - will attempt optimized rejoin");
+    if (app_intentional_leave_pending) {
+      emberAfCorePrintln("Network down after manual leave");
+      app_intentional_leave_pending = false;
+    } else {
+      emberAfCorePrintln("Network down - will attempt optimized rejoin");
+    }
     app_button_unlock_tick = 0;
 
 #if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
@@ -1336,9 +1342,15 @@ void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
     APP_DEBUG_PRINTF("Join: emberJoinNetwork -> 0x%02x\n", join_status);
     if (join_status != EMBER_SUCCESS) {
       emberAfCorePrintln("Join failed to start: 0x%x", join_status);
+      // If stack is busy/not ready, channel hopping does not help and causes long loops.
+      // Abort this join attempt and wait for the next user press.
+      EmberNetworkStatus net_state = emberAfNetworkState();
+      APP_DEBUG_PRINTF("Join: abort attempt on status 0x%02x (net=%d)\n", join_status, net_state);
+      network_join_in_progress = false;
+      join_scan_in_progress = false;
       join_network_found = false;
-      try_next_channel();
-    }
+      current_channel_index = 0;
+      }
     return;
   }
 
@@ -1475,12 +1487,14 @@ static void handle_long_press(void)
 
   if (network_state == EMBER_JOINED_NETWORK) {
     emberAfCorePrintln("Long press: leaving network...");
+    app_intentional_leave_pending = true;
 
     // Leave the network
     EmberStatus leave_status = emberLeaveNetwork();
     if (leave_status == EMBER_SUCCESS) {
       emberAfCorePrintln("Leave requested, waiting for network down");
     } else {
+      app_intentional_leave_pending = false;
       emberAfCorePrintln("Failed to leave network: 0x%x", leave_status);
     }
   } else {
