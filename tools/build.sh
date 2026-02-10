@@ -263,9 +263,7 @@ EOF
     --tempState \
     --skipPostGeneration \
     -z "$ZCL_DIR/zcl-zap-custom.json" \
-    -z "$GSDK_DIR/extension/matter_extension/src/app/zap-templates/zcl/zcl.json" \
     -g "$GSDK_DIR/protocol/zigbee/app/framework/gen-template/gen-templates.json" \
-    -g "$GSDK_DIR/extension/matter_extension/src/app/zap-templates/app-templates.json" \
     -o "$ZAP_OUTPUT_DIR" \
     "$ZAP_INPUT_FILE"
   echo -e "${GREEN}✓${NC} Custom ZAP generation completed"
