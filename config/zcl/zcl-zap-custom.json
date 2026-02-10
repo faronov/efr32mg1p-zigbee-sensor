@@ -4,7 +4,7 @@
   "version": 1,
   "xmlRoot": [
     ".",
-    "../../../../app/zcl/"
+    "/gecko_sdk_4.5.0/protocol/zigbee/app/zcl/"
   ],
   "xmlFile": [
     "ami-devices.xml",
