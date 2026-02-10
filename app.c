@@ -9,9 +9,6 @@
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
 #include "app/framework/plugin/network-steering/network-steering.h"
 #endif
-#ifdef SL_CATALOG_ZIGBEE_REPORTING_PRESENT
-#include "app/framework/plugin/reporting/reporting.h"
-#endif
 #include "app_profile.h"
 #include "app_sensor.h"
 #include "app_config.h"
@@ -219,11 +216,9 @@ static EmberZigbeeNetwork join_candidate;
 static bool af_init_seen = false;
 static bool af_init_reported = false;
 static bool basic_identity_pending = false;
-static bool reporting_config_pending = false;
 static bool af_init_force_pending = false;
 static uint32_t af_init_force_tick = 0;
 static uint32_t basic_identity_tick = 0;
-static uint32_t reporting_config_tick = 0;
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
 static bool app_join_awake_active = false;
 static uint32_t app_join_awake_start_tick = 0;
@@ -281,7 +276,6 @@ static void app_init_once(void);
 #if APP_DEBUG_RESET_NETWORK
 static void app_debug_reset_network_state(void);
 #endif
-static bool app_configure_default_reporting(void);
 
 static bool app_join_retry_blocked(uint32_t now)
 {
@@ -415,14 +409,6 @@ static void app_init_once(void)
 #endif
   }
 
-  if (!app_configure_default_reporting()) {
-    reporting_config_pending = true;
-    reporting_config_tick = now;
-  } else {
-    reporting_config_pending = false;
-    reporting_config_tick = 0;
-  }
-
 #if APP_DEBUG_AUTO_JOIN_ON_BOOT
   if (emberAfNetworkState() != EMBER_JOINED_NETWORK && !network_join_in_progress) {
     uint32_t now = sl_sleeptimer_get_tick_count();
@@ -440,93 +426,6 @@ static void app_init_once(void)
     APP_DEBUG_PRINTF("Debug: auto-join after pin reset\n");
     handle_short_press();
   }
-#endif
-}
-
-static bool app_configure_default_reporting(void)
-{
-#ifdef SL_CATALOG_ZIGBEE_REPORTING_PRESENT
-  uint8_t endpoint_count = emberAfEndpointCount();
-  if (endpoint_count == 0) {
-    APP_DEBUG_PRINTF("Reporting default: endpoints not ready (count=0), deferring\n");
-    return false;
-  }
-
-  EmberAfPluginReportingEntry entry;
-  EmberAfStatus st;
-  bool ok = true;
-
-  memset(&entry, 0, sizeof(entry));
-  entry.direction = EMBER_ZCL_REPORTING_DIRECTION_REPORTED;
-  entry.endpoint = 1;
-  entry.mask = CLUSTER_MASK_SERVER;
-  entry.manufacturerCode = EMBER_AF_NULL_MANUFACTURER_CODE;
-
-  entry.clusterId = ZCL_TEMP_MEASUREMENT_CLUSTER_ID;
-  entry.attributeId = ZCL_TEMP_MEASURED_VALUE_ATTRIBUTE_ID;
-  entry.data.reported.minInterval = 10;
-  entry.data.reported.maxInterval = 300;
-  entry.data.reported.reportableChange = 50;   // 0.50 C (0.01C units)
-  st = emberAfPluginReportingConfigureReportedAttribute(&entry);
-  APP_DEBUG_PRINTF("Reporting default: temp -> 0x%02x\n", st);
-  if (st != EMBER_ZCL_STATUS_SUCCESS) {
-    ok = false;
-  }
-
-  entry.clusterId = ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID;
-  entry.attributeId = ZCL_RELATIVE_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID;
-  entry.data.reported.minInterval = 10;
-  entry.data.reported.maxInterval = 300;
-  entry.data.reported.reportableChange = 100;  // 1.00 %RH (0.01% units)
-#if (APP_PROFILE_HAS_HUMIDITY != 0)
-  st = emberAfPluginReportingConfigureReportedAttribute(&entry);
-  APP_DEBUG_PRINTF("Reporting default: humidity -> 0x%02x\n", st);
-  if (st != EMBER_ZCL_STATUS_SUCCESS) {
-    ok = false;
-  }
-#else
-  APP_DEBUG_PRINTF("Reporting default: humidity skipped by profile\n");
-#endif
-
-  entry.clusterId = ZCL_PRESSURE_MEASUREMENT_CLUSTER_ID;
-  entry.attributeId = ZCL_PRESSURE_MEASURED_VALUE_ATTRIBUTE_ID;
-  entry.data.reported.minInterval = 10;
-  entry.data.reported.maxInterval = 300;
-  entry.data.reported.reportableChange = 1;    // 1 kPa (cluster units)
-#if (APP_PROFILE_HAS_PRESSURE != 0)
-  st = emberAfPluginReportingConfigureReportedAttribute(&entry);
-  APP_DEBUG_PRINTF("Reporting default: pressure -> 0x%02x\n", st);
-  if (st != EMBER_ZCL_STATUS_SUCCESS) {
-    ok = false;
-  }
-#else
-  APP_DEBUG_PRINTF("Reporting default: pressure skipped by profile\n");
-#endif
-
-  entry.clusterId = ZCL_POWER_CONFIG_CLUSTER_ID;
-  entry.attributeId = ZCL_BATTERY_VOLTAGE_ATTRIBUTE_ID;
-  entry.data.reported.minInterval = 30;
-  entry.data.reported.maxInterval = 1800;
-  entry.data.reported.reportableChange = 1;    // 0.1V (100mV units)
-  st = emberAfPluginReportingConfigureReportedAttribute(&entry);
-  APP_DEBUG_PRINTF("Reporting default: battery voltage -> 0x%02x\n", st);
-  if (st != EMBER_ZCL_STATUS_SUCCESS) {
-    ok = false;
-  }
-
-  entry.clusterId = ZCL_POWER_CONFIG_CLUSTER_ID;
-  entry.attributeId = ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID;
-  entry.data.reported.minInterval = 30;
-  entry.data.reported.maxInterval = 1800;
-  entry.data.reported.reportableChange = 2;    // 1% (0.5% units)
-  st = emberAfPluginReportingConfigureReportedAttribute(&entry);
-  APP_DEBUG_PRINTF("Reporting default: battery pct -> 0x%02x\n", st);
-  if (st != EMBER_ZCL_STATUS_SUCCESS) {
-    ok = false;
-  }
-  return ok;
-#else
-  return true;
 #endif
 }
 
@@ -685,17 +584,6 @@ void app_debug_poll(void)
       }
     }
   }
-  if (reporting_config_pending && af_init_seen) {
-    if (reporting_config_tick == 0
-        || sl_sleeptimer_tick_to_ms(now - reporting_config_tick) >= 2000) {
-      reporting_config_tick = now;
-      if (app_configure_default_reporting()) {
-        reporting_config_pending = false;
-        emberAfCorePrintln("Reporting default configured");
-      }
-    }
-  }
-
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
   if (app_join_awake_active && app_join_awake_start_tick != 0) {
     uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_join_awake_start_tick);
@@ -1128,6 +1016,50 @@ bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
         uint8_t dir = cmd->buffer[3];
         EmberAfAttributeId attr = (EmberAfAttributeId)(cmd->buffer[4] | ((uint16_t)cmd->buffer[5] << 8));
         APP_DEBUG_PRINTF("ZCL cfg-report attr: dir=%u attr=0x%04x\n", dir, attr);
+      }
+      if (cmd->commandId == ZCL_CONFIGURE_REPORTING_COMMAND_ID) {
+        uint16_t i = 3;
+        while ((i + 5u) < cmd->bufLen) {
+          uint8_t dir = cmd->buffer[i++];
+          EmberAfAttributeId attr = (EmberAfAttributeId)(cmd->buffer[i] | ((uint16_t)cmd->buffer[i + 1] << 8));
+          i += 2;
+          if (dir == EMBER_ZCL_REPORTING_DIRECTION_REPORTED) {
+            if ((i + 5u) > cmd->bufLen) {
+              break;
+            }
+            uint8_t type = cmd->buffer[i++];
+            uint16_t min_i = (uint16_t)(cmd->buffer[i] | ((uint16_t)cmd->buffer[i + 1] << 8));
+            i += 2;
+            uint16_t max_i = (uint16_t)(cmd->buffer[i] | ((uint16_t)cmd->buffer[i + 1] << 8));
+            i += 2;
+            uint32_t change = 0;
+            uint8_t change_len = emberAfGetDataSize(type);
+            if ((i + change_len) > cmd->bufLen) {
+              break;
+            }
+            for (uint8_t n = 0; n < change_len; n++) {
+              change |= ((uint32_t)cmd->buffer[i + n]) << (8u * n);
+            }
+            i += change_len;
+            APP_DEBUG_PRINTF("ZCL cfg-report set: clus=0x%04x attr=0x%04x type=0x%02x min=%us max=%us chg=%lu\n",
+                             cmd->apsFrame->clusterId,
+                             attr,
+                             type,
+                             (unsigned)min_i,
+                             (unsigned)max_i,
+                             (unsigned long)change);
+          } else {
+            if ((i + 2u) > cmd->bufLen) {
+              break;
+            }
+            uint16_t timeout = (uint16_t)(cmd->buffer[i] | ((uint16_t)cmd->buffer[i + 1] << 8));
+            i += 2;
+            APP_DEBUG_PRINTF("ZCL cfg-report recv: clus=0x%04x attr=0x%04x timeout=%us\n",
+                             cmd->apsFrame->clusterId,
+                             attr,
+                             (unsigned)timeout);
+          }
+        }
       }
     }
   }
