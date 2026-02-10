@@ -6,6 +6,8 @@
 #include "sl_component_catalog.h"
 #include "zigbee_app_framework_event.h"
 #include "app/framework/include/af.h"
+#include "app/framework/util/client-api.h"
+#include "app/framework/util/util.h"
 #ifdef SL_CATALOG_ZIGBEE_NETWORK_STEERING_PRESENT
 #include "app/framework/plugin/network-steering/network-steering.h"
 #endif
@@ -273,6 +275,7 @@ static bool app_flash_probe_with_cs(GPIO_Port_TypeDef port,
                                     unsigned int pin,
                                     const char *label);
 static void app_init_once(void);
+static bool app_handle_basic_mfg_rw_command(const EmberAfClusterCommand *cmd);
 #if APP_DEBUG_RESET_NETWORK
 static void app_debug_reset_network_state(void);
 #endif
@@ -1001,8 +1004,122 @@ void emberAfPluginEndDeviceSupportPollCompletedCallback(EmberStatus status)
   }
 }
 
+static bool app_handle_basic_mfg_rw_command(const EmberAfClusterCommand *cmd)
+{
+  if (cmd == NULL || cmd->apsFrame == NULL) {
+    return false;
+  }
+
+  if (!cmd->mfgSpecific
+      || cmd->mfgCode != APP_MANUFACTURER_CODE
+      || cmd->apsFrame->clusterId != ZCL_BASIC_CLUSTER_ID) {
+    return false;
+  }
+
+  // Manufacturer-specific global command frame: global + mfg + server->client
+  const uint8_t mfg_global_response_fc =
+    (uint8_t)(ZCL_GLOBAL_COMMAND
+              | ZCL_MANUFACTURER_SPECIFIC_MASK
+              | ZCL_FRAME_CONTROL_SERVER_TO_CLIENT);
+
+  if (cmd->commandId == ZCL_READ_ATTRIBUTES_COMMAND_ID) {
+    // Header for mfg-specific command: FC(1), MFG(2), SEQ(1), CMD(1)
+    uint16_t i = 5;
+    (void)emberAfFillExternalManufacturerSpecificBuffer(mfg_global_response_fc,
+                                                         ZCL_BASIC_CLUSTER_ID,
+                                                         APP_MANUFACTURER_CODE,
+                                                         ZCL_READ_ATTRIBUTES_RESPONSE_COMMAND_ID,
+                                                         "");
+
+    while ((i + 1u) < cmd->bufLen) {
+      EmberAfAttributeId attribute_id =
+        (EmberAfAttributeId)(cmd->buffer[i] | ((uint16_t)cmd->buffer[i + 1] << 8));
+      i += 2;
+
+      uint8_t attr_type = 0;
+      uint8_t value[8];
+      uint8_t value_len = (uint8_t)sizeof(value);
+      EmberAfStatus st = app_config_read_mfg_attribute(attribute_id,
+                                                       &attr_type,
+                                                       value,
+                                                       &value_len);
+
+      (void)emberAfPutInt16uInResp(attribute_id);
+      (void)emberAfPutInt8uInResp((uint8_t)st);
+      if (st == EMBER_ZCL_STATUS_SUCCESS) {
+        (void)emberAfPutInt8uInResp(attr_type);
+        if (value_len > 0) {
+          (void)emberAfAppendToExternalBuffer(value, value_len);
+        }
+      }
+    }
+
+    EmberStatus send_st = emberAfSendResponse();
+    if (send_st != EMBER_SUCCESS) {
+      APP_DEBUG_PRINTF("MFG READ response send failed: 0x%02x\n", send_st);
+    }
+    return true;
+  }
+
+  if (cmd->commandId == ZCL_WRITE_ATTRIBUTES_COMMAND_ID) {
+    // Header for mfg-specific command: FC(1), MFG(2), SEQ(1), CMD(1)
+    uint16_t i = 5;
+    bool all_success = true;
+    (void)emberAfFillExternalManufacturerSpecificBuffer(mfg_global_response_fc,
+                                                         ZCL_BASIC_CLUSTER_ID,
+                                                         APP_MANUFACTURER_CODE,
+                                                         ZCL_WRITE_ATTRIBUTES_RESPONSE_COMMAND_ID,
+                                                         "");
+
+    while ((i + 3u) < cmd->bufLen) {
+      EmberAfAttributeId attribute_id =
+        (EmberAfAttributeId)(cmd->buffer[i] | ((uint16_t)cmd->buffer[i + 1] << 8));
+      i += 2;
+      uint8_t attr_type = cmd->buffer[i++];
+      uint8_t data_len = emberAfGetDataSize(attr_type);
+      if ((i + data_len) > cmd->bufLen) {
+        // Malformed payload
+        all_success = false;
+        (void)emberAfPutInt8uInResp((uint8_t)EMBER_ZCL_STATUS_MALFORMED_COMMAND);
+        (void)emberAfPutInt16uInResp(attribute_id);
+        break;
+      }
+
+      EmberAfStatus st = app_config_write_mfg_attribute(attribute_id,
+                                                        attr_type,
+                                                        &cmd->buffer[i],
+                                                        data_len);
+      i += data_len;
+
+      if (st != EMBER_ZCL_STATUS_SUCCESS) {
+        all_success = false;
+        // Per ZCL write response format: include attr id for failures
+        (void)emberAfPutInt8uInResp((uint8_t)st);
+        (void)emberAfPutInt16uInResp(attribute_id);
+      }
+    }
+
+    if (all_success) {
+      // For all-success case, emit single success status.
+      (void)emberAfPutInt8uInResp((uint8_t)EMBER_ZCL_STATUS_SUCCESS);
+    }
+
+    EmberStatus send_st = emberAfSendResponse();
+    if (send_st != EMBER_SUCCESS) {
+      APP_DEBUG_PRINTF("MFG WRITE response send failed: 0x%02x\n", send_st);
+    }
+    return true;
+  }
+
+  return false;
+}
+
 bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
 {
+  if (app_handle_basic_mfg_rw_command(cmd)) {
+    return true;
+  }
+
   if (cmd != NULL && cmd->mfgSpecific == 0u) {
     if (cmd->commandId == ZCL_CONFIGURE_REPORTING_COMMAND_ID
         || cmd->commandId == ZCL_READ_REPORTING_CONFIGURATION_COMMAND_ID) {
