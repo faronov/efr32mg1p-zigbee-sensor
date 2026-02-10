@@ -160,44 +160,21 @@ fi
 MAKEFILE_NAME=$(basename "$MAKEFILE")
 echo -e "${GREEN}✓${NC} Project generated successfully: $MAKEFILE_NAME"
 
-# Copy custom config files (e.g., ZCL config) before patching slc_args.json.
-if [ -d "$PROJECT_ROOT/config" ]; then
-  echo -e "${GREEN}Copying custom config files...${NC}"
-  mkdir -p "$FIRMWARE_DIR/config"
-  cp -R "$PROJECT_ROOT/config/"* "$FIRMWARE_DIR/config/" 2>/dev/null || true
-  echo -e "${GREEN}✓${NC} Custom config files copied"
-fi
-
-# Force ZAP generation to use repository custom ZCL data.
-# In CI, apack_zclConfigurator may fall back to the SDK default zcl-zap.json,
-# which drops manufacturer-specific cluster extensions from openbme280-extensions.xml.
-SLC_ARGS_FILE="$FIRMWARE_DIR/config/zcl/slc_args.json"
-CUSTOM_ZCL_JSON="$FIRMWARE_DIR/config/zcl/zcl-zap-custom.json"
-if [ -f "$SLC_ARGS_FILE" ] && [ -f "$CUSTOM_ZCL_JSON" ]; then
+# Copy only custom ZCL data/extension files, then regenerate without slc_args.json.
+# slc_args.json forces SDK-default zcl-zap.json; removing it allows ZAP package data
+# from the .zap file (which points to ./zcl-zap-custom.json).
+CUSTOM_ZCL_SRC="$PROJECT_ROOT/config/zcl/zcl-zap-custom.json"
+CUSTOM_XML_SRC="$PROJECT_ROOT/config/zcl/openbme280-extensions.xml"
+ZCL_DIR="$FIRMWARE_DIR/config/zcl"
+SLC_ARGS_FILE="$ZCL_DIR/slc_args.json"
+if [ -d "$ZCL_DIR" ] && [ -f "$CUSTOM_ZCL_SRC" ] && [ -f "$CUSTOM_XML_SRC" ]; then
   echo ""
-  echo -e "${GREEN}Patching ZAP args to use custom ZCL data...${NC}"
-  cp "$SLC_ARGS_FILE" "${SLC_ARGS_FILE}.bak"
-  # Replace both path variants observed in CI logs.
-  sed -i.bak \
-    -e "s|/gecko_sdk_4.5.0//app/zcl/zcl-zap.json|$CUSTOM_ZCL_JSON|g" \
-    -e "s|/gecko_sdk_4.5.0/app/zcl/zcl-zap.json|$CUSTOM_ZCL_JSON|g" \
-    "$SLC_ARGS_FILE"
-  # Fallback replacement for escaped or alternate path forms inside slc_args.json.
-  # Replace any JSON token that ends with "zcl-zap.json".
-  sed -i.bak -E \
-    -e "s#[^\",]*zcl-zap\\.json#$CUSTOM_ZCL_JSON#g" \
-    "$SLC_ARGS_FILE"
-  rm -f "${SLC_ARGS_FILE}.bak"
+  echo -e "${GREEN}Installing custom ZCL data into generated project...${NC}"
+  cp "$CUSTOM_ZCL_SRC" "$ZCL_DIR/"
+  cp "$CUSTOM_XML_SRC" "$ZCL_DIR/"
+  rm -f "$SLC_ARGS_FILE"
 
-  echo "ZAP args (zcl-related) after patch:"
-  grep -n "zcl" "$SLC_ARGS_FILE" || true
-  if ! grep -q "zcl-zap-custom.json" "$SLC_ARGS_FILE"; then
-    echo -e "${YELLOW}Warning: slc_args.json still does not reference custom zcl-zap data${NC}"
-    echo "First 120 lines of slc_args.json for diagnostics:"
-    sed -n '1,120p' "$SLC_ARGS_FILE" || true
-  fi
-
-  echo -e "${GREEN}Re-running SLC generate to refresh autogen with patched ZAP args...${NC}"
+  echo -e "${GREEN}Re-running SLC generate after removing slc_args.json...${NC}"
   SLC_REGEN_CMD="slc generate \"$FIRMWARE_DIR/$PROJECT_NAME.slcp\" -np -d \"$FIRMWARE_DIR\" -name \"$PROJECT_NAME\" -o makefile --configuration release --with EFR32MG1P132F256GM32"
   echo "Running: $SLC_REGEN_CMD"
   eval $SLC_REGEN_CMD
