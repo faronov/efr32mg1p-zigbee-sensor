@@ -36,6 +36,17 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 FIRMWARE_DIR="$PROJECT_ROOT/firmware"
+SOURCE_ZCL_DIR="$PROJECT_ROOT/config/zcl"
+SLC_ARGS_SOURCE="$SOURCE_ZCL_DIR/slc_args.json"
+TEMP_SLC_ARGS_CREATED=0
+
+cleanup_generated_files() {
+  if [ "$TEMP_SLC_ARGS_CREATED" -eq 1 ] && [ -f "$SLC_ARGS_SOURCE" ]; then
+    rm -f "$SLC_ARGS_SOURCE"
+  fi
+}
+
+trap cleanup_generated_files EXIT
 
 # Use TRÅDFRI SLCP if not provided
 if [ -z "$SAMPLE_SLCP" ]; then
@@ -86,6 +97,31 @@ echo "  GSDK: $GSDK_DIR"
 echo "  Sample SLCP: $SAMPLE_SLCP"
 echo "  Board: $BOARD"
 echo "  Firmware Output: $FIRMWARE_DIR"
+
+# Prepare slc_args.json so APACK/ZAP uses custom Zigbee ZCL data on first generation pass.
+CUSTOM_ZCL_SRC="$SOURCE_ZCL_DIR/zcl-zap-custom.json"
+CUSTOM_XML_SRC="$SOURCE_ZCL_DIR/openbme280-extensions.xml"
+if [ -d "$SOURCE_ZCL_DIR" ] && [ -f "$CUSTOM_ZCL_SRC" ] && [ -f "$CUSTOM_XML_SRC" ]; then
+  echo ""
+  echo -e "${GREEN}Preparing source slc_args.json for custom ZCL...${NC}"
+  cat > "$SLC_ARGS_SOURCE" <<EOF
+{
+  "sdkRoot": "$GSDK_DIR",
+  "apackRoot": "",
+  "partOpn": "EFR32MG1P132F256GM32",
+  "boards": [
+    "$BOARD"
+  ],
+  "zcl": {
+    "zigbeeZclJsonFile": "./zcl-zap-custom.json",
+    "zigbeeTemplateJsonFile": "$GSDK_DIR/protocol/zigbee/app/framework/gen-template/gen-templates.json",
+    "matterZclJsonFile": "$GSDK_DIR/extension/matter_extension/src/app/zap-templates/zcl/zcl.json",
+    "matterTemplateJsonFile": "$GSDK_DIR/extension/matter_extension/src/app/zap-templates/app-templates.json"
+  }
+}
+EOF
+  TEMP_SLC_ARGS_CREATED=1
+fi
 
 # Configure SLC CLI
 echo ""
@@ -162,8 +198,6 @@ echo -e "${GREEN}✓${NC} Project generated successfully: $MAKEFILE_NAME"
 
 # Copy custom ZCL data/extension files into generated project.
 # Keep generation flow single-pass; profile builds rely on generated layout.
-CUSTOM_ZCL_SRC="$PROJECT_ROOT/config/zcl/zcl-zap-custom.json"
-CUSTOM_XML_SRC="$PROJECT_ROOT/config/zcl/openbme280-extensions.xml"
 ZCL_DIR="$FIRMWARE_DIR/config/zcl"
 if [ -d "$ZCL_DIR" ] && [ -f "$CUSTOM_ZCL_SRC" ] && [ -f "$CUSTOM_XML_SRC" ]; then
   echo ""
@@ -238,6 +272,7 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}Build completed successfully!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
+
 echo "Build outputs:"
 
 # Find common output files
