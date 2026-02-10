@@ -238,6 +238,37 @@ EOF
   fi
   MAKEFILE_NAME=$(basename "$MAKEFILE")
   echo -e "${GREEN}✓${NC} Regenerated project successfully: $MAKEFILE_NAME"
+
+  echo -e "${GREEN}Forcing ZAP generation with custom Zigbee ZCL metadata...${NC}"
+  ZAP_CLI_BIN="$(command -v zap-cli || true)"
+  if [ -z "$ZAP_CLI_BIN" ] && [ -x "/root/.silabs/slt/installs/archive/zap/zap-cli" ]; then
+    ZAP_CLI_BIN="/root/.silabs/slt/installs/archive/zap/zap-cli"
+  fi
+  if [ -z "$ZAP_CLI_BIN" ]; then
+    echo -e "${RED}Error: zap-cli not found; cannot force custom ZCL generation${NC}"
+    exit 1
+  fi
+
+  ZAP_INPUT_FILE="$(find "$ZCL_DIR" -maxdepth 1 -type f -name '*.zap' | head -1)"
+  if [ -z "$ZAP_INPUT_FILE" ] || [ ! -f "$ZAP_INPUT_FILE" ]; then
+    echo -e "${RED}Error: No .zap input file found in $ZCL_DIR${NC}"
+    exit 1
+  fi
+
+  ZAP_OUTPUT_DIR="$FIRMWARE_DIR/autogen"
+  mkdir -p "$ZAP_OUTPUT_DIR"
+  echo "Using zap-cli: $ZAP_CLI_BIN"
+  echo "ZAP input: $ZAP_INPUT_FILE"
+  "$ZAP_CLI_BIN" generate \
+    --tempState \
+    --skipPostGeneration \
+    -z "$ZCL_DIR/zcl-zap-custom.json" \
+    -z "$GSDK_DIR/extension/matter_extension/src/app/zap-templates/zcl/zcl.json" \
+    -g "$GSDK_DIR/protocol/zigbee/app/framework/gen-template/gen-templates.json" \
+    -g "$GSDK_DIR/extension/matter_extension/src/app/zap-templates/app-templates.json" \
+    -o "$ZAP_OUTPUT_DIR" \
+    "$ZAP_INPUT_FILE"
+  echo -e "${GREEN}✓${NC} Custom ZAP generation completed"
 fi
 
 # Copy our custom source files
