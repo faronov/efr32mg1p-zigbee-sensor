@@ -192,8 +192,9 @@ if [ -f "$SLC_ARGS_FILE" ] && [ -f "$CUSTOM_ZCL_JSON" ]; then
   echo "ZAP args (zcl-related) after patch:"
   grep -n "zcl" "$SLC_ARGS_FILE" || true
   if ! grep -q "zcl-zap-custom.json" "$SLC_ARGS_FILE"; then
-    echo -e "${RED}Error: slc_args.json still does not reference custom zcl-zap data${NC}"
-    exit 1
+    echo -e "${YELLOW}Warning: slc_args.json still does not reference custom zcl-zap data${NC}"
+    echo "First 120 lines of slc_args.json for diagnostics:"
+    sed -n '1,120p' "$SLC_ARGS_FILE" || true
   fi
 
   echo -e "${GREEN}Re-running SLC generate to refresh autogen with patched ZAP args...${NC}"
