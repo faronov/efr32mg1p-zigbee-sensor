@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<configurator>
+  <domain name="OpenBME280"/>
+
+  <!-- Manufacturer-specific attributes on Basic cluster (0x0000), mfgCode 0x1002 -->
+  <clusterExtension code="0x0000">
+    <attribute side="server" code="0xF000" define="SENSOR_READ_INTERVAL" type="INT16U" min="0x000A" max="0x0E10" writable="true" default="0x003C" optional="true" manufacturerCode="0x1002">Sensor Read Interval</attribute>
+    <attribute side="server" code="0xF001" define="TEMPERATURE_OFFSET" type="INT16S" min="-5000" max="5000" writable="true" default="0x0000" optional="true" manufacturerCode="0x1002">Temperature Offset</attribute>
+    <attribute side="server" code="0xF002" define="HUMIDITY_OFFSET" type="INT16S" min="-5000" max="5000" writable="true" default="0x0000" optional="true" manufacturerCode="0x1002">Humidity Offset</attribute>
+    <attribute side="server" code="0xF003" define="PRESSURE_OFFSET" type="INT16S" min="-5000" max="5000" writable="true" default="0x0000" optional="true" manufacturerCode="0x1002">Pressure Offset</attribute>
+    <attribute side="server" code="0xF004" define="LED_ENABLE" type="BOOLEAN" min="0x00" max="0x01" writable="true" default="0x01" optional="true" manufacturerCode="0x1002">LED Enable</attribute>
+
+    <attribute side="server" code="0xF010" define="REPORT_THRESHOLD_TEMPERATURE" type="INT16U" min="0x0000" max="0xFFFF" writable="true" default="0x0064" optional="true" manufacturerCode="0x1002">Report Threshold Temperature</attribute>
+    <attribute side="server" code="0xF011" define="REPORT_THRESHOLD_HUMIDITY" type="INT16U" min="0x0000" max="0xFFFF" writable="true" default="0x0064" optional="true" manufacturerCode="0x1002">Report Threshold Humidity</attribute>
+    <attribute side="server" code="0xF012" define="REPORT_THRESHOLD_PRESSURE" type="INT16U" min="0x0000" max="0xFFFF" writable="true" default="0x0001" optional="true" manufacturerCode="0x1002">Report Threshold Pressure</attribute>
+  </clusterExtension>
+</configurator>

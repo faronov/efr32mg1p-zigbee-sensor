@@ -19,7 +19,7 @@
   "package": [
     {
       "pathRelativity": "relativeToZap",
-      "path": "../../../app/zcl/zcl-zap.json",
+      "path": "./zcl-zap-custom.json",
       "type": "zcl-properties",
       "category": "zigbee",
       "version": 1,
