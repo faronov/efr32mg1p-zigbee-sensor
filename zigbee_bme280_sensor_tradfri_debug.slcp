@@ -205,7 +205,7 @@ define:
   - name: APP_DEBUG_DIAG_ALWAYS
     value: 1
   - name: APP_DEBUG_NO_SLEEP
-    value: 1
+    value: 0
   - name: APP_DEBUG_RESET_NETWORK
     value: 0
   - name: APP_DEBUG_MAIN_HEARTBEAT

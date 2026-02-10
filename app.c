@@ -219,9 +219,11 @@ static EmberZigbeeNetwork join_candidate;
 static bool af_init_seen = false;
 static bool af_init_reported = false;
 static bool basic_identity_pending = false;
+static bool reporting_config_pending = false;
 static bool af_init_force_pending = false;
 static uint32_t af_init_force_tick = 0;
 static uint32_t basic_identity_tick = 0;
+static uint32_t reporting_config_tick = 0;
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT) && (APP_DEBUG_AWAKE_AFTER_JOIN_MS > 0)
 static bool app_join_awake_active = false;
 static uint32_t app_join_awake_start_tick = 0;
@@ -279,7 +281,7 @@ static void app_init_once(void);
 #if APP_DEBUG_RESET_NETWORK
 static void app_debug_reset_network_state(void);
 #endif
-static void app_configure_default_reporting(void);
+static bool app_configure_default_reporting(void);
 
 static bool app_join_retry_blocked(uint32_t now)
 {
@@ -413,7 +415,13 @@ static void app_init_once(void)
 #endif
   }
 
-  app_configure_default_reporting();
+  if (!app_configure_default_reporting()) {
+    reporting_config_pending = true;
+    reporting_config_tick = now;
+  } else {
+    reporting_config_pending = false;
+    reporting_config_tick = 0;
+  }
 
 #if APP_DEBUG_AUTO_JOIN_ON_BOOT
   if (emberAfNetworkState() != EMBER_JOINED_NETWORK && !network_join_in_progress) {
@@ -435,11 +443,18 @@ static void app_init_once(void)
 #endif
 }
 
-static void app_configure_default_reporting(void)
+static bool app_configure_default_reporting(void)
 {
 #ifdef SL_CATALOG_ZIGBEE_REPORTING_PRESENT
+  uint8_t endpoint_count = emberAfEndpointCount();
+  if (endpoint_count == 0) {
+    APP_DEBUG_PRINTF("Reporting default: endpoints not ready (count=0), deferring\n");
+    return false;
+  }
+
   EmberAfPluginReportingEntry entry;
   EmberAfStatus st;
+  bool ok = true;
 
   memset(&entry, 0, sizeof(entry));
   entry.direction = EMBER_ZCL_REPORTING_DIRECTION_REPORTED;
@@ -454,6 +469,9 @@ static void app_configure_default_reporting(void)
   entry.data.reported.reportableChange = 50;   // 0.50 C (0.01C units)
   st = emberAfPluginReportingConfigureReportedAttribute(&entry);
   APP_DEBUG_PRINTF("Reporting default: temp -> 0x%02x\n", st);
+  if (st != EMBER_ZCL_STATUS_SUCCESS) {
+    ok = false;
+  }
 
   entry.clusterId = ZCL_RELATIVE_HUMIDITY_MEASUREMENT_CLUSTER_ID;
   entry.attributeId = ZCL_RELATIVE_HUMIDITY_MEASURED_VALUE_ATTRIBUTE_ID;
@@ -463,6 +481,9 @@ static void app_configure_default_reporting(void)
 #if (APP_PROFILE_HAS_HUMIDITY != 0)
   st = emberAfPluginReportingConfigureReportedAttribute(&entry);
   APP_DEBUG_PRINTF("Reporting default: humidity -> 0x%02x\n", st);
+  if (st != EMBER_ZCL_STATUS_SUCCESS) {
+    ok = false;
+  }
 #else
   APP_DEBUG_PRINTF("Reporting default: humidity skipped by profile\n");
 #endif
@@ -475,6 +496,9 @@ static void app_configure_default_reporting(void)
 #if (APP_PROFILE_HAS_PRESSURE != 0)
   st = emberAfPluginReportingConfigureReportedAttribute(&entry);
   APP_DEBUG_PRINTF("Reporting default: pressure -> 0x%02x\n", st);
+  if (st != EMBER_ZCL_STATUS_SUCCESS) {
+    ok = false;
+  }
 #else
   APP_DEBUG_PRINTF("Reporting default: pressure skipped by profile\n");
 #endif
@@ -486,6 +510,9 @@ static void app_configure_default_reporting(void)
   entry.data.reported.reportableChange = 1;    // 0.1V (100mV units)
   st = emberAfPluginReportingConfigureReportedAttribute(&entry);
   APP_DEBUG_PRINTF("Reporting default: battery voltage -> 0x%02x\n", st);
+  if (st != EMBER_ZCL_STATUS_SUCCESS) {
+    ok = false;
+  }
 
   entry.clusterId = ZCL_POWER_CONFIG_CLUSTER_ID;
   entry.attributeId = ZCL_BATTERY_PERCENTAGE_REMAINING_ATTRIBUTE_ID;
@@ -494,6 +521,12 @@ static void app_configure_default_reporting(void)
   entry.data.reported.reportableChange = 2;    // 1% (0.5% units)
   st = emberAfPluginReportingConfigureReportedAttribute(&entry);
   APP_DEBUG_PRINTF("Reporting default: battery pct -> 0x%02x\n", st);
+  if (st != EMBER_ZCL_STATUS_SUCCESS) {
+    ok = false;
+  }
+  return ok;
+#else
+  return true;
 #endif
 }
 
@@ -649,6 +682,16 @@ void app_debug_poll(void)
       basic_identity_tick = now;
       if (log_basic_identity()) {
         basic_identity_pending = false;
+      }
+    }
+  }
+  if (reporting_config_pending && af_init_seen) {
+    if (reporting_config_tick == 0
+        || sl_sleeptimer_tick_to_ms(now - reporting_config_tick) >= 2000) {
+      reporting_config_tick = now;
+      if (app_configure_default_reporting()) {
+        reporting_config_pending = false;
+        emberAfCorePrintln("Reporting default configured");
       }
     }
   }
@@ -1081,6 +1124,11 @@ bool emberAfPreCommandReceivedCallback(EmberAfClusterCommand *cmd)
                        cmd->commandId,
                        (unsigned)((cmd->buffer[0] & ZCL_FRAME_CONTROL_CLIENT_TO_SERVER) ? 1 : 0),
                        cmd->bufLen);
+      if (cmd->bufLen >= 6) {
+        uint8_t dir = cmd->buffer[3];
+        EmberAfAttributeId attr = (EmberAfAttributeId)(cmd->buffer[4] | ((uint16_t)cmd->buffer[5] << 8));
+        APP_DEBUG_PRINTF("ZCL cfg-report attr: dir=%u attr=0x%04x\n", dir, attr);
+      }
     }
   }
   return false;
