@@ -160,32 +160,16 @@ fi
 MAKEFILE_NAME=$(basename "$MAKEFILE")
 echo -e "${GREEN}✓${NC} Project generated successfully: $MAKEFILE_NAME"
 
-# Copy only custom ZCL data/extension files, then regenerate without slc_args.json.
-# slc_args.json forces SDK-default zcl-zap.json; removing it allows ZAP package data
-# from the .zap file (which points to ./zcl-zap-custom.json).
+# Copy custom ZCL data/extension files into generated project.
+# Keep generation flow single-pass; profile builds rely on generated layout.
 CUSTOM_ZCL_SRC="$PROJECT_ROOT/config/zcl/zcl-zap-custom.json"
 CUSTOM_XML_SRC="$PROJECT_ROOT/config/zcl/openbme280-extensions.xml"
 ZCL_DIR="$FIRMWARE_DIR/config/zcl"
-SLC_ARGS_FILE="$ZCL_DIR/slc_args.json"
 if [ -d "$ZCL_DIR" ] && [ -f "$CUSTOM_ZCL_SRC" ] && [ -f "$CUSTOM_XML_SRC" ]; then
   echo ""
   echo -e "${GREEN}Installing custom ZCL data into generated project...${NC}"
   cp "$CUSTOM_ZCL_SRC" "$ZCL_DIR/"
   cp "$CUSTOM_XML_SRC" "$ZCL_DIR/"
-  rm -f "$SLC_ARGS_FILE"
-
-  echo -e "${GREEN}Re-running SLC generate after removing slc_args.json...${NC}"
-  SLC_REGEN_CMD="slc generate \"$FIRMWARE_DIR/$PROJECT_NAME.slcp\" -np -d \"$FIRMWARE_DIR\" -name \"$PROJECT_NAME\" -o makefile --configuration release --with EFR32MG1P132F256GM32"
-  echo "Running: $SLC_REGEN_CMD"
-  eval $SLC_REGEN_CMD
-
-  MAKEFILE=$(find "$FIRMWARE_DIR" -maxdepth 1 -name "*.Makefile" 2>/dev/null | head -1)
-  if [ -z "$MAKEFILE" ] || [ ! -f "$MAKEFILE" ]; then
-    echo -e "${RED}Error: Regeneration failed - no Makefile found${NC}"
-    exit 1
-  fi
-  MAKEFILE_NAME=$(basename "$MAKEFILE")
-  echo -e "${GREEN}✓${NC} Regenerated project successfully: $MAKEFILE_NAME"
 fi
 
 # Copy our custom source files
@@ -205,6 +189,8 @@ cp "$PROJECT_ROOT/src/drivers/"*.h "$FIRMWARE_DIR/src/drivers/" 2>/dev/null || t
 cp "$PROJECT_ROOT/src/drivers/bme280/"*.c "$FIRMWARE_DIR/src/drivers/bme280/" 2>/dev/null || true
 cp "$PROJECT_ROOT/src/drivers/bme280/"*.h "$FIRMWARE_DIR/src/drivers/bme280/" 2>/dev/null || true
 cp -R "$PROJECT_ROOT/include/"* "$FIRMWARE_DIR/include/" 2>/dev/null || true
+# Some generated builds include app_profile.h from project root.
+cp "$PROJECT_ROOT/include/"*.h "$FIRMWARE_DIR/" 2>/dev/null || true
 
 echo -e "${GREEN}✓${NC} Custom source files copied"
 
