@@ -160,6 +160,39 @@ fi
 MAKEFILE_NAME=$(basename "$MAKEFILE")
 echo -e "${GREEN}✓${NC} Project generated successfully: $MAKEFILE_NAME"
 
+# Force ZAP generation to use repository custom ZCL data.
+# In CI, apack_zclConfigurator may fall back to the SDK default zcl-zap.json,
+# which drops manufacturer-specific cluster extensions from openbme280-extensions.xml.
+SLC_ARGS_FILE="$FIRMWARE_DIR/config/zcl/slc_args.json"
+CUSTOM_ZCL_JSON="$FIRMWARE_DIR/config/zcl/zcl-zap-custom.json"
+if [ -f "$SLC_ARGS_FILE" ] && [ -f "$CUSTOM_ZCL_JSON" ]; then
+  echo ""
+  echo -e "${GREEN}Patching ZAP args to use custom ZCL data...${NC}"
+  cp "$SLC_ARGS_FILE" "${SLC_ARGS_FILE}.bak"
+  # Replace both path variants observed in CI logs.
+  sed -i.bak \
+    -e "s|/gecko_sdk_4.5.0//app/zcl/zcl-zap.json|$CUSTOM_ZCL_JSON|g" \
+    -e "s|/gecko_sdk_4.5.0/app/zcl/zcl-zap.json|$CUSTOM_ZCL_JSON|g" \
+    "$SLC_ARGS_FILE"
+  rm -f "${SLC_ARGS_FILE}.bak"
+
+  echo "ZAP args (zcl-related) after patch:"
+  grep -n "zcl" "$SLC_ARGS_FILE" || true
+
+  echo -e "${GREEN}Re-running SLC generate to refresh autogen with patched ZAP args...${NC}"
+  SLC_REGEN_CMD="slc generate \"$FIRMWARE_DIR/$PROJECT_NAME.slcp\" -np -d \"$FIRMWARE_DIR\" -name \"$PROJECT_NAME\" -o makefile --configuration release --with EFR32MG1P132F256GM32"
+  echo "Running: $SLC_REGEN_CMD"
+  eval $SLC_REGEN_CMD
+
+  MAKEFILE=$(find "$FIRMWARE_DIR" -maxdepth 1 -name "*.Makefile" 2>/dev/null | head -1)
+  if [ -z "$MAKEFILE" ] || [ ! -f "$MAKEFILE" ]; then
+    echo -e "${RED}Error: Regeneration failed - no Makefile found${NC}"
+    exit 1
+  fi
+  MAKEFILE_NAME=$(basename "$MAKEFILE")
+  echo -e "${GREEN}✓${NC} Regenerated project successfully: $MAKEFILE_NAME"
+fi
+
 # Copy our custom source files
 echo ""
 echo -e "${GREEN}Copying custom source files...${NC}"
