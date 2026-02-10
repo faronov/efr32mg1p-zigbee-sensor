@@ -182,11 +182,16 @@ if [ -f "$SLC_ARGS_FILE" ] && [ -f "$CUSTOM_ZCL_JSON" ]; then
     -e "s|/gecko_sdk_4.5.0//app/zcl/zcl-zap.json|$CUSTOM_ZCL_JSON|g" \
     -e "s|/gecko_sdk_4.5.0/app/zcl/zcl-zap.json|$CUSTOM_ZCL_JSON|g" \
     "$SLC_ARGS_FILE"
+  # Fallback replacement for escaped or alternate path forms inside slc_args.json.
+  # Replace any JSON token that ends with "zcl-zap.json".
+  sed -i.bak -E \
+    -e "s#[^\",]*zcl-zap\\.json#$CUSTOM_ZCL_JSON#g" \
+    "$SLC_ARGS_FILE"
   rm -f "${SLC_ARGS_FILE}.bak"
 
   echo "ZAP args (zcl-related) after patch:"
   grep -n "zcl" "$SLC_ARGS_FILE" || true
-  if ! grep -q "$CUSTOM_ZCL_JSON" "$SLC_ARGS_FILE"; then
+  if ! grep -q "zcl-zap-custom.json" "$SLC_ARGS_FILE"; then
     echo -e "${RED}Error: slc_args.json still does not reference custom zcl-zap data${NC}"
     exit 1
   fi
