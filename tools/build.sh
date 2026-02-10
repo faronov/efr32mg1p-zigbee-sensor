@@ -160,6 +160,14 @@ fi
 MAKEFILE_NAME=$(basename "$MAKEFILE")
 echo -e "${GREEN}✓${NC} Project generated successfully: $MAKEFILE_NAME"
 
+# Copy custom config files (e.g., ZCL config) before patching slc_args.json.
+if [ -d "$PROJECT_ROOT/config" ]; then
+  echo -e "${GREEN}Copying custom config files...${NC}"
+  mkdir -p "$FIRMWARE_DIR/config"
+  cp -R "$PROJECT_ROOT/config/"* "$FIRMWARE_DIR/config/" 2>/dev/null || true
+  echo -e "${GREEN}✓${NC} Custom config files copied"
+fi
+
 # Force ZAP generation to use repository custom ZCL data.
 # In CI, apack_zclConfigurator may fall back to the SDK default zcl-zap.json,
 # which drops manufacturer-specific cluster extensions from openbme280-extensions.xml.
@@ -178,6 +186,10 @@ if [ -f "$SLC_ARGS_FILE" ] && [ -f "$CUSTOM_ZCL_JSON" ]; then
 
   echo "ZAP args (zcl-related) after patch:"
   grep -n "zcl" "$SLC_ARGS_FILE" || true
+  if ! grep -q "$CUSTOM_ZCL_JSON" "$SLC_ARGS_FILE"; then
+    echo -e "${RED}Error: slc_args.json still does not reference custom zcl-zap data${NC}"
+    exit 1
+  fi
 
   echo -e "${GREEN}Re-running SLC generate to refresh autogen with patched ZAP args...${NC}"
   SLC_REGEN_CMD="slc generate \"$FIRMWARE_DIR/$PROJECT_NAME.slcp\" -np -d \"$FIRMWARE_DIR\" -name \"$PROJECT_NAME\" -o makefile --configuration release --with EFR32MG1P132F256GM32"
@@ -212,14 +224,6 @@ cp "$PROJECT_ROOT/src/drivers/bme280/"*.h "$FIRMWARE_DIR/src/drivers/bme280/" 2>
 cp -R "$PROJECT_ROOT/include/"* "$FIRMWARE_DIR/include/" 2>/dev/null || true
 
 echo -e "${GREEN}✓${NC} Custom source files copied"
-
-# Copy custom config files (e.g., ZCL config) to ensure ZAP uses our settings
-if [ -d "$PROJECT_ROOT/config" ]; then
-  echo -e "${GREEN}Copying custom config files...${NC}"
-  mkdir -p "$FIRMWARE_DIR/config"
-  cp -R "$PROJECT_ROOT/config/"* "$FIRMWARE_DIR/config/" 2>/dev/null || true
-  echo -e "${GREEN}✓${NC} Custom config files copied"
-fi
 
 # Suppress noisy config #warning lines in generated headers.
 CONFIG_DIR="$FIRMWARE_DIR/config"
