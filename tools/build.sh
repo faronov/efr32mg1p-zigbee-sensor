@@ -247,6 +247,7 @@ echo -e "${GREEN}Copying custom source files...${NC}"
 # Create source directory structure in firmware
 mkdir -p "$FIRMWARE_DIR/src/app"
 mkdir -p "$FIRMWARE_DIR/src/drivers/bme280"
+mkdir -p "$FIRMWARE_DIR/src/drivers/hal"
 mkdir -p "$FIRMWARE_DIR/include"
 
 # Copy files
@@ -262,6 +263,11 @@ cp "$PROJECT_ROOT/include/"*.h "$FIRMWARE_DIR/" 2>/dev/null || true
 # Sources under src/app include "app_profile.h" without include/ prefix.
 # Keep a copy adjacent to those sources so all profile builds resolve it.
 cp "$PROJECT_ROOT/include/app_profile.h" "$FIRMWARE_DIR/src/app/" 2>/dev/null || true
+# Drivers include these headers without include/ prefix in some generated projects.
+cp "$PROJECT_ROOT/include/bme280_board_config.h" "$FIRMWARE_DIR/src/drivers/" 2>/dev/null || true
+cp "$PROJECT_ROOT/include/bme280_board_config.h" "$FIRMWARE_DIR/src/drivers/bme280/" 2>/dev/null || true
+cp "$PROJECT_ROOT/include/bme280_board_config_tradfri.h" "$FIRMWARE_DIR/src/drivers/" 2>/dev/null || true
+cp -R "$PROJECT_ROOT/include/hal/"* "$FIRMWARE_DIR/src/drivers/hal/" 2>/dev/null || true
 
 echo -e "${GREEN}✓${NC} Custom source files copied"
 
