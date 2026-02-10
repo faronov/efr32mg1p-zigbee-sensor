@@ -196,14 +196,48 @@ fi
 MAKEFILE_NAME=$(basename "$MAKEFILE")
 echo -e "${GREEN}✓${NC} Project generated successfully: $MAKEFILE_NAME"
 
-# Copy custom ZCL data/extension files into generated project.
-# Keep generation flow single-pass; profile builds rely on generated layout.
+# Copy custom ZCL data/extension files into generated project and patch
+# generated slc_args.json for custom Zigbee ZCL metadata.
 ZCL_DIR="$FIRMWARE_DIR/config/zcl"
 if [ -d "$ZCL_DIR" ] && [ -f "$CUSTOM_ZCL_SRC" ] && [ -f "$CUSTOM_XML_SRC" ]; then
   echo ""
   echo -e "${GREEN}Installing custom ZCL data into generated project...${NC}"
   cp "$CUSTOM_ZCL_SRC" "$ZCL_DIR/"
   cp "$CUSTOM_XML_SRC" "$ZCL_DIR/"
+
+  GENERATED_SLC_ARGS="$ZCL_DIR/slc_args.json"
+  if [ -f "$GENERATED_SLC_ARGS" ]; then
+    echo -e "${GREEN}Patching generated slc_args.json with custom ZCL metadata...${NC}"
+    cat > "$GENERATED_SLC_ARGS" <<EOF
+{
+  "sdkRoot": "$GSDK_DIR",
+  "apackRoot": "",
+  "partOpn": "EFR32MG1P132F256GM32",
+  "boards": [
+    "$BOARD"
+  ],
+  "zcl": {
+    "zigbeeZclJsonFile": "./zcl-zap-custom.json",
+    "zigbeeTemplateJsonFile": "$GSDK_DIR/protocol/zigbee/app/framework/gen-template/gen-templates.json",
+    "matterZclJsonFile": "$GSDK_DIR/extension/matter_extension/src/app/zap-templates/zcl/zcl.json",
+    "matterTemplateJsonFile": "$GSDK_DIR/extension/matter_extension/src/app/zap-templates/app-templates.json"
+  }
+}
+EOF
+  fi
+
+  echo -e "${GREEN}Re-running SLC generation after slc_args patch...${NC}"
+  SLC_REGEN_CMD="slc generate \"$FIRMWARE_DIR/$PROJECT_NAME.slcp\" -np -d \"$FIRMWARE_DIR\" -name \"$PROJECT_NAME\" -o makefile --configuration release --with EFR32MG1P132F256GM32"
+  echo "Running: $SLC_REGEN_CMD"
+  eval $SLC_REGEN_CMD
+
+  MAKEFILE=$(find "$FIRMWARE_DIR" -maxdepth 1 -name "*.Makefile" 2>/dev/null | head -1)
+  if [ -z "$MAKEFILE" ] || [ ! -f "$MAKEFILE" ]; then
+    echo -e "${RED}Error: Regeneration failed - no Makefile found${NC}"
+    exit 1
+  fi
+  MAKEFILE_NAME=$(basename "$MAKEFILE")
+  echo -e "${GREEN}✓${NC} Regenerated project successfully: $MAKEFILE_NAME"
 fi
 
 # Copy our custom source files
