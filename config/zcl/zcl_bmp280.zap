@@ -309,7 +309,7 @@
               "defaultValue": "30",
               "reportable": 1,
               "minInterval": 3600,
-              "maxInterval": 7200,
+              "maxInterval": 21600,
               "reportableChange": 1
             },
             {
@@ -325,8 +325,8 @@
               "defaultValue": "200",
               "reportable": 1,
               "minInterval": 3600,
-              "maxInterval": 7200,
-              "reportableChange": 10
+              "maxInterval": 21600,
+              "reportableChange": 2
             },
             {
               "name": "BatterySize",
@@ -482,8 +482,8 @@
               "bounded": 0,
               "defaultValue": "0x8000",
               "reportable": 1,
-              "minInterval": 10,
-              "maxInterval": 600,
+              "minInterval": 60,
+              "maxInterval": 1800,
               "reportableChange": 100
             },
             {
@@ -556,8 +556,8 @@
               "bounded": 0,
               "defaultValue": "0x8000",
               "reportable": 1,
-              "minInterval": 10,
-              "maxInterval": 600,
+              "minInterval": 60,
+              "maxInterval": 1800,
               "reportableChange": 1
             },
             {
@@ -630,8 +630,8 @@
               "bounded": 0,
               "defaultValue": "0xFFFF",
               "reportable": 1,
-              "minInterval": 10,
-              "maxInterval": 600,
+              "minInterval": 60,
+              "maxInterval": 1800,
               "reportableChange": 100
             },
             {
