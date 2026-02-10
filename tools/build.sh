@@ -259,6 +259,9 @@ cp "$PROJECT_ROOT/src/drivers/bme280/"*.h "$FIRMWARE_DIR/src/drivers/bme280/" 2>
 cp -R "$PROJECT_ROOT/include/"* "$FIRMWARE_DIR/include/" 2>/dev/null || true
 # Some generated builds include app_profile.h from project root.
 cp "$PROJECT_ROOT/include/"*.h "$FIRMWARE_DIR/" 2>/dev/null || true
+# Sources under src/app include "app_profile.h" without include/ prefix.
+# Keep a copy adjacent to those sources so all profile builds resolve it.
+cp "$PROJECT_ROOT/include/app_profile.h" "$FIRMWARE_DIR/src/app/" 2>/dev/null || true
 
 echo -e "${GREEN}✓${NC} Custom source files copied"
 
