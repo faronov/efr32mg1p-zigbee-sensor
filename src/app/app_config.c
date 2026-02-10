@@ -15,19 +15,6 @@
 // Endpoint where configuration attributes are located
 #define CONFIG_ENDPOINT  1
 
-// Manufacturer code for custom configuration attributes
-#define APP_MANUFACTURER_CODE 0x1002u
-
-// Manufacturer-specific attribute IDs in Basic cluster (0xF000 range)
-#define ZCL_SENSOR_READ_INTERVAL_ATTRIBUTE_ID          0xF000  // uint16, seconds
-#define ZCL_TEMPERATURE_OFFSET_ATTRIBUTE_ID            0xF001  // int16s, 0.01°C units
-#define ZCL_HUMIDITY_OFFSET_ATTRIBUTE_ID               0xF002  // int16s, 0.01% units
-#define ZCL_PRESSURE_OFFSET_ATTRIBUTE_ID               0xF003  // int16s, 0.01 kPa units
-#define ZCL_LED_ENABLE_ATTRIBUTE_ID                    0xF004  // boolean
-#define ZCL_REPORT_THRESHOLD_TEMPERATURE_ATTRIBUTE_ID  0xF010  // uint16, 0.01°C units
-#define ZCL_REPORT_THRESHOLD_HUMIDITY_ATTRIBUTE_ID     0xF011  // uint16, 0.01% units
-#define ZCL_REPORT_THRESHOLD_PRESSURE_ATTRIBUTE_ID     0xF012  // uint16, 0.01 kPa units
-
 // Global configuration (loaded from NVM at startup)
 static app_config_t config;
 
@@ -115,6 +102,177 @@ void app_config_init(void)
 const app_config_t* app_config_get(void)
 {
   return &config;
+}
+
+static EmberAfStatus write_config_attribute(EmberAfAttributeId attribute_id,
+                                            const uint8_t *data,
+                                            EmberAfAttributeType data_type,
+                                            uint8_t data_size)
+{
+  return emberAfWriteManufacturerSpecificServerAttribute(CONFIG_ENDPOINT,
+                                                         ZCL_BASIC_CLUSTER_ID,
+                                                         attribute_id,
+                                                         APP_MANUFACTURER_CODE,
+                                                         data,
+                                                         data_type);
+}
+
+EmberAfStatus app_config_read_mfg_attribute(EmberAfAttributeId attribute_id,
+                                            uint8_t *attribute_type,
+                                            uint8_t *value_out,
+                                            uint8_t *value_len_io)
+{
+  if (attribute_type == NULL || value_out == NULL || value_len_io == NULL) {
+    return EMBER_ZCL_STATUS_INVALID_FIELD;
+  }
+
+  switch (attribute_id) {
+    case ZCL_SENSOR_READ_INTERVAL_ATTRIBUTE_ID:
+      if (*value_len_io < sizeof(uint16_t)) { return EMBER_ZCL_STATUS_INSUFFICIENT_SPACE; }
+      *attribute_type = ZCL_INT16U_ATTRIBUTE_TYPE;
+      value_out[0] = (uint8_t)(config.sensor_read_interval_seconds & 0xFFu);
+      value_out[1] = (uint8_t)(config.sensor_read_interval_seconds >> 8);
+      *value_len_io = 2;
+      return EMBER_ZCL_STATUS_SUCCESS;
+    case ZCL_TEMPERATURE_OFFSET_ATTRIBUTE_ID:
+      if (*value_len_io < sizeof(int16_t)) { return EMBER_ZCL_STATUS_INSUFFICIENT_SPACE; }
+      *attribute_type = ZCL_INT16S_ATTRIBUTE_TYPE;
+      value_out[0] = (uint8_t)(config.temperature_offset_centidegrees & 0xFF);
+      value_out[1] = (uint8_t)(((uint16_t)config.temperature_offset_centidegrees) >> 8);
+      *value_len_io = 2;
+      return EMBER_ZCL_STATUS_SUCCESS;
+    case ZCL_HUMIDITY_OFFSET_ATTRIBUTE_ID:
+      if (*value_len_io < sizeof(int16_t)) { return EMBER_ZCL_STATUS_INSUFFICIENT_SPACE; }
+      *attribute_type = ZCL_INT16S_ATTRIBUTE_TYPE;
+      value_out[0] = (uint8_t)(config.humidity_offset_centipercent & 0xFF);
+      value_out[1] = (uint8_t)(((uint16_t)config.humidity_offset_centipercent) >> 8);
+      *value_len_io = 2;
+      return EMBER_ZCL_STATUS_SUCCESS;
+    case ZCL_PRESSURE_OFFSET_ATTRIBUTE_ID:
+      if (*value_len_io < sizeof(int16_t)) { return EMBER_ZCL_STATUS_INSUFFICIENT_SPACE; }
+      *attribute_type = ZCL_INT16S_ATTRIBUTE_TYPE;
+      value_out[0] = (uint8_t)(config.pressure_offset_centikilopascals & 0xFF);
+      value_out[1] = (uint8_t)(((uint16_t)config.pressure_offset_centikilopascals) >> 8);
+      *value_len_io = 2;
+      return EMBER_ZCL_STATUS_SUCCESS;
+    case ZCL_LED_ENABLE_ATTRIBUTE_ID:
+      if (*value_len_io < sizeof(uint8_t)) { return EMBER_ZCL_STATUS_INSUFFICIENT_SPACE; }
+      *attribute_type = ZCL_BOOLEAN_ATTRIBUTE_TYPE;
+      value_out[0] = config.led_enable ? 1 : 0;
+      *value_len_io = 1;
+      return EMBER_ZCL_STATUS_SUCCESS;
+    case ZCL_REPORT_THRESHOLD_TEMPERATURE_ATTRIBUTE_ID:
+      if (*value_len_io < sizeof(uint16_t)) { return EMBER_ZCL_STATUS_INSUFFICIENT_SPACE; }
+      *attribute_type = ZCL_INT16U_ATTRIBUTE_TYPE;
+      value_out[0] = (uint8_t)(config.report_threshold_temperature & 0xFFu);
+      value_out[1] = (uint8_t)(config.report_threshold_temperature >> 8);
+      *value_len_io = 2;
+      return EMBER_ZCL_STATUS_SUCCESS;
+    case ZCL_REPORT_THRESHOLD_HUMIDITY_ATTRIBUTE_ID:
+      if (*value_len_io < sizeof(uint16_t)) { return EMBER_ZCL_STATUS_INSUFFICIENT_SPACE; }
+      *attribute_type = ZCL_INT16U_ATTRIBUTE_TYPE;
+      value_out[0] = (uint8_t)(config.report_threshold_humidity & 0xFFu);
+      value_out[1] = (uint8_t)(config.report_threshold_humidity >> 8);
+      *value_len_io = 2;
+      return EMBER_ZCL_STATUS_SUCCESS;
+    case ZCL_REPORT_THRESHOLD_PRESSURE_ATTRIBUTE_ID:
+      if (*value_len_io < sizeof(uint16_t)) { return EMBER_ZCL_STATUS_INSUFFICIENT_SPACE; }
+      *attribute_type = ZCL_INT16U_ATTRIBUTE_TYPE;
+      value_out[0] = (uint8_t)(config.report_threshold_pressure & 0xFFu);
+      value_out[1] = (uint8_t)(config.report_threshold_pressure >> 8);
+      *value_len_io = 2;
+      return EMBER_ZCL_STATUS_SUCCESS;
+    default:
+      return EMBER_ZCL_STATUS_UNSUPPORTED_ATTRIBUTE;
+  }
+}
+
+EmberAfStatus app_config_write_mfg_attribute(EmberAfAttributeId attribute_id,
+                                             uint8_t attribute_type,
+                                             const uint8_t *value,
+                                             uint8_t value_len)
+{
+  EmberAfStatus status = EMBER_ZCL_STATUS_SUCCESS;
+  if (value == NULL) {
+    return EMBER_ZCL_STATUS_INVALID_FIELD;
+  }
+
+  switch (attribute_id) {
+    case ZCL_SENSOR_READ_INTERVAL_ATTRIBUTE_ID: {
+      if (attribute_type != ZCL_INT16U_ATTRIBUTE_TYPE || value_len != 2) {
+        return EMBER_ZCL_STATUS_INVALID_DATA_TYPE;
+      }
+      uint16_t interval = (uint16_t)(value[0] | ((uint16_t)value[1] << 8));
+      if (interval < 10 || interval > 3600) {
+        return EMBER_ZCL_STATUS_INVALID_VALUE;
+      }
+      config.sensor_read_interval_seconds = interval;
+      app_sensor_set_interval((uint32_t)interval * 1000u);
+      (void)write_config_attribute(attribute_id, value, ZCL_INT16U_ATTRIBUTE_TYPE, 2);
+      break;
+    }
+    case ZCL_TEMPERATURE_OFFSET_ATTRIBUTE_ID: {
+      if (attribute_type != ZCL_INT16S_ATTRIBUTE_TYPE || value_len != 2) {
+        return EMBER_ZCL_STATUS_INVALID_DATA_TYPE;
+      }
+      config.temperature_offset_centidegrees = (int16_t)(value[0] | ((uint16_t)value[1] << 8));
+      (void)write_config_attribute(attribute_id, value, ZCL_INT16S_ATTRIBUTE_TYPE, 2);
+      break;
+    }
+    case ZCL_HUMIDITY_OFFSET_ATTRIBUTE_ID: {
+      if (attribute_type != ZCL_INT16S_ATTRIBUTE_TYPE || value_len != 2) {
+        return EMBER_ZCL_STATUS_INVALID_DATA_TYPE;
+      }
+      config.humidity_offset_centipercent = (int16_t)(value[0] | ((uint16_t)value[1] << 8));
+      (void)write_config_attribute(attribute_id, value, ZCL_INT16S_ATTRIBUTE_TYPE, 2);
+      break;
+    }
+    case ZCL_PRESSURE_OFFSET_ATTRIBUTE_ID: {
+      if (attribute_type != ZCL_INT16S_ATTRIBUTE_TYPE || value_len != 2) {
+        return EMBER_ZCL_STATUS_INVALID_DATA_TYPE;
+      }
+      config.pressure_offset_centikilopascals = (int16_t)(value[0] | ((uint16_t)value[1] << 8));
+      (void)write_config_attribute(attribute_id, value, ZCL_INT16S_ATTRIBUTE_TYPE, 2);
+      break;
+    }
+    case ZCL_LED_ENABLE_ATTRIBUTE_ID: {
+      if (attribute_type != ZCL_BOOLEAN_ATTRIBUTE_TYPE || value_len != 1) {
+        return EMBER_ZCL_STATUS_INVALID_DATA_TYPE;
+      }
+      config.led_enable = (value[0] != 0);
+      (void)write_config_attribute(attribute_id, value, ZCL_BOOLEAN_ATTRIBUTE_TYPE, 1);
+      break;
+    }
+    case ZCL_REPORT_THRESHOLD_TEMPERATURE_ATTRIBUTE_ID: {
+      if (attribute_type != ZCL_INT16U_ATTRIBUTE_TYPE || value_len != 2) {
+        return EMBER_ZCL_STATUS_INVALID_DATA_TYPE;
+      }
+      config.report_threshold_temperature = (uint16_t)(value[0] | ((uint16_t)value[1] << 8));
+      (void)write_config_attribute(attribute_id, value, ZCL_INT16U_ATTRIBUTE_TYPE, 2);
+      break;
+    }
+    case ZCL_REPORT_THRESHOLD_HUMIDITY_ATTRIBUTE_ID: {
+      if (attribute_type != ZCL_INT16U_ATTRIBUTE_TYPE || value_len != 2) {
+        return EMBER_ZCL_STATUS_INVALID_DATA_TYPE;
+      }
+      config.report_threshold_humidity = (uint16_t)(value[0] | ((uint16_t)value[1] << 8));
+      (void)write_config_attribute(attribute_id, value, ZCL_INT16U_ATTRIBUTE_TYPE, 2);
+      break;
+    }
+    case ZCL_REPORT_THRESHOLD_PRESSURE_ATTRIBUTE_ID: {
+      if (attribute_type != ZCL_INT16U_ATTRIBUTE_TYPE || value_len != 2) {
+        return EMBER_ZCL_STATUS_INVALID_DATA_TYPE;
+      }
+      config.report_threshold_pressure = (uint16_t)(value[0] | ((uint16_t)value[1] << 8));
+      (void)write_config_attribute(attribute_id, value, ZCL_INT16U_ATTRIBUTE_TYPE, 2);
+      break;
+    }
+    default:
+      status = EMBER_ZCL_STATUS_UNSUPPORTED_ATTRIBUTE;
+      break;
+  }
+
+  return status;
 }
 
 /**
