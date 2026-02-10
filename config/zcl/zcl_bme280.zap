@@ -482,9 +482,9 @@
               "bounded": 0,
               "defaultValue": "0x8000",
               "reportable": 1,
-              "minInterval": 60,
-              "maxInterval": 1800,
-              "reportableChange": 100
+              "minInterval": 30,
+              "maxInterval": 900,
+              "reportableChange": 25
             },
             {
               "name": "min measured value",
@@ -630,9 +630,9 @@
               "bounded": 0,
               "defaultValue": "0xFFFF",
               "reportable": 1,
-              "minInterval": 60,
-              "maxInterval": 1800,
-              "reportableChange": 100
+              "minInterval": 30,
+              "maxInterval": 1200,
+              "reportableChange": 50
             },
             {
               "name": "min measured value",
