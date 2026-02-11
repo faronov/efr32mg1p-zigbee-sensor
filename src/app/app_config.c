@@ -15,7 +15,7 @@
 #define CONFIG_ENDPOINT 1
 #define APP_SENSOR_INTERVAL_MIN_SECONDS 10u
 #define APP_SENSOR_INTERVAL_MAX_SECONDS 3600u
-#define APP_SENSOR_INTERVAL_DEFAULT_SECONDS 60u
+#define APP_SENSOR_INTERVAL_DEFAULT_SECONDS 10u
 
 // Global configuration (loaded from NVM at startup)
 static app_config_t config;

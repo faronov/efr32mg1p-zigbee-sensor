@@ -4,6 +4,6 @@
 
   <!-- Manufacturer-specific attributes on Basic cluster (0x0000), mfgCode 0x1002 -->
   <clusterExtension code="0x0000">
-    <attribute side="server" code="0xF000" define="SENSOR_READ_INTERVAL" type="INT16U" min="0x000A" max="0x0E10" writable="true" default="0x003C" optional="true" manufacturerCode="0x1002">Sensor Read Interval</attribute>
+    <attribute side="server" code="0xF000" define="SENSOR_READ_INTERVAL" type="INT16U" min="0x000A" max="0x0E10" writable="true" default="0x000A" optional="true" manufacturerCode="0x1002">Sensor Read Interval</attribute>
   </clusterExtension>
 </configurator>
