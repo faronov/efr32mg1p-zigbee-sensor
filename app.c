@@ -608,11 +608,12 @@ void app_debug_poll(void)
       // "window" so SWO remains alive and SED stays responsive for diagnostics.
       APP_DEBUG_PRINTF("Debug: fast poll window ended (no-sleep mode, keeping short poll)\n");
 #else
-      emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
+      // Keep parent-connectivity short-poll task active after join window.
+      // Fully dropping to long-poll caused SEDs to go quiet on some coordinators.
+      emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
       emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL);
-      emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
       emberAfSetDefaultSleepControl(EMBER_AF_OK_TO_SLEEP);
-      APP_DEBUG_PRINTF("Debug: fast poll window ended\n");
+      APP_DEBUG_PRINTF("Debug: fast poll window ended (keeping parent connectivity short poll)\n");
 #endif
       app_fast_poll_active = false;
       app_fast_poll_start_tick = 0;
