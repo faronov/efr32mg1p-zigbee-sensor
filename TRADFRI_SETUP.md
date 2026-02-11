@@ -177,9 +177,9 @@ For ST-Link or other debuggers:
      -c "program firmware/build/debug/zigbee_bme280_sensor_tradfri.hex verify reset exit"
    ```
 
-## OTA Updates (Using External Flash)
+## OTA Updates (Using On-Module SPI Flash)
 
-The TRÅDFRI variant includes OTA bootloader support using the external IS25LQ020B flash.
+The TRÅDFRI variant includes OTA bootloader support using the IS25LQ020B flash that is already mounted on the module.
 
 ### Setup OTA
 

@@ -137,7 +137,7 @@ The TRÅDFRI board has a combined reset/pairing button:
 
 ## SPI Flash (for OTA Updates)
 
-The TRÅDFRI board includes **ISSI IS25LQ020B** 256KB (2Mbit) SPI flash for OTA:
+The TRÅDFRI board already includes **ISSI IS25LQ020B** 256KB (2Mbit) SPI flash on the module for OTA:
 - **PD13**: SPI CLK
 - **PD14**: SPI MISO
 - **PD15**: SPI MOSI

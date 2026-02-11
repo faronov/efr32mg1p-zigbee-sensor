@@ -38,5 +38,5 @@ TRADFRI EFR32MG1P Zigbee sleepy end-device firmware with sensor profiles and bat
 
 ## Known Hardware Caveats
 - TRADFRI boards can show PB13 noise when touched; internal pull-up may be insufficient alone.
-- SPI flash probe on PB11 often reports no response in current setup.
+- SPI flash is physically present on the module (IS25LQ020B); probe/enable behavior may still vary by board wiring and PF3 enable state.
 - If BME280 init fails, debug fallback values can be used (when debug flag is enabled).

@@ -40,7 +40,7 @@ bash tools/build.sh
 - **Automatic network recovery** with exponential backoff (30s → 10min)
 
 ### OTA Firmware Updates
-- **External SPI flash** storage (IS25LQ020B 256KB on TRÅDFRI)
+- **On-module SPI flash** storage (IS25LQ020B 256KB already present on TRÅDFRI module)
 - **Custom bootloader** (35KB) with application upgrade support
 - **Standard Zigbee OTA format** (.gbl, .ota, .zigbee files)
 - **Compressed images** with LZMA support
