@@ -194,9 +194,9 @@ Configuration defined in `include/bme280_board_config_tradfri.h`:
 - **Do not exceed 3.6V!** Risk of chip damage
 
 ### Battery Life Estimate
-- **5-minute update interval**: ~2 years (typical AAA capacity ~1000mAh)
-- Sleep current: ~5μA
-- Average current: ~50μA including measurements and reports
+- Depends on `sensor_read_interval` (default 10s, configurable 10..3600s)
+- Depends on coordinator reporting settings and link quality
+- Debug no-sleep builds are not representative for battery estimates
 
 See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for detailed power analysis.
 
@@ -217,7 +217,7 @@ voltage_mv = (adc_value * 1250 * 4) / 4096
 Battery percentage reported to Zigbee Power Configuration cluster:
 - 0-200 range (200 = 100%)
 - Based on 3.0V nominal, 2.0V cutoff
-- Updated every 5 minutes with sensor readings
+- Updated on sensor cycle and reported per Zigbee reporting configuration
 
 ## Wiring Example
 

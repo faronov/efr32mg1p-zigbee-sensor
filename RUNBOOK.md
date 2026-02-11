@@ -58,4 +58,5 @@ APP=$(find "$T" -type f -name '*.s37' | grep -E 'zigbee_.*tradfri.*(debug)?\\.s3
   - confirm inbound reads appear in SWO
 - No report updates:
   - verify `FC 10 ... cmd 0B` traffic in SWO
-  - check report thresholds vs actual value change
+  - verify coordinator `Configure Reporting` and active bindings
+  - confirm `sensor_read_interval` (Basic attr `0xF000`) is in expected range

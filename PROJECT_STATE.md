@@ -24,9 +24,12 @@ TRADFRI EFR32MG1P Zigbee sleepy end-device firmware with sensor profiles and bat
   - `src/app/app_sensor.c`
   - Uses BME/BMP driver for profiles 1/2
   - Uses SHT31 driver for profile 3
+- Runtime config:
+  - Manufacturer-specific Basic attribute `0xF000` (`sensor_read_interval`, seconds)
+  - Default: `10`, range: `10..3600`
 - Reporting defaults:
   - `app.c` (`app_configure_default_reporting`)
-  - Humidity/pressure defaults are profile-conditional
+  - Values are defined in ZAP and can be overridden by coordinator
 
 ## Sleep/Join/Button Notes
 - Sleep timer for periodic sensor updates is armed on `NETWORK_UP` and stopped on `NETWORK_DOWN`.

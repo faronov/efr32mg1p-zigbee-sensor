@@ -29,7 +29,7 @@ bash tools/build.sh
 - **BME280 sensor** via I2C (temperature, humidity, pressure)
 - **2xAAA batteries** (3.0V nominal, ~2.0V cutoff)
 - **Battery monitoring** with real-time voltage and percentage reporting
-- **5-minute update interval** optimized for battery life
+- **Configurable sensor read interval** (default 10s, range 10..3600s)
 - **Automatic sleep** between measurements
 
 ### Zigbee 3.0 Compliance
@@ -66,15 +66,15 @@ bash tools/build.sh
 
 Sensor exposes the following server clusters on **Endpoint 1**:
 
-| Cluster ID | Cluster Name                | Attribute | Data Type | Unit | Update Rate |
-|------------|----------------------------|-----------|-----------|------|-------------|
-| 0x0000     | Basic                      | -         | -         | -    | -           |
-| 0x0001     | Power Configuration        | 0x0020    | uint8     | 100mV | 5min       |
-|            |                            | 0x0021    | uint8     | 0.5% | 5min        |
-| 0x0003     | Identify                   | -         | -         | -    | -           |
-| 0x0402     | Temperature Measurement    | 0x0000    | int16     | 0.01°C | 5min       |
-| 0x0405     | Relative Humidity          | 0x0000    | uint16    | 0.01%RH | 5min      |
-| 0x0403     | Pressure Measurement       | 0x0000    | int16     | kPa  | 5min         |
+| Cluster ID | Cluster Name                | Attribute | Data Type | Unit |
+|------------|----------------------------|-----------|-----------|------|
+| 0x0000     | Basic                      | -         | -         | -    |
+| 0x0001     | Power Configuration        | 0x0020    | uint8     | 100mV |
+|            |                            | 0x0021    | uint8     | 0.5% |
+| 0x0003     | Identify                   | -         | -         | -    |
+| 0x0402     | Temperature Measurement    | 0x0000    | int16     | 0.01°C |
+| 0x0405     | Relative Humidity          | 0x0000    | uint16    | 0.01%RH |
+| 0x0403     | Pressure Measurement       | 0x0000    | int16     | kPa  |
 
 ### Attribute Details
 
@@ -86,10 +86,8 @@ Sensor exposes the following server clusters on **Endpoint 1**:
 
 ### Reportable Attributes
 
-All measurement attributes are configured as reportable with:
-- **Min interval**: 60 seconds (don't report more frequently)
-- **Max interval**: 3600 seconds (force report at least hourly)
-- **Reportable change**: Threshold-based updates (e.g., ±0.5°C temperature change)
+Reportable attributes are configured in ZAP and can be overridden by coordinator-side
+`Configure Reporting` (ZHA, Zigbee2MQTT, deCONZ).
 
 ## Hardware Setup
 
@@ -250,12 +248,13 @@ See [BINDING_GUIDE.md](BINDING_GUIDE.md) for details.
 
 ## Power Consumption
 
-### Battery Life Estimates
+### Battery Life Notes
 
-| Configuration | Sleep Current | Avg Current | Battery Life (2xAAA) |
-|--------------|---------------|-------------|---------------------|
-| 5min updates | ~5μA          | ~50μA       | **~2 years**        |
-| 1min updates | ~5μA          | ~120μA      | **~10 months**      |
+Battery life depends on:
+- Sensor read interval (`sensor_read_interval`)
+- Reporting configuration (min/max/change)
+- Link quality / retries / rejoin frequency
+- Debug mode (`APP_DEBUG_NO_SLEEP`)
 
 ### Power Optimization Features
 
@@ -296,6 +295,10 @@ See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for analysis.
 
 ## Documentation
 
+- **Canonical project state**:
+  - **[PROJECT_STATE.md](PROJECT_STATE.md)** - active profiles, files, current behavior
+  - **[RUNBOOK.md](RUNBOOK.md)** - CI/artifacts/flash/SWO operational flow
+  - **[DECISIONS.md](DECISIONS.md)** - accepted technical decisions
 - **[PINOUT.md](PINOUT.md)** - Hardware connections and pin mappings
 - **[TRADFRI_SETUP.md](TRADFRI_SETUP.md)** - TRÅDFRI module specific setup
 - **[OTA_FILE_CREATION.md](OTA_FILE_CREATION.md)** - Creating OTA update files
@@ -303,6 +306,10 @@ See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for analysis.
 - **[BINDING_GUIDE.md](BINDING_GUIDE.md)** - Zigbee cluster binding setup
 - **[POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md)** - Power consumption analysis
 - **[BATTERY_AND_BUTTON_FEATURES.md](BATTERY_AND_BUTTON_FEATURES.md)** - UI features
+- **[docs/zha_quirk_v2.py](docs/zha_quirk_v2.py)** - ZHA Quirk v2 (single config: `sensor_read_interval`)
+- **[docs/zigbee2mqtt-converter.js](docs/zigbee2mqtt-converter.js)** - Zigbee2MQTT converter (single config: `sensor_read_interval`)
+
+Historical notes are kept under `docs/archive/` and may describe superseded implementations.
 
 ## Troubleshooting
 
@@ -339,10 +346,8 @@ See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for analysis.
 
 ### Modify Sensor Update Interval
 
-Edit `src/app/app_sensor.c`:
-```c
-#define SENSOR_UPDATE_INTERVAL_MS  (5 * 60 * 1000)  // 5 minutes
-```
+Runtime-configure via manufacturer-specific Basic attribute `0xF000`
+(`sensor_read_interval`, seconds, range `10..3600`, default `10`).
 
 ### Add Custom Clusters
 
@@ -390,7 +395,7 @@ Features:
 - Custom bootloader (35KB) for TRÅDFRI
 - Optimized network rejoin (7x faster)
 - Coordinator-side cluster binding
-- Power-optimized 5-minute update interval
+- Runtime-configurable sensor interval (default 10s)
 - Automated CI/CD builds
 
 Hardware:
@@ -399,9 +404,7 @@ Hardware:
 Technical:
 - GSDK 4.5.0 LTS
 - Release builds with size optimization
-- Silicon Labs manufacturer ID (0x1049)
-- Firmware size: ~155KB
-- Bootloader size: 35KB
+- Firmware size: depends on selected profile/build variant
 
 ## Contact
 

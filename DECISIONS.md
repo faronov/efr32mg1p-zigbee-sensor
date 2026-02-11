@@ -40,3 +40,13 @@
   - Avoid raw direct GPIO edge fallback for action generation.
 - Rationale:
   - Raw PB13 reads are susceptible to noise/touch-trigger on this hardware.
+
+## D-006: Simplify manufacturer-specific configuration surface
+- Status: accepted
+- Decision:
+  - Keep only one custom Basic attribute:
+    - `0xF000` (`sensor_read_interval`, seconds)
+  - Remove custom offsets/LED/report-threshold attributes from firmware API.
+- Rationale:
+  - Reduce interview/reconfigure friction and mismatch risk with coordinators/quirks.
+  - Keep one stable runtime knob while preserving standard Zigbee reporting control.

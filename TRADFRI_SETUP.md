@@ -221,8 +221,10 @@ After flashing, the LED (PA0) will indicate:
 
 ### Button Functions (PB13)
 
-- **When not joined**: Press to start network joining
-- **When joined**: Press to trigger immediate sensor reading
+- **Short press**: Immediate sensor read (or join if not joined)
+- **Long press**: Leave/rejoin flow
+
+Note: firmware includes guard/debounce logic to reduce false triggers on noisy boards.
 
 ### Debug Output
 
