@@ -19,13 +19,6 @@ class OpenBme280Basic(CustomCluster, Basic):
     attributes.update(
         {
             0xF000: ("sensor_read_interval", t.uint16_t),
-            0xF001: ("temperature_offset", t.int16s),
-            0xF002: ("humidity_offset", t.int16s),
-            0xF003: ("pressure_offset", t.int16s),
-            0xF004: ("led_enable", t.Bool),
-            0xF010: ("report_threshold_temperature", t.uint16_t),
-            0xF011: ("report_threshold_humidity", t.uint16_t),
-            0xF012: ("report_threshold_pressure", t.uint16_t),
         }
     )
 

@@ -185,10 +185,6 @@ bool app_sensor_init(void)
 
   emberAfCorePrintln("Sensor poll interval: %d seconds (armed on network up)",
                      sensor_update_interval_ms / 1000);
-  emberAfCorePrintln("Reporting thresholds (local attrs): dT=%d dRH=%d dP=%d",
-                     config->report_threshold_temperature,
-                     config->report_threshold_humidity,
-                     config->report_threshold_pressure);
 
   return true;
 }
@@ -374,22 +370,10 @@ void app_sensor_update(void)
     }
   }
 
-  // Get configuration and apply calibration offsets
-  const app_config_t* config = app_config_get();
-  // Apply calibration offsets
+  // Keep calibrated values equal to raw sensor values.
   int32_t temp_calibrated = raw_temperature;
   int32_t humidity_calibrated = raw_humidity;
   int32_t pressure_calibrated = raw_pressure;
-  if (have_sensor_sample) {
-    temp_calibrated = raw_temperature + config->temperature_offset_centidegrees;
-    if (has_humidity) {
-      humidity_calibrated = raw_humidity + config->humidity_offset_centipercent;
-    }
-    if (has_pressure) {
-      // Convert pressure offset from 0.01 kPa to Pa.
-      pressure_calibrated = raw_pressure + (config->pressure_offset_centikilopascals * 10);
-    }
-  }
 
   if (have_sensor_sample) {
     if (has_humidity && has_pressure) {
