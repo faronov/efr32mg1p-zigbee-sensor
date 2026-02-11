@@ -160,6 +160,15 @@ filter:
 define:
   - name: CUSTOM_BOARD_TRADFRI
     value: 1
+  # Runtime join/interview behavior for sleepy end device in release builds.
+  - name: APP_DEBUG_FAST_POLL_AFTER_JOIN_MS
+    value: 30000
+  - name: APP_DEBUG_FAST_POLL_INTERVAL_MS
+    value: 250
+  - name: APP_DEBUG_MANUAL_POLL_BOOST_MS
+    value: 0
+  - name: APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS
+    value: 1000
 
   # Increase event queue capacity for Series 1 (fixes event-queue.c:294 crash)
   # Default is 5, increase to 8 to allow network scanning
