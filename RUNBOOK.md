@@ -10,15 +10,15 @@ bash tools/build.sh
 ## CI Build
 Push branch and watch workflow:
 ```bash
-gh run list -R faronov/efr32mg1p-bme280-zigbee-sensor -L 1
-gh run watch <run_id> -R faronov/efr32mg1p-bme280-zigbee-sensor --exit-status
+gh run list -R faronov/efr32mg1p-zigbee-sensor -L 1
+gh run watch <run_id> -R faronov/efr32mg1p-zigbee-sensor --exit-status
 ```
 
 ## Download Artifacts
 ```bash
 tmpdir=/tmp/ci-<run_id>
 rm -rf "$tmpdir" && mkdir -p "$tmpdir"
-gh run download <run_id> -R faronov/efr32mg1p-bme280-zigbee-sensor -D "$tmpdir"
+gh run download <run_id> -R faronov/efr32mg1p-zigbee-sensor -D "$tmpdir"
 ```
 
 ## Flash Full Stack

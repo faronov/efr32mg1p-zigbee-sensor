@@ -226,7 +226,7 @@ All documentation has been updated:
 
 ## Build Logs
 
-✅ **Build successful:** https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/actions/runs/21488806617
+✅ **Build successful:** https://github.com/faronov/efr32mg1p-zigbee-sensor/actions/runs/21488806617
 
 Both BRD4151A and TRÅDFRI variants compiled without errors or warnings (except expected redef warning that was fixed).
 

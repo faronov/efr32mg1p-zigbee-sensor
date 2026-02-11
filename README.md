@@ -1,8 +1,8 @@
 # EFR32MG1P BME280 Zigbee Sensor
 
-[![Release](https://img.shields.io/github/v/release/faronov/efr32mg1p-bme280-zigbee-sensor)](https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/releases)
-[![Build](https://img.shields.io/github/actions/workflow/status/faronov/efr32mg1p-bme280-zigbee-sensor/build-docker.yml?branch=main)](https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/actions)
-[![License](https://img.shields.io/github/license/faronov/efr32mg1p-bme280-zigbee-sensor)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/faronov/efr32mg1p-zigbee-sensor)](https://github.com/faronov/efr32mg1p-zigbee-sensor/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/faronov/efr32mg1p-zigbee-sensor/build-docker.yml?branch=main)](https://github.com/faronov/efr32mg1p-zigbee-sensor/actions)
+[![License](https://img.shields.io/github/license/faronov/efr32mg1p-zigbee-sensor)](LICENSE)
 
 A Zigbee 3.0 sleepy end device sensor for Silicon Labs EFR32MG1P (Wireless Gecko Series 1) that reads temperature, humidity, and pressure data from a Bosch BME280 sensor and reports via standard Zigbee clusters. Features OTA firmware updates, optimized power consumption, and automated CI/CD builds.
 
@@ -10,14 +10,14 @@ A Zigbee 3.0 sleepy end device sensor for Silicon Labs EFR32MG1P (Wireless Gecko
 
 ```bash
 # Clone repository
-git clone https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor.git
-cd efr32mg1p-bme280-zigbee-sensor
+git clone https://github.com/faronov/efr32mg1p-zigbee-sensor.git
+cd efr32mg1p-zigbee-sensor
 
 # Build firmware (local)
 bash tools/build.sh
 
 # Or download pre-built release
-# See: https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/releases/latest
+# See: https://github.com/faronov/efr32mg1p-zigbee-sensor/releases/latest
 ```
 
 ## Features
@@ -158,7 +158,7 @@ git tag v1.0.1 -m "Release v1.0.1"
 git push origin v1.0.1
 
 # Download artifacts from GitHub Actions
-# See: https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/actions
+# See: https://github.com/faronov/efr32mg1p-zigbee-sensor/actions
 ```
 
 ## Flashing Firmware
@@ -408,5 +408,5 @@ Technical:
 
 ## Contact
 
-- **Issues**: https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/issues
-- **Discussions**: https://github.com/faronov/efr32mg1p-bme280-zigbee-sensor/discussions
+- **Issues**: https://github.com/faronov/efr32mg1p-zigbee-sensor/issues
+- **Discussions**: https://github.com/faronov/efr32mg1p-zigbee-sensor/discussions
