@@ -239,12 +239,12 @@ define:
   - name: APP_DEBUG_AWAKE_AFTER_JOIN_MS
     value: 0
   # Keep sleepy end device in fast-poll mode after join to speed up coordinator interview.
-  - name: APP_DEBUG_FAST_POLL_AFTER_JOIN_MS
+  - name: APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS
     value: 30000
-  - name: APP_DEBUG_FAST_POLL_INTERVAL_MS
+  - name: APP_RUNTIME_FAST_POLL_INTERVAL_MS
     value: 250
   # Disable manual poll bursts; rely on normal stack poll + temporary fast poll window.
-  - name: APP_DEBUG_MANUAL_POLL_BOOST_MS
+  - name: APP_RUNTIME_MANUAL_POLL_BOOST_MS
     value: 0
   # Keep keep-alive policy on stack defaults for better parent compatibility.
   - name: APP_DEBUG_SET_KEEPALIVE_ALL
@@ -261,7 +261,7 @@ define:
   - name: APP_BUTTON_LONG_PRESS_MS
     value: 5000
   # Short post-join guard to suppress spurious edges right after join.
-  - name: APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS
+  - name: APP_RUNTIME_BUTTON_GUARD_AFTER_JOIN_MS
     value: 1000
   - name: APP_BUILD_TAG
     value: '"dbg-netreset-otaoff-bootspam-crashprint"'

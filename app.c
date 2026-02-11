@@ -103,20 +103,32 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_AWAKE_AFTER_JOIN_MS
 #define APP_DEBUG_AWAKE_AFTER_JOIN_MS 0
 #endif
-#ifndef APP_DEBUG_FAST_POLL_AFTER_JOIN_MS
-#define APP_DEBUG_FAST_POLL_AFTER_JOIN_MS 0
+#if !defined(APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS) && defined(APP_DEBUG_FAST_POLL_AFTER_JOIN_MS)
+#define APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS APP_DEBUG_FAST_POLL_AFTER_JOIN_MS
 #endif
-#ifndef APP_DEBUG_FAST_POLL_INTERVAL_MS
-#define APP_DEBUG_FAST_POLL_INTERVAL_MS 250
+#ifndef APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS
+#define APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS 0
 #endif
-#ifndef APP_DEBUG_MANUAL_POLL_BOOST_MS
-#define APP_DEBUG_MANUAL_POLL_BOOST_MS 60000
+#if !defined(APP_RUNTIME_FAST_POLL_INTERVAL_MS) && defined(APP_DEBUG_FAST_POLL_INTERVAL_MS)
+#define APP_RUNTIME_FAST_POLL_INTERVAL_MS APP_DEBUG_FAST_POLL_INTERVAL_MS
+#endif
+#ifndef APP_RUNTIME_FAST_POLL_INTERVAL_MS
+#define APP_RUNTIME_FAST_POLL_INTERVAL_MS 250
+#endif
+#if !defined(APP_RUNTIME_MANUAL_POLL_BOOST_MS) && defined(APP_DEBUG_MANUAL_POLL_BOOST_MS)
+#define APP_RUNTIME_MANUAL_POLL_BOOST_MS APP_DEBUG_MANUAL_POLL_BOOST_MS
+#endif
+#ifndef APP_RUNTIME_MANUAL_POLL_BOOST_MS
+#define APP_RUNTIME_MANUAL_POLL_BOOST_MS 60000
 #endif
 #ifndef APP_DEBUG_MANUAL_POLL_INTERVAL_MS
 #define APP_DEBUG_MANUAL_POLL_INTERVAL_MS 250
 #endif
-#ifndef APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS
-#define APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS 30000
+#if !defined(APP_RUNTIME_BUTTON_GUARD_AFTER_JOIN_MS) && defined(APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS)
+#define APP_RUNTIME_BUTTON_GUARD_AFTER_JOIN_MS APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS
+#endif
+#ifndef APP_RUNTIME_BUTTON_GUARD_AFTER_JOIN_MS
+#define APP_RUNTIME_BUTTON_GUARD_AFTER_JOIN_MS 30000
 #endif
 #ifndef APP_DEBUG_BUTTON_GUARD_AFTER_BOOT_MS
 #define APP_DEBUG_BUTTON_GUARD_AFTER_BOOT_MS 1500
@@ -225,7 +237,7 @@ static uint32_t basic_identity_tick = 0;
 static bool app_join_awake_active = false;
 static uint32_t app_join_awake_start_tick = 0;
 #endif
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+#if (APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS > 0)
 static bool app_fast_poll_active = false;
 static uint32_t app_fast_poll_start_tick = 0;
 #endif
@@ -599,10 +611,10 @@ void app_runtime_poll(void)
   }
 #endif
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+#if (APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS > 0)
   if (app_fast_poll_active && app_fast_poll_start_tick != 0) {
     uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_fast_poll_start_tick);
-    if (elapsed_ms >= APP_DEBUG_FAST_POLL_AFTER_JOIN_MS) {
+    if (elapsed_ms >= APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS) {
 #if (APP_DEBUG_NO_SLEEP != 0)
       // In no-sleep debug mode keep short-poll/app-tasks active after the
       // "window" so SWO remains alive and SED stays responsive for diagnostics.
@@ -621,7 +633,7 @@ void app_runtime_poll(void)
   }
 #endif
 
-#if (APP_DEBUG_MANUAL_POLL_BOOST_MS > 0)
+#if (APP_RUNTIME_MANUAL_POLL_BOOST_MS > 0)
   if (app_manual_poll_boost_active) {
     if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
       app_manual_poll_boost_active = false;
@@ -629,7 +641,7 @@ void app_runtime_poll(void)
       app_manual_poll_boost_last_tick = 0;
     } else {
       uint32_t elapsed_ms = sl_sleeptimer_tick_to_ms(now - app_manual_poll_boost_start_tick);
-      if (elapsed_ms >= APP_DEBUG_MANUAL_POLL_BOOST_MS) {
+      if (elapsed_ms >= APP_RUNTIME_MANUAL_POLL_BOOST_MS) {
         app_manual_poll_boost_active = false;
         app_manual_poll_boost_start_tick = 0;
         app_manual_poll_boost_last_tick = 0;
@@ -877,17 +889,17 @@ void emberAfStackStatusCallback(EmberStatus status)
 #else
     APP_DEBUG_PRINTF("Join: keep-alive mode: stack default\n");
 #endif
-    app_button_unlock_tick = now + sl_sleeptimer_ms_to_tick(APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS);
+    app_button_unlock_tick = now + sl_sleeptimer_ms_to_tick(APP_RUNTIME_BUTTON_GUARD_AFTER_JOIN_MS);
     APP_DEBUG_PRINTF("Button guard: ignoring BTN0 for %lu ms after join\n",
-                     (unsigned long)APP_DEBUG_BUTTON_GUARD_AFTER_JOIN_MS);
+                     (unsigned long)APP_RUNTIME_BUTTON_GUARD_AFTER_JOIN_MS);
 
-#if (APP_DEBUG_MANUAL_POLL_BOOST_MS > 0)
+#if (APP_RUNTIME_MANUAL_POLL_BOOST_MS > 0)
     if (runtime_node_type == EMBER_SLEEPY_END_DEVICE) {
       app_manual_poll_boost_active = true;
       app_manual_poll_boost_start_tick = sl_sleeptimer_get_tick_count();
       app_manual_poll_boost_last_tick = 0;
       APP_DEBUG_PRINTF("Debug: manual poll boost enabled for %lu ms (interval=%lu ms)\n",
-                       (unsigned long)APP_DEBUG_MANUAL_POLL_BOOST_MS,
+                       (unsigned long)APP_RUNTIME_MANUAL_POLL_BOOST_MS,
                        (unsigned long)APP_DEBUG_MANUAL_POLL_INTERVAL_MS);
     } else {
       app_manual_poll_boost_active = false;
@@ -906,18 +918,18 @@ void emberAfStackStatusCallback(EmberStatus status)
     }
 #endif
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+#if (APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_SHORT_POLL);
     emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL);
     emberAfAddToCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
-    emberAfSetShortPollIntervalMsCallback((int16u)APP_DEBUG_FAST_POLL_INTERVAL_MS);
-    emberAfSetWakeTimeoutMsCallback((int16u)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS);
+    emberAfSetShortPollIntervalMsCallback((int16u)APP_RUNTIME_FAST_POLL_INTERVAL_MS);
+    emberAfSetWakeTimeoutMsCallback((int16u)APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS);
     emberAfSetDefaultSleepControl(EMBER_AF_STAY_AWAKE);
     app_fast_poll_active = true;
     app_fast_poll_start_tick = sl_sleeptimer_get_tick_count();
     APP_DEBUG_PRINTF("Debug: fast poll enabled for %lu ms (short=%lu ms)\n",
-                     (unsigned long)APP_DEBUG_FAST_POLL_AFTER_JOIN_MS,
-                     (unsigned long)APP_DEBUG_FAST_POLL_INTERVAL_MS);
+                     (unsigned long)APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS,
+                     (unsigned long)APP_RUNTIME_FAST_POLL_INTERVAL_MS);
 #endif
 
     // Reset join attempt counter and scan state on success
@@ -966,7 +978,7 @@ void emberAfStackStatusCallback(EmberStatus status)
     app_button_unlock_tick = 0;
     join_security_configured = false;
 
-#if (APP_DEBUG_FAST_POLL_AFTER_JOIN_MS > 0)
+#if (APP_RUNTIME_FAST_POLL_AFTER_JOIN_MS > 0)
     emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
     emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL);
     emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
