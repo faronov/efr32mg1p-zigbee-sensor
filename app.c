@@ -241,8 +241,8 @@ static uint32_t app_auto_join_tick = 0;
 static bool debug_reset_network_done = false;
 #endif
 
-void app_debug_poll(void);
-bool app_debug_button_ready(void);
+void app_runtime_poll(void);
+bool app_button_ready(void);
 static bool join_pending = false;
 static bool join_security_configured = false;
 
@@ -469,7 +469,7 @@ void app_debug_force_af_init(void)
 #endif
 }
 
-void app_debug_poll(void)
+void app_runtime_poll(void)
 {
   static uint32_t sensor_watchdog_last_tick = 0;
   uint32_t now = sl_sleeptimer_get_tick_count();
@@ -648,7 +648,7 @@ void app_debug_poll(void)
 #endif
 }
 
-bool app_debug_button_ready(void)
+bool app_button_ready(void)
 {
   return af_init_seen;
 }
@@ -1302,11 +1302,8 @@ static void led_off_event_handler(sl_zigbee_event_t *event)
  */
 void emberAfTickCallback(void)
 {
-  // In debug profiles, app_debug_poll() is called from main loop.
+  // Runtime poll is called from main loop in this app.
   // Avoid handling button/join logic in two places to prevent edge races.
-#if !(APP_DEBUG_DIAG_ALWAYS || APP_DEBUG_FORCE_AF_INIT)
-  app_debug_poll();
-#endif
 }
 
 /**

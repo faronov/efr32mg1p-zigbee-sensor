@@ -29,8 +29,8 @@ void app_debug_sanity(void);
 void app_debug_trigger_short_press(void);
 void app_debug_trigger_long_press(void);
 void app_debug_force_af_init(void);
-void app_debug_poll(void);
-bool app_debug_button_ready(void);
+void app_runtime_poll(void);
+bool app_button_ready(void);
 
 #ifndef APP_DEBUG_DIAG_ALWAYS
 #define APP_DEBUG_DIAG_ALWAYS 0
@@ -133,7 +133,7 @@ int main(void)
 #endif
 
 #if APP_DEBUG_FORCE_AF_INIT
-  // Enable AF-init watchdog; fallback callback is handled in app_debug_poll().
+  // Enable AF-init watchdog; fallback callback is handled in app_runtime_poll().
   // Avoid direct emberAfInit() call here to keep framework init sequence intact.
   printf("Debug: AF init watchdog enabled\n");
   app_debug_force_af_init();
@@ -207,7 +207,7 @@ int main(void)
 
     // Runtime poll drives button handling, deferred join, auto-join timer,
     // and sensor watchdog. Keep it enabled for both release and debug builds.
-    app_debug_poll();
+    app_runtime_poll();
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
     // Sleep until next event
