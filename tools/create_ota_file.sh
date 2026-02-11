@@ -3,7 +3,8 @@
 #
 # Usage:
 #   ./tools/create_ota_file.sh 1.2.3
-#   ./tools/create_ota_file.sh 1.2.3 --variant tradfri_debug --image-type 0x0001
+#   ./tools/create_ota_file.sh 1.2.3 --variant sensor_tradfri_bmp280
+#   ./tools/create_ota_file.sh 1.2.3 --variant sensor_tradfri_sht31 --s37 <path>
 
 set -euo pipefail
 
@@ -75,12 +76,33 @@ infer_manufacturer_id_from_zap() {
 }
 
 infer_image_type_for_variant() {
-  # Keep stable image type per firmware family unless explicitly overridden.
-  # Debug and release variants can still override with --image-type.
-  if [[ "$VARIANT" == "tradfri_debug" ]]; then
-    echo "0x0001"
+  # Stable image type per sensor profile.
+  # Release:
+  #   bme280 -> 0x0000
+  #   bmp280 -> 0x0001
+  #   sht31  -> 0x0002
+  # Debug channel uses 0x8000 + base profile to avoid collisions with release.
+  local lower
+  lower="$(echo "${VARIANT}" | tr '[:upper:]' '[:lower:]')"
+  local base="0x0000"
+
+  if [[ "$lower" == *"bmp280"* ]]; then
+    base="0x0001"
+  elif [[ "$lower" == *"sht31"* ]]; then
+    base="0x0002"
   else
-    echo "0x0000"
+    base="0x0000"
+  fi
+
+  if [[ "$lower" == *"debug"* ]]; then
+    case "$base" in
+      0x0000) echo "0x8000" ;;
+      0x0001) echo "0x8001" ;;
+      0x0002) echo "0x8002" ;;
+      *) echo "$base" ;;
+    esac
+  else
+    echo "$base"
   fi
 }
 
@@ -141,6 +163,16 @@ if [[ -z "$S37_FILE" ]]; then
     "build/${VARIANT}/release/zigbee_bme280_sensor_${VARIANT}.s37"
     "firmware/build/debug/zigbee_bme280_sensor_${VARIANT}.s37"
     "build/${VARIANT}/debug/zigbee_bme280_sensor_${VARIANT}.s37"
+    "firmware/build/release/zigbee_sensor_${VARIANT}.s37"
+    "build/${VARIANT}/release/zigbee_sensor_${VARIANT}.s37"
+    "firmware/build/debug/zigbee_sensor_${VARIANT}.s37"
+    "build/${VARIANT}/debug/zigbee_sensor_${VARIANT}.s37"
+    "firmware/build/release/zigbee_sensor_tradfri_bme280.s37"
+    "firmware/build/release/zigbee_sensor_tradfri_bmp280.s37"
+    "firmware/build/release/zigbee_sensor_tradfri_sht31.s37"
+    "firmware/build/debug/zigbee_sensor_tradfri_bme280.s37"
+    "firmware/build/debug/zigbee_sensor_tradfri_bmp280.s37"
+    "firmware/build/debug/zigbee_sensor_tradfri_sht31.s37"
   )
   for candidate in "${CANDIDATES[@]}"; do
     if [[ -f "$candidate" ]]; then
@@ -159,7 +191,7 @@ fi
 OUTPUT_DIR="build/${VARIANT}/ota"
 mkdir -p "$OUTPUT_DIR"
 
-BASENAME="zigbee_bme280_sensor_${VARIANT}-${VERSION}"
+BASENAME="zigbee_sensor_${VARIANT}-${VERSION}"
 GBL_FILE="${OUTPUT_DIR}/${BASENAME}.gbl"
 OTA_FILE="${OUTPUT_DIR}/${BASENAME}.ota"
 ZIGBEE_FILE="${OUTPUT_DIR}/${BASENAME}.zigbee"

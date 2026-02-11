@@ -302,6 +302,35 @@ jobs:
           echo "Building profile=${{ matrix.profile }} slcp=${{ matrix.slcp }}"
           bash tools/build.sh
 
+      - name: Create OTA files - profile
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HOME=/root
+
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            VERSION="1.0.0"
+            echo "No valid version tag found, using default: $VERSION"
+          else
+            echo "Using version from tag: $VERSION"
+          fi
+
+          PROFILE="${{ matrix.profile }}"
+          VARIANT="sensor_tradfri_${PROFILE}"
+          S37="$(find firmware/build -type f -name "zigbee_sensor_tradfri_${PROFILE}.s37" | head -n1)"
+          if [[ -z "$S37" || ! -f "$S37" ]]; then
+            echo "ERROR: profile S37 not found for ${PROFILE}"
+            find firmware/build -type f -name "*.s37" -print || true
+            exit 1
+          fi
+
+          echo "Creating OTA for profile=${PROFILE} variant=${VARIANT}"
+          bash tools/create_ota_file.sh "$VERSION" \
+            --variant "$VARIANT" \
+            --s37 "$S37"
+
       - name: Upload profile artifacts
         uses: actions/upload-artifact@v4
         if: success()
@@ -315,6 +344,9 @@ jobs:
             firmware/build/**/*.map
             firmware/autogen/**
             firmware/build/**/project/autogen/**
+            build/**/*.gbl
+            build/**/*.ota
+            build/**/*.zigbee
           retention-days: 30
           if-no-files-found: error
 
