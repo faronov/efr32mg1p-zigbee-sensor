@@ -205,10 +205,9 @@ int main(void)
     // Process periodic sensor work scheduled by sleeptimer callback.
     app_sensor_process();
 
-#if APP_DEBUG_DIAG_ALWAYS || APP_DEBUG_FORCE_AF_INIT
-    // Ensure debug AF init and identity checks run even if AF tick isn't wired.
+    // Runtime poll drives button handling, deferred join, auto-join timer,
+    // and sensor watchdog. Keep it enabled for both release and debug builds.
     app_debug_poll();
-#endif
 
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
     // Sleep until next event
