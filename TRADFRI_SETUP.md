@@ -189,9 +189,11 @@ The TRÅDFRI variant includes OTA bootloader support using the IS25LQ020B flash 
 
 2. **Flash bootloader** (one-time):
    ```bash
-   # Download appropriate bootloader from Silicon Labs
-   commander flash bootloader-storage-spiflash-single-512k.s37 \
-     --device EFR32MG1P132F256GM32
+   # Use bootloader artifacts produced by this repository:
+   #  - first_stage.s37
+   #  - tradfri-bootloader-spiflash.s37
+   commander flash first_stage.s37 --device EFR32MG1P132F256GM32
+   commander flash tradfri-bootloader-spiflash.s37 --device EFR32MG1P132F256GM32
    ```
 
 3. **OTA Update Process**:
