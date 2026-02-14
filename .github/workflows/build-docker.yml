@@ -318,7 +318,7 @@ jobs:
           fi
 
           PROFILE="${{ matrix.profile }}"
-          VARIANT="sensor_tradfri_${PROFILE}"
+          VARIANT="tradfri_${PROFILE}"
           S37="$(find firmware/build -type f -name "zigbee_sensor_tradfri_${PROFILE}.s37" | head -n1)"
           if [[ -z "$S37" || ! -f "$S37" ]]; then
             echo "ERROR: profile S37 not found for ${PROFILE}"

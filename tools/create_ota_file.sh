@@ -191,7 +191,13 @@ fi
 OUTPUT_DIR="build/${VARIANT}/ota"
 mkdir -p "$OUTPUT_DIR"
 
-BASENAME="zigbee_sensor_${VARIANT}-${VERSION}"
+# Keep artifact names stable and avoid duplicated "sensor_" prefix.
+NAME_VARIANT="${VARIANT}"
+if [[ "$NAME_VARIANT" == sensor_* ]]; then
+  NAME_VARIANT="${NAME_VARIANT#sensor_}"
+fi
+
+BASENAME="zigbee_sensor_${NAME_VARIANT}-${VERSION}"
 GBL_FILE="${OUTPUT_DIR}/${BASENAME}.gbl"
 OTA_FILE="${OUTPUT_DIR}/${BASENAME}.ota"
 ZIGBEE_FILE="${OUTPUT_DIR}/${BASENAME}.zigbee"
