@@ -4,7 +4,7 @@ This document describes the hardware connections for the IKEA TRÅDFRI module (E
 
 ## TRÅDFRI ICC-1 Module Pinout
 
-![TRÅDFRI Pinout](docs/images/tradfri-pinout.png)
+![TRÅDFRI Pinout](images/tradfri-pinout.png)
 
 *Pinout diagram credit: [basilfx/TRADFRI-Hacking](https://github.com/basilfx/TRADFRI-Hacking)*
 

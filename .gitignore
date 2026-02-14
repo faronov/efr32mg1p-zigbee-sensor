@@ -36,3 +36,6 @@ __pycache__/
 
 # Logs
 *.log
+
+# AI assistant instructions
+.github/copilot-instructions.md

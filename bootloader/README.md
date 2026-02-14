@@ -208,7 +208,7 @@ To create a bootloader for different hardware:
 ## Reference Documentation
 
 - [Gecko Bootloader Developer Guide](https://docs.silabs.com/gecko-platform/latest/bootloader/)
-- [OTA Setup Guide](../OTA_SETUP_GUIDE.md)
+- [OTA Setup Guide](../docs/OTA_SETUP_GUIDE.md)
 - [TRÅDFRI Bootloader README](tradfri-spiflash/README_BOOTLOADER.md)
 
 ## License

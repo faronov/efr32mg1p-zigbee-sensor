@@ -110,7 +110,7 @@ LED0: PA0 (Pin 2)
 BTN0: PB13 (Pin 19)
 ```
 
-See [PINOUT.md](PINOUT.md) for detailed hardware connections.
+See [docs/PINOUT.md](docs/PINOUT.md) for detailed hardware connections.
 
 ## Building Firmware
 
@@ -215,7 +215,7 @@ cp build/tradfri/ota/*.ota ~/.local/share/dresden-elektronik/deCONZ/otau/
 # 2. Trigger update from deCONZ UI
 ```
 
-See [OTA_FILE_CREATION.md](OTA_FILE_CREATION.md) for detailed OTA setup.
+See [docs/OTA_FILE_CREATION.md](docs/OTA_FILE_CREATION.md) for detailed OTA setup.
 
 ## Network Integration
 
@@ -244,7 +244,7 @@ mosquitto_pub -t 'zigbee2mqtt/bridge/request/device/bind' \
 
 **ZHA/deCONZ:** Use GUI binding options
 
-See [BINDING_GUIDE.md](BINDING_GUIDE.md) for details.
+See [docs/BINDING_GUIDE.md](docs/BINDING_GUIDE.md) for details.
 
 ## Power Consumption
 
@@ -265,7 +265,7 @@ Battery life depends on:
 - **Optimized rejoin** - single channel attempt first (138ms vs 2.2s)
 - **Event-driven** operation (no polling loops)
 
-See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for analysis.
+See [docs/POWER_OPTIMIZATION.md](docs/POWER_OPTIMIZATION.md) for analysis.
 
 ## Project Structure
 
@@ -282,7 +282,10 @@ See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for analysis.
 │       ├── hal_i2c.c          # I2C hardware abstraction
 │       └── battery.c          # Battery monitoring (ADC)
 ├── config/
-│   └── zcl/zcl_config.zap     # Zigbee cluster configuration
+│   └── zcl/                   # Zigbee cluster profiles (.zap)
+│       ├── zcl_bme280.zap
+│       ├── zcl_bmp280.zap
+│       └── zcl_sht31.zap
 ├── bootloader/
 │   └── tradfri-spiflash/      # Custom OTA bootloader
 ├── tools/
@@ -296,20 +299,18 @@ See [POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md) for analysis.
 ## Documentation
 
 - **Canonical project state**:
-  - **[PROJECT_STATE.md](PROJECT_STATE.md)** - active profiles, files, current behavior
-  - **[RUNBOOK.md](RUNBOOK.md)** - CI/artifacts/flash/SWO operational flow
-  - **[DECISIONS.md](DECISIONS.md)** - accepted technical decisions
-- **[PINOUT.md](PINOUT.md)** - Hardware connections and pin mappings
-- **[TRADFRI_SETUP.md](TRADFRI_SETUP.md)** - TRÅDFRI module specific setup
-- **[OTA_FILE_CREATION.md](OTA_FILE_CREATION.md)** - Creating OTA update files
-- **[OTA_SETUP_GUIDE.md](OTA_SETUP_GUIDE.md)** - OTA bootloader configuration
-- **[BINDING_GUIDE.md](BINDING_GUIDE.md)** - Zigbee cluster binding setup
-- **[POWER_OPTIMIZATION.md](POWER_OPTIMIZATION.md)** - Power consumption analysis
-- **[BATTERY_AND_BUTTON_FEATURES.md](BATTERY_AND_BUTTON_FEATURES.md)** - UI features
+  - **[docs/README.md](docs/README.md)** - documentation index (single entry point)
+  - **[docs/PROJECT_STATE.md](docs/PROJECT_STATE.md)** - active profiles, files, current behavior
+  - **[docs/RUNBOOK.md](docs/RUNBOOK.md)** - CI/artifacts/flash/SWO operational flow
+  - **[docs/DECISIONS.md](docs/DECISIONS.md)** - accepted technical decisions
+- **[docs/PINOUT.md](docs/PINOUT.md)** - Hardware connections and pin mappings
+- **[docs/TRADFRI_SETUP.md](docs/TRADFRI_SETUP.md)** - TRÅDFRI module specific setup
+- **[docs/OTA_FILE_CREATION.md](docs/OTA_FILE_CREATION.md)** - Creating OTA update files
+- **[docs/OTA_SETUP_GUIDE.md](docs/OTA_SETUP_GUIDE.md)** - OTA bootloader configuration
+- **[docs/BINDING_GUIDE.md](docs/BINDING_GUIDE.md)** - Zigbee cluster binding setup
+- **[docs/POWER_OPTIMIZATION.md](docs/POWER_OPTIMIZATION.md)** - Power consumption analysis
 - **[docs/zha_quirk_v2.py](docs/zha_quirk_v2.py)** - ZHA Quirk v2 (single config: `sensor_read_interval`)
 - **[docs/zigbee2mqtt-converter.js](docs/zigbee2mqtt-converter.js)** - Zigbee2MQTT converter (single config: `sensor_read_interval`)
-
-Historical notes are kept under `docs/archive/` and may describe superseded implementations.
 
 ## Troubleshooting
 
@@ -351,7 +352,7 @@ Runtime-configure via manufacturer-specific Basic attribute `0xF000`
 
 ### Add Custom Clusters
 
-1. Edit `config/zcl/zcl_config.zap` using Simplicity Studio ZAP tool
+1. Edit one of profile files in `config/zcl/*.zap` using Simplicity Studio ZAP tool
 2. Regenerate with `slc generate`
 3. Implement handlers in `app.c`
 
