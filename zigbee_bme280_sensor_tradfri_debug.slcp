@@ -249,11 +249,11 @@ define:
   # Keep keep-alive policy on stack defaults for better parent compatibility.
   - name: APP_DEBUG_SET_KEEPALIVE_ALL
     value: 0
-  - name: APP_DEBUG_AUTO_JOIN_ON_BOOT
+  - name: APP_AUTO_JOIN_ON_BOOT
     value: 1
-  - name: APP_DEBUG_AUTO_JOIN_DELAY_MS
+  - name: APP_AUTO_JOIN_DELAY_MS
     value: 5000
-  - name: APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
+  - name: APP_AUTO_JOIN_ON_PIN_RESET
     value: 0
   - name: APP_DEBUG_JOIN_AS_END_DEVICE
     value: 0

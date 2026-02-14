@@ -48,9 +48,8 @@ bash tools/build.sh
 
 ### User Interface
 - **Button (BTN0)**:
-  - Short press (<2s): Trigger immediate sensor reading and report
-  - Long press (≥2s): Leave and rejoin network
-  - Network join trigger when not connected
+  - Short press (<5s): Trigger immediate sensor reading and report (only when joined)
+  - Long press (≥5s): Leave and rejoin network (or join if not connected)
 - **LED (LED0)**:
   - Network status indication
   - Auto-off after 30 seconds to save power
@@ -229,7 +228,7 @@ See [docs/OTA_FILE_CREATION.md](docs/OTA_FILE_CREATION.md) for detailed OTA setu
 
 ### Force Rejoin
 
-- **Long press button** (≥2s) to leave and rejoin network
+- **Long press button** (≥5s) to leave and rejoin network
 - Useful after coordinator replacement or network issues
 
 ### Binding Clusters
@@ -317,7 +316,7 @@ See [docs/POWER_OPTIMIZATION.md](docs/POWER_OPTIMIZATION.md) for analysis.
 ### Device Won't Join Network
 
 1. **Check LED**: Should blink during join
-2. **Reset device**: Long press button (≥2s)
+2. **Reset device**: Long press button (≥5s)
 3. **Check coordinator**: Ensure pairing mode is active
 4. **Check distance**: Move closer to coordinator
 5. **Check logs**: Use Zigbee sniffer or coordinator logs

@@ -113,7 +113,7 @@ The TRÅDFRI board has a combined reset/pairing button:
 - Button reads 0 when pressed, 1 when released
 - Shared with bootloader/reset functionality
 
-### Short Press (<2 seconds)
+### Short Press (<5 seconds)
 
 **When not joined to network:**
 - Initiates network joining
@@ -124,7 +124,7 @@ The TRÅDFRI board has a combined reset/pairing button:
 - Forces attribute report to coordinator
 - LED flashes briefly (200ms)
 
-### Long Press (≥2 seconds)
+### Long Press (≥5 seconds)
 
 **When joined to network:**
 - Leaves current network
@@ -250,7 +250,7 @@ GND ─────────────────────────�
 
 ### Button Test
 1. **Short press**: LED should flash briefly
-2. **Long press (2s)**: LED should flash rapidly 5 times
+2. **Long press (5s)**: LED should flash rapidly 5 times
 
 ### I2C Test
 1. Power on device (2xAAA batteries)

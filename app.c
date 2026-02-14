@@ -57,8 +57,8 @@ static volatile bool button_short_press_pending = false;
 static volatile bool button_long_press_pending = false;
 
 // Button press duration tracking
-static uint32_t button_press_start_tick = 0;
-static bool button_pressed = false;
+static volatile uint32_t button_press_start_tick = 0;
+static volatile bool button_pressed = false;
 #define BUTTON_DEBOUNCE_MS 80
 #ifndef APP_BUTTON_LONG_PRESS_MS
 #define APP_BUTTON_LONG_PRESS_MS 5000  // default: 5 seconds for long press
@@ -148,14 +148,14 @@ static bool button_pressed = false;
 #ifndef APP_DEBUG_POLL_SIMPLE_BUTTON_INSTANCES
 #define APP_DEBUG_POLL_SIMPLE_BUTTON_INSTANCES 0
 #endif
-#ifndef APP_DEBUG_AUTO_JOIN_ON_BOOT
-#define APP_DEBUG_AUTO_JOIN_ON_BOOT 1
+#ifndef APP_AUTO_JOIN_ON_BOOT
+#define APP_AUTO_JOIN_ON_BOOT 1
 #endif
-#ifndef APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
-#define APP_DEBUG_AUTO_JOIN_ON_PIN_RESET 0
+#ifndef APP_AUTO_JOIN_ON_PIN_RESET
+#define APP_AUTO_JOIN_ON_PIN_RESET 0
 #endif
-#ifndef APP_DEBUG_AUTO_JOIN_DELAY_MS
-#define APP_DEBUG_AUTO_JOIN_DELAY_MS 5000
+#ifndef APP_AUTO_JOIN_DELAY_MS
+#define APP_AUTO_JOIN_DELAY_MS 5000
 #endif
 #ifndef APP_DEBUG_JOIN_AS_END_DEVICE
 #define APP_DEBUG_JOIN_AS_END_DEVICE 0
@@ -179,6 +179,7 @@ static bool button_pressed = false;
 
 static void handle_short_press(void);
 static void handle_long_press(void);
+static void start_network_join(void);
 
 void app_debug_sanity(void)
 {
@@ -249,6 +250,43 @@ static uint32_t app_leave_unlock_tick = 0;
 static uint32_t app_join_retry_unlock_tick = 0;
 static bool app_auto_join_scheduled = false;
 static uint32_t app_auto_join_tick = 0;
+static sl_sleeptimer_timer_handle_t app_rejoin_wake_timer;
+
+// Rejoin delay after unintentional network loss (ms).
+// Gives the coordinator a moment to settle before we scan.
+#ifndef APP_REJOIN_AFTER_LOSS_DELAY_MS
+#define APP_REJOIN_AFTER_LOSS_DELAY_MS 5000
+#endif
+
+// Maximum auto-rejoin delay with exponential backoff (10 minutes).
+#ifndef APP_REJOIN_MAX_DELAY_MS
+#define APP_REJOIN_MAX_DELAY_MS 600000
+#endif
+
+static void app_rejoin_wake_timer_callback(sl_sleeptimer_timer_handle_t *handle,
+                                           void *data)
+{
+  (void)handle;
+  (void)data;
+  // Nothing to do — the timer firing wakes the CPU from sleep so that
+  // app_runtime_poll() can process app_auto_join_scheduled.
+}
+
+// Schedule an auto-rejoin attempt after delay_ms.  Uses a one-shot
+// sleeptimer to guarantee the CPU wakes from deep sleep.
+static void app_schedule_auto_rejoin(uint32_t delay_ms)
+{
+  uint32_t now = sl_sleeptimer_get_tick_count();
+  app_auto_join_scheduled = true;
+  app_auto_join_tick = now + sl_sleeptimer_ms_to_tick(delay_ms);
+  sl_sleeptimer_stop_timer(&app_rejoin_wake_timer);
+  sl_sleeptimer_start_timer_ms(&app_rejoin_wake_timer,
+                               delay_ms,
+                               app_rejoin_wake_timer_callback,
+                               NULL, 0, 0);
+  APP_DEBUG_PRINTF("Auto-rejoin scheduled in %lu ms\n",
+                   (unsigned long)delay_ms);
+}
 #if APP_DEBUG_RESET_NETWORK
 static bool debug_reset_network_done = false;
 #endif
@@ -274,6 +312,7 @@ static void rejoin_retry_event_handler(sl_zigbee_event_t *event) APP_UNUSED;
 static void start_optimized_rejoin(void) APP_UNUSED;
 static void handle_short_press(void);
 static void handle_long_press(void);
+static void start_network_join(void);
 static EmberStatus start_join_scan(void);
 static void try_next_channel(void);
 static bool configure_join_security(void);
@@ -333,11 +372,23 @@ void emberAfPluginNetworkSteeringCompleteCallback(EmberStatus status,
                    joinAttempts,
                    finalState);
 
-  // If stack is still down after steering completion, allow a new button-triggered join attempt.
+  // If stack is still down after steering completion, allow a new join attempt.
   if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
     network_join_in_progress = false;
     join_scan_in_progress = false;
     join_network_found = false;
+    join_attempt_count++;
+
+    // Schedule automatic retry with exponential backoff so the device
+    // does not sleep indefinitely after a failed steering attempt.
+    uint32_t backoff_ms = APP_REJOIN_AFTER_LOSS_DELAY_MS;
+    for (uint8_t i = 0; i < join_attempt_count && i < 8; i++) {
+      backoff_ms *= 2;
+    }
+    if (backoff_ms > APP_REJOIN_MAX_DELAY_MS) {
+      backoff_ms = APP_REJOIN_MAX_DELAY_MS;
+    }
+    app_schedule_auto_rejoin(backoff_ms);
   }
 }
 #endif
@@ -424,22 +475,18 @@ static void app_init_once(void)
 #endif
   }
 
-#if APP_DEBUG_AUTO_JOIN_ON_BOOT
+#if APP_AUTO_JOIN_ON_BOOT
   if (emberAfNetworkState() != EMBER_JOINED_NETWORK && !network_join_in_progress) {
-    uint32_t now = sl_sleeptimer_get_tick_count();
-    app_auto_join_scheduled = true;
-    app_auto_join_tick = now + sl_sleeptimer_ms_to_tick(APP_DEBUG_AUTO_JOIN_DELAY_MS);
-    APP_DEBUG_PRINTF("Debug: auto-join scheduled in %lu ms\n",
-                     (unsigned long)APP_DEBUG_AUTO_JOIN_DELAY_MS);
+    app_schedule_auto_rejoin(APP_AUTO_JOIN_DELAY_MS);
   }
 #endif
 
-#if APP_DEBUG_AUTO_JOIN_ON_PIN_RESET
+#if APP_AUTO_JOIN_ON_PIN_RESET
   // TRADFRI button can be wired to reset line on some hardware revisions.
   // If boot reason is external pin reset, treat it as an implicit join request.
   if (halGetResetInfo() == 0x03u) {
     APP_DEBUG_PRINTF("Debug: auto-join after pin reset\n");
-    handle_short_press();
+    start_network_join();
   }
 #endif
 }
@@ -532,7 +579,7 @@ void app_runtime_poll(void)
   if (join_pending && af_init_seen && !network_join_in_progress) {
     join_pending = false;
     APP_DEBUG_PRINTF("Join: deferred request starting (poll)\n");
-    handle_short_press();
+    start_network_join();
   }
 
   if (app_auto_join_scheduled) {
@@ -546,7 +593,7 @@ void app_runtime_poll(void)
       app_auto_join_scheduled = false;
       app_auto_join_tick = 0;
       APP_DEBUG_PRINTF("Debug: auto-join timer fired\n");
-      handle_short_press();
+      start_network_join();
     }
   }
 
@@ -940,9 +987,10 @@ void emberAfStackStatusCallback(EmberStatus status)
     join_network_found = false;
     app_join_retry_unlock_tick = 0;
 
-    // Cancel any pending rejoin attempts - network is up (TEMPORARILY DISABLED)
-    // rejoin_state = REJOIN_STATE_DONE;
-    // sl_zigbee_event_set_inactive(&rejoin_retry_event);
+    // Cancel any pending rejoin attempts - network is up
+    sl_sleeptimer_stop_timer(&app_rejoin_wake_timer);
+    app_auto_join_scheduled = false;
+    app_auto_join_tick = 0;
 
     // Stop LED blinking
     led_blink_active = false;
@@ -965,15 +1013,20 @@ void emberAfStackStatusCallback(EmberStatus status)
 
   } else if (status == EMBER_NETWORK_DOWN) {
     if (app_intentional_leave_pending) {
-      emberAfCorePrintln("Network down after manual leave");
+      emberAfCorePrintln("Network down after manual leave - scheduling rejoin");
       app_intentional_leave_pending = false;
       app_leave_unlock_tick = now + sl_sleeptimer_ms_to_tick(APP_DEBUG_BUTTON_GUARD_AFTER_LEAVE_MS);
       app_set_join_retry_backoff(now, APP_DEBUG_BUTTON_GUARD_AFTER_LEAVE_MS);
       APP_DEBUG_PRINTF("Button guard: ignoring BTN0 for %lu ms after leave\n",
                        (unsigned long)APP_DEBUG_BUTTON_GUARD_AFTER_LEAVE_MS);
+      // Auto-rejoin after the button guard window expires.
+      app_schedule_auto_rejoin(APP_DEBUG_BUTTON_GUARD_AFTER_LEAVE_MS);
     } else {
-      emberAfCorePrintln("Network down - will attempt optimized rejoin");
+      emberAfCorePrintln("Network down - scheduling auto-rejoin");
       app_set_join_retry_backoff(now, APP_DEBUG_JOIN_RETRY_BACKOFF_AFTER_LEAVE_MS);
+
+      // Schedule automatic rejoin attempt after backoff delay.
+      app_schedule_auto_rejoin(APP_REJOIN_AFTER_LOSS_DELAY_MS);
     }
     app_button_unlock_tick = 0;
     join_security_configured = false;
@@ -982,10 +1035,11 @@ void emberAfStackStatusCallback(EmberStatus status)
     emberAfSetDefaultPollControlCallback(EMBER_AF_LONG_POLL);
     emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL);
     emberAfRemoveFromCurrentAppTasksCallback(EMBER_AF_FORCE_SHORT_POLL_FOR_PARENT_CONNECTIVITY);
-    emberAfSetDefaultSleepControl(EMBER_AF_OK_TO_SLEEP);
     app_fast_poll_active = false;
     app_fast_poll_start_tick = 0;
 #endif
+    // Always allow sleep when network is down regardless of fast-poll config.
+    emberAfSetDefaultSleepControl(EMBER_AF_OK_TO_SLEEP);
 
     app_manual_poll_boost_active = false;
     app_manual_poll_boost_start_tick = 0;
@@ -998,13 +1052,8 @@ void emberAfStackStatusCallback(EmberStatus status)
     sl_zigbee_event_set_inactive(&led_off_event);
 #endif
 
-    // Stop periodic sensor timer while network is down to avoid 10s wakeups.
+    // Stop periodic sensor timer while network is down to avoid wakeups.
     app_sensor_stop_periodic_updates();
-
-    // Optimized rejoin TEMPORARILY DISABLED - event queue issue
-    // emberAfCorePrintln("Scheduling optimized rejoin in 100ms...");
-    // rejoin_state = REJOIN_STATE_IDLE;
-    // sl_zigbee_event_set_delay_ms(&rejoin_retry_event, 100);
 
   }
 }
@@ -1380,13 +1429,25 @@ static void try_next_channel(void)
   }
 
   if (current_channel_index >= total_channels) {
-    // Exhausted all channels - give up
+    // Exhausted all channels - schedule retry with exponential backoff
     emberAfCorePrintln("All channels scanned - no network found");
     network_join_in_progress = false;
     join_scan_in_progress = false;
     join_network_found = false;
     current_channel_index = 0;
     join_attempt_count++;
+
+    // Exponential backoff: 5s, 10s, 20s, 40s, ... capped at 10 min
+    uint32_t backoff_ms = APP_REJOIN_AFTER_LOSS_DELAY_MS;
+    for (uint8_t i = 0; i < join_attempt_count && i < 8; i++) {
+      backoff_ms *= 2;
+    }
+    if (backoff_ms > APP_REJOIN_MAX_DELAY_MS) {
+      backoff_ms = APP_REJOIN_MAX_DELAY_MS;
+    }
+    if (emberAfNetworkState() != EMBER_JOINED_NETWORK) {
+      app_schedule_auto_rejoin(backoff_ms);
+    }
 
 #ifdef SL_CATALOG_SIMPLE_LED_PRESENT
     // Stop LED blinking
@@ -1548,8 +1609,8 @@ void emberAfScanCompleteCallback(uint8_t channel, EmberStatus status)
 /**
  * @brief Handle short button press (<5 seconds)
  *
- * Short press triggers immediate sensor read and report.
- * If not joined to network, starts network joining.
+ * Short press triggers immediate sensor read and report when joined.
+ * Ignored when not connected to a network.
  */
 static void handle_short_press(void)
 {
@@ -1572,81 +1633,8 @@ static void handle_short_press(void)
 #endif
 
   } else {
-    uint32_t now = sl_sleeptimer_get_tick_count();
-    if (app_join_retry_blocked(now)) {
-      APP_DEBUG_PRINTF("Join: retry backoff active\n");
-      return;
-    }
-    if (!af_init_seen) {
-      APP_DEBUG_PRINTF("Join: AF init not ready - deferring\n");
-      join_pending = true;
-      return;
-    }
-    if (network_join_in_progress) {
-      emberAfCorePrintln("Join already in progress - ignoring button press");
-      APP_DEBUG_PRINTF("Join: already in progress\n");
-      return;
-    }
-
-    // Not on network - start join
-    emberAfCorePrintln("Not joined - starting network join (attempt %d)...",
-                       join_attempt_count + 1);
-    APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
-#if !APP_RUNTIME_NETWORK_STEERING
-    if (!configure_join_security()) {
-      emberAfCorePrintln("Join aborted: security state setup failed");
-      return;
-    }
-#endif
-
-    // Reset to start of channel list
-    current_channel_index = 0;
-    join_scan_in_progress = false;
-    join_network_found = false;
-    network_join_in_progress = true;
-
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-    // Start LED blinking to indicate joining
-    led_blink_active = true;
-    sl_zigbee_event_set_active(&led_blink_event);
-#endif
-
-    EmberStatus join_status = EMBER_INVALID_CALL;
-#if APP_RUNTIME_NETWORK_STEERING
-    // When network steering is linked, use only plugin API to avoid scan callback conflicts.
-    // Keep post-join behavior quiet and deterministic:
-    // - skip steering-driven TC link key update workflow
-    // - keep join focused on association/interview
-    sli_zigbee_af_network_steering_options_mask = EMBER_AF_PLUGIN_NETWORK_STEERING_OPTIONS_NO_TCLK_UPDATE;
-    join_status = emberAfPluginNetworkSteeringStart();
-    APP_DEBUG_PRINTF("Join: emberAfPluginNetworkSteeringStart -> 0x%02x\n", join_status);
-#else
-    // Manual active scan + join path for builds without network steering plugin.
-    join_status = start_join_scan();
-#endif
-
-    if (join_status != EMBER_SUCCESS) {
-      emberAfCorePrintln("Join failed to start: 0x%x", join_status);
-      if (join_status == EMBER_INVALID_CALL || join_status == 0xA8) {
-        emberAfCorePrintln("Join aborted: stack not ready");
-        network_join_in_progress = false;
-        join_scan_in_progress = false;
-        join_network_found = false;
-        join_security_configured = false;
-        app_set_join_retry_backoff(sl_sleeptimer_get_tick_count(), APP_DEBUG_JOIN_RETRY_BACKOFF_MS);
-      } else {
-        try_next_channel();
-      }
-
-#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
-      // Stop LED blinking on failure
-      if (!network_join_in_progress) {
-        led_blink_active = false;
-        sl_zigbee_event_set_inactive(&led_blink_event);
-        sl_led_turn_off(&sl_led_led0);
-      }
-#endif
-    }
+    // Not on network - ignore short press
+    APP_DEBUG_PRINTF("Short press ignored: not joined\n");
   }
 }
 
@@ -1666,34 +1654,110 @@ static bool configure_join_security(void)
 }
 
 /**
+ * @brief Start network join procedure
+ *
+ * Initiates active scan and join. Called from long press handler
+ * and auto-rejoin paths.
+ */
+static void start_network_join(void)
+{
+  uint32_t now = sl_sleeptimer_get_tick_count();
+  if (app_join_retry_blocked(now)) {
+    APP_DEBUG_PRINTF("Join: retry backoff active\n");
+    return;
+  }
+  if (!af_init_seen) {
+    APP_DEBUG_PRINTF("Join: AF init not ready - deferring\n");
+    join_pending = true;
+    return;
+  }
+  if (network_join_in_progress) {
+    emberAfCorePrintln("Join already in progress - ignoring");
+    APP_DEBUG_PRINTF("Join: already in progress\n");
+    return;
+  }
+
+  emberAfCorePrintln("Starting network join (attempt %d)...",
+                     join_attempt_count + 1);
+  APP_DEBUG_PRINTF("Join: attempt %d\n", join_attempt_count + 1);
+#if !APP_RUNTIME_NETWORK_STEERING
+  if (!configure_join_security()) {
+    emberAfCorePrintln("Join aborted: security state setup failed");
+    return;
+  }
+#endif
+
+  current_channel_index = 0;
+  join_scan_in_progress = false;
+  join_network_found = false;
+  network_join_in_progress = true;
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+  led_blink_active = true;
+  sl_zigbee_event_set_active(&led_blink_event);
+#endif
+
+  EmberStatus join_status = EMBER_INVALID_CALL;
+#if APP_RUNTIME_NETWORK_STEERING
+  sli_zigbee_af_network_steering_options_mask = EMBER_AF_PLUGIN_NETWORK_STEERING_OPTIONS_NO_TCLK_UPDATE;
+  join_status = emberAfPluginNetworkSteeringStart();
+  APP_DEBUG_PRINTF("Join: emberAfPluginNetworkSteeringStart -> 0x%02x\n", join_status);
+#else
+  join_status = start_join_scan();
+#endif
+
+  if (join_status != EMBER_SUCCESS) {
+    emberAfCorePrintln("Join failed to start: 0x%x", join_status);
+    if (join_status == EMBER_INVALID_CALL || join_status == 0xA8) {
+      emberAfCorePrintln("Join aborted: stack not ready");
+      network_join_in_progress = false;
+      join_scan_in_progress = false;
+      join_network_found = false;
+      join_security_configured = false;
+      app_schedule_auto_rejoin(APP_REJOIN_AFTER_LOSS_DELAY_MS);
+    } else {
+      try_next_channel();
+    }
+
+#ifdef SL_CATALOG_SIMPLE_LED_PRESENT
+    if (!network_join_in_progress) {
+      led_blink_active = false;
+      sl_zigbee_event_set_inactive(&led_blink_event);
+      sl_led_turn_off(&sl_led_led0);
+    }
+#endif
+  }
+}
+
+/**
  * @brief Handle long button press (>=5 seconds)
  *
- * Long press toggles network state:
- * - joined: leave network
- * - not joined: start join
+ * Long press triggers network join/rejoin:
+ * - If joined: leave network, then auto-rejoin
+ * - If not joined: start join immediately
  */
 static void handle_long_press(void)
 {
   EmberNetworkStatus network_state = emberAfNetworkState();
 
   if (network_state == EMBER_JOINED_NETWORK) {
-    emberAfCorePrintln("Long press: leaving network...");
+    emberAfCorePrintln("Long press: leaving and rejoining network...");
     app_intentional_leave_pending = true;
     button_short_press_pending = false;
     button_long_press_pending = false;
     button_pressed = false;
     button_press_start_tick = 0;
 
-    // Leave the network
+    // Leave the network — auto-rejoin is scheduled in NETWORK_DOWN handler
     EmberStatus leave_status = emberLeaveNetwork();
     if (leave_status == EMBER_SUCCESS) {
-      emberAfCorePrintln("Leave requested, waiting for network down");
+      emberAfCorePrintln("Leave requested, will auto-rejoin after network down");
     } else {
       app_intentional_leave_pending = false;
       emberAfCorePrintln("Failed to leave network: 0x%x", leave_status);
     }
   } else {
     emberAfCorePrintln("Long press: not joined, starting join");
-    handle_short_press();
+    start_network_join();
   }
 }
