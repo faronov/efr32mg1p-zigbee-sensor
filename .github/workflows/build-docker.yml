@@ -613,8 +613,8 @@ jobs:
 
   release:
     name: Upload artifacts to release
-    needs: [build-firmware, build-bootloader]
-    if: always() && needs.build-firmware.result == 'success' && needs.build-bootloader.result == 'success' && startsWith(github.ref, 'refs/tags/v')
+    needs: [build-firmware, build-firmware-profiles, build-bootloader]
+    if: always() && needs.build-firmware.result == 'success' && needs.build-firmware-profiles.result == 'success' && needs.build-bootloader.result == 'success' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -624,6 +624,13 @@ jobs:
         with:
           name: firmware-tradfri-${{ github.sha }}
           path: artifacts/firmware
+
+      - name: Download firmware profile artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-profile-*-${{ github.sha }}
+          path: artifacts/firmware_profiles
+          merge-multiple: true
 
       - name: Download bootloader artifacts
         uses: actions/download-artifact@v4
@@ -644,11 +651,17 @@ jobs:
           find artifacts/firmware -name "*.hex" -exec cp {} release/firmware/ \;
           find artifacts/firmware -name "*.s37" -exec cp {} release/firmware/ \;
           find artifacts/firmware -name "*.out" -exec cp {} release/firmware/ \;
+          find artifacts/firmware_profiles -name "*.hex" -exec cp {} release/firmware/ \; 2>/dev/null || true
+          find artifacts/firmware_profiles -name "*.s37" -exec cp {} release/firmware/ \; 2>/dev/null || true
+          find artifacts/firmware_profiles -name "*.out" -exec cp {} release/firmware/ \; 2>/dev/null || true
 
           # Copy OTA files
           find artifacts/firmware -name "*.gbl" -exec cp {} release/ota/ \; 2>/dev/null || true
           find artifacts/firmware -name "*.ota" -exec cp {} release/ota/ \; 2>/dev/null || true
           find artifacts/firmware -name "*.zigbee" -exec cp {} release/ota/ \; 2>/dev/null || true
+          find artifacts/firmware_profiles -name "*.gbl" -exec cp {} release/ota/ \; 2>/dev/null || true
+          find artifacts/firmware_profiles -name "*.ota" -exec cp {} release/ota/ \; 2>/dev/null || true
+          find artifacts/firmware_profiles -name "*.zigbee" -exec cp {} release/ota/ \; 2>/dev/null || true
 
           # Copy bootloader files
           find artifacts/bootloader -name "*.hex" -exec cp {} release/bootloader/ \;
@@ -656,10 +669,11 @@ jobs:
 
           # Create README for release
           cat > release/README.txt <<EOF
-          EFR32MG1P BME280 Zigbee Sensor - Release ${VERSION}
-          =====================================================
+          EFR32MG1P Zigbee Sensor - Release ${VERSION}
+          ============================================
 
           IKEA TRÅDFRI Board (EFR32MG1P132F256GM32)
+          Supported profiles: BME280, BMP280, SHT31
 
           Files:
           ------
@@ -678,7 +692,7 @@ jobs:
 
           # Create ZIP archive
           cd release
-          zip -r ../efr32mg1p-bme280-zigbee-sensor-v${VERSION}.zip .
+          zip -r ../efr32mg1p-zigbee-sensor-v${VERSION}.zip .
           cd ..
 
           ls -lh *.zip
@@ -687,7 +701,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            efr32mg1p-bme280-zigbee-sensor-*.zip
+            efr32mg1p-zigbee-sensor-*.zip
             release/firmware/*.hex
             release/firmware/*.s37
             release/bootloader/*.hex
@@ -697,7 +711,7 @@ jobs:
             release/ota/*.zigbee
           fail_on_unmatched_files: false
           body: |
-            ## EFR32MG1P BME280 Zigbee Sensor
+            ## EFR32MG1P Zigbee Sensor (TRÅDFRI)
 
             ### What's New
             See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
@@ -706,7 +720,10 @@ jobs:
 
             **First-time setup:**
             1. Flash the bootloader: `bootloader-storage-internal-single-*.s37`
-            2. Flash the application: `zigbee_bme280_sensor_tradfri*.s37`
+            2. Flash one profile firmware:
+               - `zigbee_sensor_tradfri_bme280.s37`
+               - `zigbee_sensor_tradfri_bmp280.s37`
+               - `zigbee_sensor_tradfri_sht31.s37`
 
             **OTA Updates:**
             - Use the `.gbl` file with Silicon Labs tools
@@ -714,7 +731,7 @@ jobs:
 
             ### Hardware
             - **Board**: IKEA TRÅDFRI (EFR32MG1P132F256GM32)
-            - **Sensor**: Bosch BME280 (I2C)
+            - **Sensors**: Bosch BME280 / Bosch BMP280 / Sensirion SHT31
             - **Flash**: IS25LQ020B 256KB SPI
 
             ### Features
